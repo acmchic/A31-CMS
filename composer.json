@@ -8,9 +8,11 @@
     "require": {
         "php": "^8.2",
         "backpack/crud": "^6.8",
+        "backpack/permissionmanager": "^7.2",
         "backpack/theme-tabler": "^1.2",
         "laravel/framework": "^12.0",
-        "laravel/tinker": "^2.10.1"
+        "laravel/tinker": "^2.10.1",
+        "nwidart/laravel-modules": "*"
     },
     "require-dev": {
         "backpack/generators": "^4.0",
@@ -62,6 +64,11 @@
     "extra": {
         "laravel": {
             "dont-discover": []
+        },
+        "merge-plugin": {
+            "include": [
+                "Modules/*/composer.json"
+            ]
         }
     },
     "config": {
@@ -70,7 +77,8 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true
+            "php-http/discovery": true,
+            "wikimedia/composer-merge-plugin": true
         }
     },
     "minimum-stability": "stable",

@@ -24,37 +24,44 @@ class DashboardController extends Controller
                     'status' => 'active'
                 ],
                 [
-                    'name' => 'Quản lý nội dung',
-                    'description' => 'Quản lý bài viết, trang nội dung',
-                    'icon' => 'la la-file-text',
-                    'url' => '#',
+                    'name' => 'Quản lý vai trò',
+                    'description' => 'Quản lý vai trò và phân quyền',
+                    'icon' => 'la la-user-shield',
+                    'url' => backpack_url('role'),
                     'status' => 'active'
                 ],
                 [
-                    'name' => 'Cài đặt hệ thống',
-                    'description' => 'Cấu hình và thiết lập hệ thống',
-                    'icon' => 'la la-cog',
-                    'url' => '#',
-                    'status' => 'development'
+                    'name' => 'Quản lý quyền',
+                    'description' => 'Quản lý quyền trong hệ thống',
+                    'icon' => 'la la-key',
+                    'url' => backpack_url('permission'),
+                    'status' => 'active'
                 ],
                 [
-                    'name' => 'Báo cáo thống kê',
-                    'description' => 'Xem báo cáo và thống kê hệ thống',
+                    'name' => 'Quản lý phòng ban',
+                    'description' => 'Quản lý cơ cấu phòng ban, phân xưởng',
+                    'icon' => 'la la-building',
+                    'url' => backpack_url('department'),
+                    'status' => 'active'
+                ],
+                [
+                    'name' => 'Quản lý nhân sự',
+                    'description' => 'Quản lý thông tin cán bộ, nhân viên',
+                    'icon' => 'la la-users',
+                    'url' => backpack_url('employee'),
+                    'status' => 'active'
+                ],
+                [
+                    'name' => 'Báo cáo quân số',
+                    'description' => 'Báo cáo và thống kê nhân sự',
                     'icon' => 'la la-chart-bar',
                     'url' => '#',
                     'status' => 'development'
                 ],
                 [
-                    'name' => 'Quản lý file',
-                    'description' => 'Upload và quản lý file, hình ảnh',
-                    'icon' => 'la la-folder',
-                    'url' => '#',
-                    'status' => 'development'
-                ],
-                [
-                    'name' => 'Logs hệ thống',
-                    'description' => 'Theo dõi logs và hoạt động hệ thống',
-                    'icon' => 'la la-list',
+                    'name' => 'Cài đặt hệ thống',
+                    'description' => 'Cấu hình và thiết lập hệ thống',
+                    'icon' => 'la la-cog',
                     'url' => '#',
                     'status' => 'development'
                 ]
