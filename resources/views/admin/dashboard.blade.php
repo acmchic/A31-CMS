@@ -4,14 +4,14 @@
 
 @section('content')
 <div class="container-fluid">
-    
+
     <!-- Military Hero Section -->
     <div class="hero-section">
         <div class="hero-content">
             <img src="{{ asset('assets/logo/logo.png') }}" alt="A31 CMS Logo" class="hero-logo">
-            <h1 class="hero-title">A31 CMS</h1>
-            <h2 class="hero-subtitle">HỆ THỐNG QUẢN LÝ NỘI DUNG</h2>
-            <h4 class="hero-description">TRUNG TÂM ĐIỀU HÀNH CMS</h4>
+             <h1 class="hero-title">QUÂN CHỦNG PHÒNG KHÔNG - KHÔNG QUÂN</h1>
+            <h2 class="hero-subtitle">NHÀ MÁY A31</h2>
+            <h4 class="hero-description">TRUNG TÂM CHỈ HUY ĐIỀU HÀNH SẢN XUẤT</h4>
         </div>
 
         <div class="hero-clock">
@@ -24,7 +24,7 @@
     <div class="row">
         @foreach($modules as $index => $module)
         <div class="col-lg-4 col-md-6 col-12 mb-4">
-            <div class="card military-module-card" 
+            <div class="card military-module-card"
                 @if($module['status'] === 'active')
                 onclick="window.location.href='{{ $module['url'] }}'"
                 @else
@@ -74,6 +74,10 @@
     }
 
     .hero-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
         position: relative;
         z-index: 2;
         text-align: center;
@@ -269,15 +273,15 @@
     function updateClock() {
         const now = new Date();
         const dateOptions = {
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
             day: 'numeric'
         };
         const timeOptions = {
-            hour: '2-digit', 
-            minute: '2-digit', 
-            second: '2-digit', 
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
             hour12: false
         };
 

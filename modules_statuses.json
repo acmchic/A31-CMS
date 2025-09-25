@@ -1,5 +1,6 @@
 {
     "Core": true,
     "UserManagement": true,
-    "OrganizationStructure": true
+    "OrganizationStructure": true,
+    "PersonnelReport": true
 }

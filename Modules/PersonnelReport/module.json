@@ -1,0 +1,11 @@
+{
+    "name": "PersonnelReport",
+    "alias": "personnelreport",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\PersonnelReport\\Providers\\PersonnelReportServiceProvider"
+    ],
+    "files": []
+}

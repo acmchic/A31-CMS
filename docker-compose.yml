@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_a31
+    restart: unless-stopped
+    ports:
+      - "3306:3306" # đổi port host nếu cần
+    environment:
+      MYSQL_ROOT_PASSWORD: A31Factory
+      MYSQL_DATABASE: a31_factory
+      MYSQL_USER: root
+      MYSQL_PASSWORD: A31Factory
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - sail
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-pA31Factory"]
+      retries: 3
+      timeout: 5s
+
+networks:
+  sail:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local

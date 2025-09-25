@@ -39,8 +39,6 @@ class EmployeeCrudController extends CrudController
 
         // Nếu không phải admin, chỉ thấy nhân sự trong department của mình
         if (!$user->hasRole('admin')) {
-            // Giả sử user có department_id trong bảng users
-            // Hoặc lấy từ employee record của user đó
             $userEmployee = Employee::where('user_id', $user->id)->first();
             if ($userEmployee) {
                 CRUD::addClause('where', 'department_id', $userEmployee->department_id);
@@ -131,8 +129,13 @@ class EmployeeCrudController extends CrudController
             ->type('date')
             ->tab('Thông tin cơ bản');
 
-        // Thông tin cá nhân
+        // Chuyển Ngày nhập ngũ sang tab Thông tin cơ bản
+        CRUD::field('enlist_date')
+            ->label('Ngày nhập ngũ')
+            ->type('date')
+            ->tab('Thông tin cơ bản');
 
+        // Thông tin cá nhân
         CRUD::field('phone')
             ->label('Số điện thoại')
             ->type('text')
@@ -153,30 +156,7 @@ class EmployeeCrudController extends CrudController
             ->allows_null(true)
             ->tab('Thông tin cá nhân');
 
-        // Thông tin quân sự
-        CRUD::field('enlist_date')
-            ->label('Ngày nhập ngũ')
-            ->type('date')
-            ->tab('Thông tin quân sự');
 
-        // Thông tin công việc
-        CRUD::field('start_date')
-            ->label('Ngày bắt đầu làm việc')
-            ->type('date')
-            ->tab('Thông tin công việc');
-
-        CRUD::field('quit_date')
-            ->label('Ngày nghỉ việc')
-            ->type('date')
-            ->tab('Thông tin công việc');
-
-        CRUD::field('is_active')
-            ->label('Đang làm việc')
-            ->type('boolean')
-            ->default(true)
-            ->tab('Thông tin công việc');
-
-        // Thông tin nghỉ phép
         CRUD::field('max_leave_allowed')
             ->label('Số ngày phép tối đa/năm')
             ->type('number')
@@ -221,29 +201,46 @@ class EmployeeCrudController extends CrudController
 
     protected function setupShowOperation()
     {
-        $this->setupListOperation();
+        CRUD::column('name')->label('Họ tên');
 
+        CRUD::column('department_name')
+            ->label('Phòng ban')
+            ->type('closure')
+            ->function(function($entry) {
+                return $entry->department ? $entry->department->name : 'Chưa có';
+            });
+
+        CRUD::column('position_name')
+            ->label('Chức vụ')
+            ->type('closure')
+            ->function(function($entry) {
+                return $entry->position ? $entry->position->name : 'Chưa có';
+            });
+
+        CRUD::column('rank_code')->label('Cấp bậc');
         CRUD::column('CCCD')->label('CCCD/CMND');
         CRUD::column('phone')->label('Điện thoại');
         CRUD::column('address')->label('Địa chỉ');
+
         CRUD::column('gender')->label('Giới tính')
             ->type('closure')
             ->function(function($entry) {
                 return $entry->gender === 1 ? 'Nam' : ($entry->gender === 0 ? 'Nữ' : 'Chưa xác định');
             });
-        CRUD::column('date_of_birth')->label('Ngày sinh')->type('date');
-        CRUD::column('enlist_date')->label('Ngày nhập ngũ')->type('date');
-        CRUD::column('start_date')->label('Ngày bắt đầu làm việc')->type('date');
-        CRUD::column('quit_date')->label('Ngày nghỉ việc')->type('date');
-        CRUD::column('max_leave_allowed')->label('Số ngày phép tối đa/năm');
-        CRUD::column('annual_leave_balance')->label('Số ngày phép còn lại');
-        CRUD::column('annual_leave_total')->label('Tổng số ngày phép/năm');
-        CRUD::column('annual_leave_used')->label('Số ngày phép đã dùng');
-        CRUD::column('delay_counter')->label('Số lần đi muộn');
-        CRUD::column('hourly_counter')->label('Số giờ làm thêm');
-        CRUD::column('is_active')->label('Trạng thái')->type('boolean');
-        CRUD::column('created_by')->label('Người tạo');
-        CRUD::column('updated_by')->label('Người cập nhật');
+
+        CRUD::column('date_of_birth')->label('Ngày sinh')
+            ->type('closure')
+            ->function(function($entry) {
+                return $entry->date_of_birth ? $entry->date_of_birth->format('d/m/Y') : '';
+            });
+
+        CRUD::column('enlist_date')->label('Ngày nhập ngũ')
+            ->type('closure')
+            ->function(function($entry) {
+                return $entry->enlist_date ? $entry->enlist_date->format('d/m/Y') : '';
+            });
+
+
     }
 
     public function store()

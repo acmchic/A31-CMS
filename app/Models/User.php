@@ -24,6 +24,7 @@ class User extends Authenticatable
         'email',
         'username',
         'password',
+        'department_id',
     ];
 
     /**
@@ -64,9 +65,21 @@ class User extends Authenticatable
         return $this->hasOne(\Modules\OrganizationStructure\Models\Employee::class, 'user_id');
     }
 
+    // Relationship with Department
+    public function department()
+    {
+        return $this->belongsTo(\Modules\OrganizationStructure\Models\Department::class, 'department_id');
+    }
+
     // Helper method to get user's department
     public function getDepartment()
     {
+        // First try to get from direct relationship
+        if ($this->department) {
+            return $this->department;
+        }
+        
+        // Fallback to employee's department
         return $this->employee ? $this->employee->department : null;
     }
 
@@ -77,6 +90,12 @@ class User extends Authenticatable
             return true;
         }
         
+        // Check direct department assignment first
+        if ($this->department_id == $departmentId) {
+            return true;
+        }
+        
+        // Fallback to employee's department
         $employee = $this->employee;
         return $employee && $employee->department_id == $departmentId;
     }
