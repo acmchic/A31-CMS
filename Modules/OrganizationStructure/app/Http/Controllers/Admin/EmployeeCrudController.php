@@ -28,6 +28,9 @@ class EmployeeCrudController extends CrudController
 
         // Apply department filtering based on user permissions
         $this->applyDepartmentFilter();
+        
+        // Setup buttons based on user role
+        $this->setupButtonsForRole();
     }
 
     /**
@@ -58,6 +61,21 @@ class EmployeeCrudController extends CrudController
         } else {
             // Nếu không có department_id, không hiển thị gì
             CRUD::addClause('where', 'id', 0);
+        }
+    }
+
+    /**
+     * Setup buttons based on user role
+     */
+    private function setupButtonsForRole()
+    {
+        $user = backpack_user();
+        
+        // For Nhân viên role - only view, no create/edit/delete
+        if ($user->hasRole('Nhân viên')) {
+            CRUD::removeButton('create');
+            CRUD::removeButton('edit');
+            CRUD::removeButton('delete');
         }
     }
 

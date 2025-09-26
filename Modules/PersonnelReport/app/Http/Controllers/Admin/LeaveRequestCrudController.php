@@ -36,30 +36,65 @@ class LeaveRequestCrudController extends CrudController
     {
         $user = backpack_user();
 
-        if (!$user->hasRole('admin')) {
-            // First try to get department from user's direct department_id
-            $departmentId = $user->department_id;
-            
-            // Fallback to employee's department if user doesn't have direct department
-            if (!$departmentId && $user->employee) {
-                $departmentId = $user->employee->department_id;
-            }
+        // Admin, BAN GIÁM ĐỐC, and Phê duyệt can see all leave requests
+        if ($user->hasRole('Admin') || $user->department_id == 1 || $user->hasRole('Phê duyệt')) {
+            return; // No filtering for admin, BAN GIÁM ĐỐC, and approver
+        }
 
-            if ($departmentId) {
-                $employeeIds = Employee::where('department_id', $departmentId)->pluck('id');
-                CRUD::addClause('whereIn', 'employee_id', $employeeIds);
-            } else {
-                CRUD::addClause('where', 'id', 0);
-            }
+        // Other users see only their department's leave requests
+        $departmentId = $user->department_id;
+        
+        // Fallback to employee's department if user doesn't have direct department
+        if (!$departmentId && $user->employee) {
+            $departmentId = $user->employee->department_id;
+        }
+
+        if ($departmentId) {
+            $employeeIds = Employee::where('department_id', $departmentId)->pluck('id');
+            CRUD::addClause('whereIn', 'employee_id', $employeeIds);
+        } else {
+            CRUD::addClause('where', 'id', 0);
         }
     }
 
-
-
+    /**
+     * Setup buttons based on user role
+     */
+    private function setupButtonsForRole()
+    {
+        $user = backpack_user();
+        
+        if ($user->hasRole('Phê duyệt')) {
+            // For approver role, hide create/edit/delete buttons
+            CRUD::removeButton('create');
+            CRUD::removeButton('edit');
+            CRUD::removeButton('delete');
+            
+            // Add custom approval buttons
+            CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
+            CRUD::addButtonFromModelFunction('line', 'reject', 'rejectButton', 'beginning');
+        }
+        
+        // For Admin and BAN GIÁM ĐỐC - add approval and download buttons
+        if ($user->hasRole('Admin') || $user->department_id == 1) {
+            CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
+            CRUD::addButtonFromModelFunction('line', 'download_pdf', 'downloadPdfButton', 'beginning');
+        }
+        
+        // For Nhân viên role - only view, no create/edit/delete
+        if ($user->hasRole('Nhân viên')) {
+            CRUD::removeButton('create');
+            CRUD::removeButton('edit');
+            CRUD::removeButton('delete');
+        }
+    }
 
     protected function setupListOperation()
     {
         CRUD::column('id')->label('ID');
+        
+        // Setup buttons based on user role
+        $this->setupButtonsForRole();
 
         CRUD::column('employee_name')
             ->label('Nhân viên')
@@ -340,5 +375,220 @@ class LeaveRequestCrudController extends CrudController
         $this->crud->unsetValidation(); // validation has already been run
 
         return $this->traitUpdate();
+    }
+
+    /**
+     * Approve leave request (for both approver and director roles)
+     */
+    public function approve($id)
+    {
+        $user = backpack_user();
+        
+        // Check if user has approval permission
+        if (!$user->hasRole('Phê duyệt') && !$user->hasRole('Admin') && $user->department_id != 1) {
+            abort(403, 'Bạn không có quyền phê duyệt');
+        }
+        
+        $leaveRequest = EmployeeLeave::findOrFail($id);
+        
+        // Phê duyệt cấp 1 (Phê duyệt role)
+        if ($user->hasRole('Phê duyệt') && $leaveRequest->workflow_status === EmployeeLeave::WORKFLOW_PENDING) {
+            $leaveRequest->update([
+                'workflow_status' => EmployeeLeave::WORKFLOW_APPROVED_BY_APPROVER,
+                'approved_by_approver' => $user->id,
+                'approved_at_approver' => now(),
+                'approver_comment' => request('comment', 'Đã phê duyệt cấp 1'),
+            ]);
+            
+            return redirect()->back()->with('success', 'Đã phê duyệt cấp 1. Đơn xin nghỉ phép chờ phê duyệt cấp 2.');
+        }
+        
+        // Phê duyệt cấp 2 (Admin hoặc BAN GIÁM ĐỐC)
+        if (($user->hasRole('Admin') || $user->department_id == 1) && $leaveRequest->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_APPROVER) {
+            // Tạo chữ ký số và PDF
+            $signedPdfPath = $this->generateSignedPdf($leaveRequest, $user);
+            
+            $leaveRequest->update([
+                'workflow_status' => EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR,
+                'status' => EmployeeLeave::STATUS_APPROVED,
+                'approved_by_director' => $user->id,
+                'approved_at_director' => now(),
+                'director_comment' => request('comment', 'Đã phê duyệt hoàn tất'),
+                'signed_pdf_path' => $signedPdfPath,
+            ]);
+            
+            return redirect()->back()->with('success', 'Đã phê duyệt hoàn tất. PDF đã được ký số và lưu trữ.');
+        }
+        
+        return redirect()->back()->with('error', 'Đơn xin nghỉ phép này không thể phê duyệt ở trạng thái hiện tại');
+    }
+
+    /**
+     * Reject leave request (for approver role)
+     */
+    public function reject($id)
+    {
+        $user = backpack_user();
+        
+        // Check if user has approval permission
+        if (!$user->hasRole('Phê duyệt')) {
+            abort(403, 'Bạn không có quyền từ chối');
+        }
+        
+        $leaveRequest = EmployeeLeave::findOrFail($id);
+        
+        // Check if request is in pending status
+        if ($leaveRequest->workflow_status !== EmployeeLeave::WORKFLOW_PENDING) {
+            return redirect()->back()->with('error', 'Đơn xin nghỉ phép này đã được xử lý');
+        }
+        
+        // Update workflow status
+        $leaveRequest->update([
+            'workflow_status' => EmployeeLeave::WORKFLOW_REJECTED,
+            'status' => EmployeeLeave::STATUS_REJECTED,
+            'approved_by_approver' => $user->id,
+            'approved_at_approver' => now(),
+            'approver_comment' => request('comment', 'Đã từ chối'),
+        ]);
+        
+        return redirect()->back()->with('success', 'Đã từ chối đơn xin nghỉ phép');
+    }
+
+    /**
+     * Generate signed PDF for leave request
+     */
+    private function generateSignedPdf($leaveRequest, $user)
+    {
+        try {
+            // Tạo PDF template
+            $pdf = new \TCPDF();
+            $pdf->SetCreator('A31 Factory CMS');
+            $pdf->SetAuthor($user->name);
+            $pdf->SetTitle('Đơn xin nghỉ phép - ' . $leaveRequest->employee->name);
+            $pdf->SetSubject('Leave Request Approval');
+            
+            $pdf->AddPage();
+            
+            // Nội dung PDF
+            $html = $this->generatePdfContent($leaveRequest, $user);
+            $pdf->writeHTML($html, true, false, true, false, '');
+            
+            // Tạo file path
+            $filename = 'leave_request_' . $leaveRequest->id . '_' . time() . '.pdf';
+            $filePath = storage_path('app/public/signed_pdfs/' . $filename);
+            
+            // Tạo thư mục nếu chưa có
+            if (!file_exists(dirname($filePath))) {
+                mkdir(dirname($filePath), 0755, true);
+            }
+            
+            // Lưu PDF
+            $pdf->Output($filePath, 'F');
+            
+            return 'signed_pdfs/' . $filename;
+            
+        } catch (\Exception $e) {
+            \Log::error('PDF generation failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Generate PDF content
+     */
+    private function generatePdfContent($leaveRequest, $user)
+    {
+        $employee = $leaveRequest->employee;
+        $department = $employee->department;
+        
+        $html = '
+        <h1 style="text-align: center; color: #333;">ĐƠN XIN NGHỈ PHÉP</h1>
+        <br><br>
+        
+        <table border="1" cellpadding="10" style="width: 100%; border-collapse: collapse;">
+            <tr>
+                <td style="background-color: #f5f5f5; font-weight: bold;">Họ và tên:</td>
+                <td>' . $employee->name . '</td>
+            </tr>
+            <tr>
+                <td style="background-color: #f5f5f5; font-weight: bold;">Phòng ban:</td>
+                <td>' . ($department ? $department->name : 'N/A') . '</td>
+            </tr>
+            <tr>
+                <td style="background-color: #f5f5f5; font-weight: bold;">Loại nghỉ phép:</td>
+                <td>' . $leaveRequest->leave_type_text . '</td>
+            </tr>
+            <tr>
+                <td style="background-color: #f5f5f5; font-weight: bold;">Từ ngày:</td>
+                <td>' . $leaveRequest->from_date->format('d/m/Y') . '</td>
+            </tr>
+            <tr>
+                <td style="background-color: #f5f5f5; font-weight: bold;">Đến ngày:</td>
+                <td>' . $leaveRequest->to_date->format('d/m/Y') . '</td>
+            </tr>
+            <tr>
+                <td style="background-color: #f5f5f5; font-weight: bold;">Địa điểm:</td>
+                <td>' . ($leaveRequest->location ?: 'N/A') . '</td>
+            </tr>
+            <tr>
+                <td style="background-color: #f5f5f5; font-weight: bold;">Lý do:</td>
+                <td>' . ($leaveRequest->note ?: 'N/A') . '</td>
+            </tr>
+        </table>
+        
+        <br><br>
+        
+        <h3>QUY TRÌNH PHÊ DUYỆT</h3>
+        <table border="1" cellpadding="10" style="width: 100%; border-collapse: collapse;">
+            <tr>
+                <td style="background-color: #f5f5f5; font-weight: bold;">Phê duyệt cấp 1:</td>
+                <td>' . ($leaveRequest->approverUser ? $leaveRequest->approverUser->name : 'Chưa phê duyệt') . '</td>
+                <td>' . ($leaveRequest->approved_at_approver ? $leaveRequest->approved_at_approver->format('d/m/Y H:i') : '') . '</td>
+            </tr>
+            <tr>
+                <td style="background-color: #f5f5f5; font-weight: bold;">Phê duyệt cấp 2:</td>
+                <td>' . $user->name . '</td>
+                <td>' . now()->format('d/m/Y H:i') . '</td>
+            </tr>
+        </table>
+        
+        <br><br>
+        
+        <div style="text-align: right;">
+            <p><strong>Người phê duyệt cấp 2:</strong></p>
+            <br><br>
+            <p>' . $user->name . '</p>
+        </div>
+        
+        <div style="position: absolute; bottom: 50px; right: 50px; text-align: center;">
+            <div style="border: 1px solid #ccc; padding: 10px; width: 150px;">
+                <p style="font-size: 10px; margin: 0;">Chữ ký số</p>
+                <div style="height: 40px; background-color: #f0f0f0; border: 1px dashed #999;"></div>
+                <p style="font-size: 8px; margin: 5px 0 0 0;">' . now()->format('d/m/Y H:i:s') . '</p>
+            </div>
+        </div>
+        ';
+        
+        return $html;
+    }
+
+    /**
+     * Download signed PDF
+     */
+    public function downloadPdf($id)
+    {
+        $leaveRequest = EmployeeLeave::findOrFail($id);
+        
+        if (!$leaveRequest->signed_pdf_path) {
+            abort(404, 'PDF chưa được tạo');
+        }
+        
+        $filePath = storage_path('app/public/' . $leaveRequest->signed_pdf_path);
+        
+        if (!file_exists($filePath)) {
+            abort(404, 'File PDF không tồn tại');
+        }
+        
+        return response()->download($filePath, 'don_xin_nghi_phep_' . $leaveRequest->id . '.pdf');
     }
 }

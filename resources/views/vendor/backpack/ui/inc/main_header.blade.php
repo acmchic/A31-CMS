@@ -10,6 +10,6 @@
 
     <!-- Right navbar links -->
     <ul class="navbar-nav ml-auto">
-        @include('backpack::inc.header_right')
+        @include('vendor.backpack.ui.inc.header_right')
     </ul>
 </nav>

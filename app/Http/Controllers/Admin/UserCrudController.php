@@ -2,76 +2,148 @@
 
 namespace App\Http\Controllers\Admin;
 
-use Backpack\PermissionManager\app\Http\Controllers\UserCrudController as BaseUserCrudController;
-use Modules\OrganizationStructure\Models\Department;
+use Backpack\CRUD\app\Http\Controllers\CrudController;
+use Backpack\PermissionManager\app\Http\Requests\UserStoreCrudRequest as StoreRequest;
+use Backpack\PermissionManager\app\Http\Requests\UserUpdateCrudRequest as UpdateRequest;
+use Illuminate\Support\Facades\Hash;
 
-class UserCrudController extends BaseUserCrudController
+class UserCrudController extends CrudController
 {
+    use \Backpack\CRUD\app\Http\Controllers\Operations\ListOperation;
+    use \Backpack\CRUD\app\Http\Controllers\Operations\CreateOperation { store as traitStore; }
+    use \Backpack\CRUD\app\Http\Controllers\Operations\UpdateOperation { update as traitUpdate; }
+    use \Backpack\CRUD\app\Http\Controllers\Operations\DeleteOperation;
+    use \Backpack\CRUD\app\Http\Controllers\Operations\ShowOperation;
+
     public function setup()
     {
-        parent::setup();
-        
-        // Check if user has Admin role
-        if (!backpack_user()->hasRole('Admin')) {
-            abort(403, 'Bạn không có quyền truy cập chức năng này.');
-        }
+        $this->crud->setModel(config('backpack.permissionmanager.models.user'));
+        $this->crud->setEntityNameStrings(trans('backpack::permissionmanager.user'), trans('backpack::permissionmanager.users'));
+        $this->crud->setRoute(backpack_url('user'));
     }
+
 
     public function setupListOperation()
     {
-        parent::setupListOperation();
-        
-        // Add department column
-        $this->crud->addColumn([
-            'name'  => 'department_name',
-            'label' => 'Phòng ban',
-            'type'  => 'closure',
-            'function' => function($entry) {
-                return $entry->department ? $entry->department->name : 'N/A';
-            },
+        $this->crud->addColumns([
+            [
+                'name'  => 'name',
+                'label' => trans('backpack::permissionmanager.name'),
+                'type'  => 'text',
+            ],
+            [
+                'name'  => 'email',
+                'label' => trans('backpack::permissionmanager.email'),
+                'type'  => 'email',
+            ],
+            [ // n-n relationship (with pivot table)
+                'label'     => trans('backpack::permissionmanager.roles'), // Table column heading
+                'type'      => 'select_multiple',
+                'name'      => 'roles', // the method that defines the relationship in your Model
+                'entity'    => 'roles', // the method that defines the relationship in your Model
+                'attribute' => 'name', // foreign key attribute that is shown to user
+                'model'     => config('permission.models.role'), // foreign key model
+            ],
+            [ // n-n relationship (with pivot table)
+                'label'     => trans('backpack::permissionmanager.extra_permissions'), // Table column heading
+                'type'      => 'select_multiple',
+                'name'      => 'permissions', // the method that defines the relationship in your Model
+                'entity'    => 'permissions', // the method that defines the relationship in your Model
+                'attribute' => 'name', // foreign key attribute that is shown to user
+                'model'     => config('permission.models.permission'), // foreign key model
+            ],
         ]);
+
+        // Xử lý filter role từ URL parameter
+        if (request()->has('role') && request()->get('role')) {
+            $roleId = request()->get('role');
+            $this->crud->addClause('whereHas', 'roles', function ($query) use ($roleId) {
+                $query->where('role_id', '=', $roleId);
+            });
+        }
+
+        // Xử lý filter permissions từ URL parameter
+        if (request()->has('permissions') && request()->get('permissions')) {
+            $permissionId = request()->get('permissions');
+            $this->crud->addClause('whereHas', 'permissions', function ($query) use ($permissionId) {
+                $query->where('permission_id', '=', $permissionId);
+            });
+        }
     }
 
     public function setupCreateOperation()
     {
-        parent::setupCreateOperation();
-        $this->addDepartmentField();
+        $this->addUserFields();
+        $this->crud->setValidation(StoreRequest::class);
     }
 
     public function setupUpdateOperation()
     {
-        parent::setupUpdateOperation();
-        $this->addDepartmentField();
+        $this->addUserFields();
+        $this->crud->setValidation(UpdateRequest::class);
     }
 
-    public function setupShowOperation()
+    private function addUserFields()
     {
-        parent::setupShowOperation();
-        
-        // Add department column to show
-        $this->crud->addColumn([
-            'name'  => 'department_name',
-            'label' => 'Phòng ban',
-            'type'  => 'closure',
-            'function' => function($entry) {
-                return $entry->department ? $entry->department->name : 'N/A';
-            },
+        $this->crud->addFields([
+            [
+                'name'  => 'name',
+                'label' => trans('backpack::permissionmanager.name'),
+                'type'  => 'text',
+            ],
+            [
+                'name'  => 'email',
+                'label' => trans('backpack::permissionmanager.email'),
+                'type'  => 'email',
+            ],
+            [
+                'name'  => 'password',
+                'label' => trans('backpack::permissionmanager.password'),
+                'type'  => 'password',
+            ],
+            [
+                'name'  => 'password_confirmation',
+                'label' => trans('backpack::permissionmanager.password_confirmation'),
+                'type'  => 'password',
+            ],
+            [ // n-n relationship (with pivot table)
+                'label'     => trans('backpack::permissionmanager.roles'), // Table column heading
+                'type'      => 'checklist',
+                'name'      => 'roles', // the method that defines the relationship in your Model
+                'entity'    => 'roles', // the method that defines the relationship in your Model
+                'attribute' => 'name', // foreign key attribute that is shown to user
+                'model'     => config('permission.models.role'), // foreign key model
+                'pivot'     => true, // on create&update, do you need to add/delete pivot table entries?
+            ],
+            [ // n-n relationship (with pivot table)
+                'label'     => trans('backpack::permissionmanager.extra_permissions'), // Table column heading
+                'type'      => 'checklist',
+                'name'      => 'permissions', // the method that defines the relationship in your Model
+                'entity'    => 'permissions', // the method that defines the relationship in your Model
+                'attribute' => 'name', // foreign key attribute that is shown to user
+                'model'     => config('permission.models.permission'), // foreign key model
+                'pivot'     => true, // on create&update, do you need to add/delete pivot table entries?
+            ],
         ]);
     }
 
-    protected function addDepartmentField()
+    public function store()
     {
-        // Get all departments for dropdown
-        $departments = Department::all()->pluck('name', 'id')->toArray();
-        
-        // Add department field
-        $this->crud->addField([
-            'name'  => 'department_id',
-            'label' => 'Phòng ban',
-            'type'  => 'select_from_array',
-            'options' => $departments,
-            'allows_null' => true,
-            'tab' => 'Thông tin cơ bản',
-        ]);
+        $this->crud->setRequest($this->crud->validateRequest());
+        $this->crud->unsetValidation(); // We have already validated
+
+        $this->crud->setRequest($this->crud->handlePasswordInput($this->crud->getRequest()));
+
+        return $this->traitStore();
+    }
+
+    public function update()
+    {
+        $this->crud->setRequest($this->crud->validateRequest());
+        $this->crud->unsetValidation(); // We have already validated
+
+        $this->crud->setRequest($this->crud->handlePasswordInput($this->crud->getRequest()));
+
+        return $this->traitUpdate();
     }
 }

@@ -24,4 +24,9 @@ Route::group([
 ], function () {
     Route::crud('leave-request', LeaveRequestCrudController::class);
     Route::crud('daily-personnel-report', DailyPersonnelReportCrudController::class);
+    
+    // Approval routes
+    Route::get('leave-request/{id}/approve', [LeaveRequestCrudController::class, 'approve'])->name('leave-request.approve');
+    Route::get('leave-request/{id}/reject', [LeaveRequestCrudController::class, 'reject'])->name('leave-request.reject');
+    Route::get('leave-request/{id}/download-pdf', [LeaveRequestCrudController::class, 'downloadPdf'])->name('leave-request.download-pdf');
 });

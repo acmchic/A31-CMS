@@ -25,6 +25,9 @@ class DailyPersonnelReportCrudController extends CrudController
 
         // Apply department filtering based on user permissions
         $this->applyDepartmentFilter();
+        
+        // Setup buttons based on user role
+        $this->setupButtonsForRole();
     }
 
     /**
@@ -52,6 +55,21 @@ class DailyPersonnelReportCrudController extends CrudController
         } else {
             // If user has no department, show no reports
             CRUD::addClause('where', 'id', 0);
+        }
+    }
+
+    /**
+     * Setup buttons based on user role
+     */
+    private function setupButtonsForRole()
+    {
+        $user = backpack_user();
+        
+        // For Nhân viên role - only view, no create/edit/delete
+        if ($user->hasRole('Nhân viên')) {
+            CRUD::removeButton('create');
+            CRUD::removeButton('edit');
+            CRUD::removeButton('delete');
         }
     }
 

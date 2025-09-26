@@ -36,6 +36,14 @@ class EmployeeLeave extends Model
         'reviewed_at',
         'is_authorized',
         'is_checked',
+        'approved_by_approver',
+        'approved_at_approver',
+        'approver_comment',
+        'approver_signature_path',
+        'approved_by_director',
+        'approved_at_director',
+        'director_comment',
+        'director_signature_path',
         'created_by',
         'updated_by',
         'deleted_by'
@@ -69,8 +77,8 @@ class EmployeeLeave extends Model
 
     // Workflow status constants
     const WORKFLOW_PENDING = 'pending';
-    const WORKFLOW_IN_REVIEW = 'in_review';
-    const WORKFLOW_APPROVED = 'approved';
+    const WORKFLOW_APPROVED_BY_APPROVER = 'approved_by_approver';
+    const WORKFLOW_APPROVED_BY_DIRECTOR = 'approved_by_director';
     const WORKFLOW_REJECTED = 'rejected';
 
     // Relationships
@@ -92,6 +100,16 @@ class EmployeeLeave extends Model
     public function reviewer()
     {
         return $this->belongsTo(\App\Models\User::class, 'reviewer_id');
+    }
+
+    public function approverUser()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'approved_by_approver');
+    }
+
+    public function directorUser()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'approved_by_director');
     }
 
     // Scopes
@@ -132,9 +150,9 @@ class EmployeeLeave extends Model
     public function getWorkflowStatusTextAttribute()
     {
         $statuses = [
-            self::WORKFLOW_PENDING => 'Chờ xử lý',
-            self::WORKFLOW_IN_REVIEW => 'Đang xem xét',
-            self::WORKFLOW_APPROVED => 'Đã phê duyệt',
+            self::WORKFLOW_PENDING => 'Chờ phê duyệt',
+            self::WORKFLOW_APPROVED_BY_APPROVER => 'Đã phê duyệt cấp 1',
+            self::WORKFLOW_APPROVED_BY_DIRECTOR => 'Đã phê duyệt hoàn tất',
             self::WORKFLOW_REJECTED => 'Đã từ chối'
         ];
         return $statuses[$this->workflow_status] ?? 'Không xác định';
@@ -193,5 +211,74 @@ class EmployeeLeave extends Model
     public function getLocationAttribute()
     {
         return 'N/A'; // This field doesn't exist in employee_leave table
+    }
+
+    /**
+     * Get approve button HTML
+     */
+    public function approveButton()
+    {
+        $user = backpack_user();
+        
+        if (!$user) {
+            return '';
+        }
+        
+        // Phê duyệt cấp 1 (Phê duyệt role)
+        if ($user->hasRole('Phê duyệt') && $this->workflow_status === self::WORKFLOW_PENDING) {
+            return '<a class="btn btn-sm btn-success" href="' . backpack_url('leave-request/' . $this->id . '/approve') . '" title="Phê duyệt cấp 1" onclick="return confirm(\'Bạn có chắc chắn muốn phê duyệt cấp 1?\')">
+                        <i class="la la-check"></i> Phê duyệt
+                    </a>';
+        }
+        
+        // Phê duyệt cấp 2 (Admin hoặc BAN GIÁM ĐỐC)
+        if (($user->hasRole('Admin') || $user->department_id == 1) && $this->workflow_status === self::WORKFLOW_APPROVED_BY_APPROVER) {
+            return '<a class="btn btn-sm btn-success" href="' . backpack_url('leave-request/' . $this->id . '/approve') . '" title="Phê duyệt cấp 2" onclick="return confirm(\'Bạn có chắc chắn muốn phê duyệt hoàn tất?\')">
+                        <i class="la la-check"></i> Phê duyệt cấp 2
+                    </a>';
+        }
+        
+        return '';
+    }
+
+    /**
+     * Get reject button HTML
+     */
+    public function rejectButton()
+    {
+        $user = backpack_user();
+        
+        if (!$user) {
+            return '';
+        }
+        
+        // Chỉ có thể từ chối ở trạng thái pending
+        if ($user->hasRole('Phê duyệt') && $this->workflow_status === self::WORKFLOW_PENDING) {
+            return '<a class="btn btn-sm btn-danger" href="' . backpack_url('leave-request/' . $this->id . '/reject') . '" title="Từ chối" onclick="return confirm(\'Bạn có chắc chắn muốn từ chối đơn xin nghỉ phép này?\')">
+                        <i class="la la-times"></i> Từ chối
+                    </a>';
+        }
+        
+        return '';
+    }
+
+    /**
+     * Get download PDF button HTML
+     */
+    public function downloadPdfButton()
+    {
+        $user = backpack_user();
+        
+        if (!$user) {
+            return '';
+        }
+        
+        if ($this->workflow_status === self::WORKFLOW_APPROVED_BY_DIRECTOR && $this->signed_pdf_path) {
+            return '<a class="btn btn-sm btn-info" href="' . backpack_url('leave-request/' . $this->id . '/download-pdf') . '" title="Tải PDF đã ký số" target="_blank">
+                        <i class="la la-download"></i> Tải PDF
+                    </a>';
+        }
+        
+        return '';
     }
 }

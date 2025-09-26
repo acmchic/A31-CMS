@@ -25,6 +25,8 @@ class User extends Authenticatable
         'username',
         'password',
         'department_id',
+        'profile_photo_path',
+        'signature_path',
     ];
 
     /**
@@ -98,5 +100,27 @@ class User extends Authenticatable
         // Fallback to employee's department
         $employee = $this->employee;
         return $employee && $employee->department_id == $departmentId;
+    }
+
+    /**
+     * Get the profile photo URL
+     */
+    public function getProfilePhotoUrlAttribute()
+    {
+        if ($this->profile_photo_path) {
+            return \Storage::url($this->profile_photo_path);
+        }
+        return null;
+    }
+
+    /**
+     * Get the signature URL
+     */
+    public function getSignatureUrlAttribute()
+    {
+        if ($this->signature_path) {
+            return \Storage::url($this->signature_path);
+        }
+        return null;
     }
 }
