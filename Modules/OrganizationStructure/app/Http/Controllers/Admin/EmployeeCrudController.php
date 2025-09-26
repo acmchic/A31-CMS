@@ -26,8 +26,8 @@ class EmployeeCrudController extends CrudController
         // Order by id ASC
         CRUD::orderBy('id', 'ASC');
 
-        // PHÂN QUYỀN THEO DEPARTMENT (tạm tắt để debug)
-        // $this->applyDepartmentFilter();
+        // Apply department filtering based on user permissions
+        $this->applyDepartmentFilter();
     }
 
     /**
@@ -37,21 +37,32 @@ class EmployeeCrudController extends CrudController
     {
         $user = backpack_user();
 
-        // Nếu không phải admin, chỉ thấy nhân sự trong department của mình
-        if (!$user->hasRole('admin')) {
+        // Admin và BAN GIÁM ĐỐC có thể xem tất cả
+        if ($user->hasRole('Admin') || $user->department_id == 1) {
+            return; // No filtering for admin and BAN GIÁM ĐỐC
+        }
+
+        // Lấy department_id từ user
+        $departmentId = $user->department_id;
+
+        // Fallback: nếu user không có department_id, thử lấy từ employee record
+        if (!$departmentId) {
             $userEmployee = Employee::where('user_id', $user->id)->first();
             if ($userEmployee) {
-                CRUD::addClause('where', 'department_id', $userEmployee->department_id);
-            } else {
-                // Nếu user không có employee record, không show gì
-                CRUD::addClause('where', 'id', 0);
+                $departmentId = $userEmployee->department_id;
             }
+        }
+
+        if ($departmentId) {
+            CRUD::addClause('where', 'department_id', $departmentId);
+        } else {
+            // Nếu không có department_id, không hiển thị gì
+            CRUD::addClause('where', 'id', 0);
         }
     }
 
     protected function setupListOperation()
     {
-        CRUD::column('id')->label('ID');
         CRUD::column('name')->label('Họ tên');
 
         CRUD::column('department_name')
@@ -225,7 +236,7 @@ class EmployeeCrudController extends CrudController
         CRUD::column('gender')->label('Giới tính')
             ->type('closure')
             ->function(function($entry) {
-                return $entry->gender === 1 ? 'Nam' : ($entry->gender === 0 ? 'Nữ' : 'Chưa xác định');
+                return $entry->gender === 1 ? 'Nam' : ($entry->gender === 0 ? 'Nữ' : '-');
             });
 
         CRUD::column('date_of_birth')->label('Ngày sinh')

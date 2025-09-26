@@ -22,6 +22,32 @@ class DepartmentCrudController extends CrudController
         
         // Order by id ASC
         CRUD::orderBy('id', 'ASC');
+        
+        // Apply department filtering based on user permissions
+        $this->applyDepartmentFilter();
+    }
+
+    /**
+     * Apply department filtering based on user permissions
+     */
+    private function applyDepartmentFilter()
+    {
+        $user = backpack_user();
+        
+        // Admin và BAN GIÁM ĐỐC có thể xem tất cả
+        if ($user->hasRole('Admin') || $user->department_id == 1) {
+            return; // No filtering for admin and BAN GIÁM ĐỐC
+        }
+        
+        // Lấy department_id từ user
+        $departmentId = $user->department_id;
+        
+        if ($departmentId) {
+            CRUD::addClause('where', 'id', $departmentId);
+        } else {
+            // Nếu không có department_id, không hiển thị gì
+            CRUD::addClause('where', 'id', 0);
+        }
     }
 
     protected function setupListOperation()

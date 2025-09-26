@@ -107,8 +107,16 @@ class DailyPersonnelReport extends Model
         $otherLeaveCount = $leaveRequests->where('leave_type', EmployeeLeave::TYPE_OTHER)->count();
 
         $onLeaveCount = $leaveRequests->count();
-        $presentCount = $totalEmployees - $onLeaveCount;
-        $absentCount = 0; // This would need to be tracked separately
+        
+        // Fix logic: present_count should not exceed total_employees
+        // If on_leave_count > total_employees, set present_count to 0
+        if ($onLeaveCount >= $totalEmployees) {
+            $presentCount = 0;
+            $absentCount = 0;
+        } else {
+            $presentCount = $totalEmployees - $onLeaveCount;
+            $absentCount = 0; // This would need to be tracked separately
+        }
 
         return self::create([
             'department_id' => $departmentId,

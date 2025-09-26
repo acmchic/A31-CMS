@@ -29,9 +29,11 @@
             Cơ cấu tổ chức
         </a>
         <div class="dropdown-menu">
+            @if(backpack_user()->hasRole('Admin') || backpack_user()->department_id == 1)
             <a class="dropdown-item" href="{{ backpack_url('department') }}">
                 <i class="la la-building"></i> Phòng ban
             </a>
+            @endif
             <a class="dropdown-item" href="{{ backpack_url('employee') }}">
                 <i class="la la-users"></i> Nhân sự
             </a>

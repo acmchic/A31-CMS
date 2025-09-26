@@ -20,7 +20,7 @@ class DailyPersonnelReportCrudController extends CrudController
         CRUD::setModel(DailyPersonnelReport::class);
         CRUD::setRoute(config('backpack.base.route_prefix') . '/daily-personnel-report');
         CRUD::setEntityNameStrings('báo cáo quân số', 'báo cáo quân số');
-        
+
         CRUD::orderBy('report_date', 'DESC');
 
         // Apply department filtering based on user permissions
@@ -33,20 +33,20 @@ class DailyPersonnelReportCrudController extends CrudController
     private function applyDepartmentFilter()
     {
         $user = backpack_user();
-        
+
         // Admin and BAN GIÁM ĐỐC can see all data
         if ($user->hasRole('admin') || $user->department_id == 1) {
             return; // No filtering for admin and BAN GIÁM ĐỐC
         }
-        
+
         // First try to get department from user's direct department_id
         $departmentId = $user->department_id;
-        
+
         // Fallback to employee's department if user doesn't have direct department
         if (!$departmentId && $user->employee) {
             $departmentId = $user->employee->department_id;
         }
-        
+
         if ($departmentId) {
             CRUD::addClause('where', 'department_id', $departmentId);
         } else {
@@ -84,12 +84,6 @@ class DailyPersonnelReportCrudController extends CrudController
             ->label('Vắng mặt')
             ->type('number');
 
-        CRUD::column('attendance_rate')
-            ->label('Tỷ lệ có mặt')
-            ->type('closure')
-            ->function(function($entry) {
-                return $entry->attendance_rate . '%';
-            });
 
         // Note: Filters removed to avoid Backpack PRO requirement
         // You can add custom filtering logic in the controller if needed
@@ -110,12 +104,12 @@ class DailyPersonnelReportCrudController extends CrudController
         } else {
             // First try to get department from user's direct department_id
             $departmentId = $user->department_id;
-            
+
             // Fallback to employee's department if user doesn't have direct department
             if (!$departmentId && $user->employee) {
                 $departmentId = $user->employee->department_id;
             }
-            
+
             if ($departmentId) {
                 $department = Department::find($departmentId);
                 if ($department) {
@@ -164,7 +158,7 @@ class DailyPersonnelReportCrudController extends CrudController
             ->tab('Chi tiết nghỉ phép');
 
         CRUD::field('annual_leave_count')
-            ->label('Có Đồng')
+            ->label('Cơ Động')
             ->type('number')
             ->tab('Chi tiết nghỉ phép');
 
@@ -192,9 +186,9 @@ class DailyPersonnelReportCrudController extends CrudController
     protected function setupShowOperation()
     {
         $this->setupListOperation();
-        
+
         CRUD::column('sick_count')->label('Công tác');
-        CRUD::column('annual_leave_count')->label('Có Đồng');
+        CRUD::column('annual_leave_count')->label('Cơ Động');
         CRUD::column('personal_leave_count')->label('Đi học');
         CRUD::column('military_leave_count')->label('Nghỉ phép');
         CRUD::column('other_leave_count')->label('Khác');
@@ -205,44 +199,44 @@ class DailyPersonnelReportCrudController extends CrudController
     public function store()
     {
         $this->crud->setRequest($this->crud->validateRequest());
-        
+
         $user = backpack_user();
         $request = $this->crud->getRequest();
-        
+
         // Auto-generate report data
         $departmentId = $request->input('department_id');
         $reportDate = $request->input('report_date');
-        
+
         // Generate the report data automatically
         $reportData = DailyPersonnelReport::generateReport($departmentId, $reportDate);
-        
+
         if ($reportData) {
             $request->merge($reportData->toArray());
         }
-        
+
         $request->merge([
             'created_by' => $user->name ?: $user->username,
             'updated_by' => $user->name ?: $user->username
         ]);
-        
+
         $this->crud->setRequest($request);
         $this->crud->unsetValidation(); // validation has already been run
-        
+
         return $this->traitStore();
     }
 
     public function update()
     {
         $this->crud->setRequest($this->crud->validateRequest());
-        
+
         $user = backpack_user();
         $request = $this->crud->getRequest();
-        
+
         $request->merge(['updated_by' => $user->name ?: $user->username]);
-        
+
         $this->crud->setRequest($request);
         $this->crud->unsetValidation(); // validation has already been run
-        
+
         return $this->traitUpdate();
     }
 }
