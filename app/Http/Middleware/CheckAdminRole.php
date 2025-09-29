@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use App\Helpers\PermissionHelper;
 
 class CheckAdminRole
 {
@@ -15,7 +16,11 @@ class CheckAdminRole
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!backpack_user() || !backpack_user()->hasRole('Admin')) {
+        // Check if user has admin-level permissions (manage users, roles, or permissions)
+        if (!backpack_user() || 
+            (!PermissionHelper::userCan('user.view') && 
+             !PermissionHelper::userCan('role.view') && 
+             !PermissionHelper::userCan('permission.view'))) {
             abort(403, 'Bạn không có quyền truy cập chức năng này.');
         }
 

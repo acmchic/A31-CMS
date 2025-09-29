@@ -22,24 +22,24 @@ Route::group([
         (array) config('backpack.base.middleware_key', 'admin')
     ),
 ], function () {
-    // Leave Request routes - require view_leave_request permission
-    Route::group(['middleware' => 'permission:view_leave_request'], function () {
+    // Leave Request routes - require leave.view permission
+    Route::group(['middleware' => 'permission:leave.view'], function () {
         Route::crud('leave-request', LeaveRequestCrudController::class);
         Route::get('leave-request/{id}/download-pdf', [LeaveRequestCrudController::class, 'downloadPdf'])->name('leave-request.download-pdf');
     });
     
-    // Approval routes - require approve-leave-request permission
-    Route::group(['middleware' => 'permission:approve-leave-request'], function () {
+    // Approval routes - require leave.approve permission
+    Route::group(['middleware' => 'permission:leave.approve'], function () {
         Route::get('leave-request/{id}/approve', [LeaveRequestCrudController::class, 'approve'])->name('leave-request.approve');
     });
     
-    // Reject routes - require reject-leave-request permission
-    Route::group(['middleware' => 'permission:reject-leave-request'], function () {
+    // Reject routes - require leave.approve permission (same as approve)
+    Route::group(['middleware' => 'permission:leave.approve'], function () {
         Route::get('leave-request/{id}/reject', [LeaveRequestCrudController::class, 'reject'])->name('leave-request.reject');
     });
     
-    // Daily Report routes - require view_daily_report permission
-    Route::group(['middleware' => 'permission:view_daily_report'], function () {
+    // Daily Report routes - require report.view permission
+    Route::group(['middleware' => 'permission:report.view'], function () {
         Route::crud('daily-personnel-report', DailyPersonnelReportCrudController::class);
     });
 });

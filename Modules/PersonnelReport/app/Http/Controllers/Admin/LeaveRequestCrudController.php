@@ -8,6 +8,7 @@ use Modules\PersonnelReport\Models\EmployeeLeave;
 use Modules\OrganizationStructure\Models\Employee;
 use Modules\OrganizationStructure\Models\Department;
 use Modules\OrganizationStructure\Models\Leave;
+use App\Helpers\PermissionHelper;
 
 class LeaveRequestCrudController extends CrudController
 {
@@ -30,62 +31,74 @@ class LeaveRequestCrudController extends CrudController
     }
 
     /**
-     * Apply department filtering based on user permissions
+     * Apply department filtering based on user permissions - clean approach
      */
     private function applyDepartmentFilter()
     {
         $user = backpack_user();
-
-        // Admin, BAN GIÁM ĐỐC, and Phê duyệt can see all leave requests
-        if ($user->hasRole('Admin') || $user->department_id == 1 || $user->hasRole('Phê duyệt')) {
-            return; // No filtering for admin, BAN GIÁM ĐỐC, and approver
-        }
-
-        // Other users see only their department's leave requests
-        $departmentId = $user->department_id;
+        $scope = PermissionHelper::getUserScope($user);
         
-        // Fallback to employee's department if user doesn't have direct department
-        if (!$departmentId && $user->employee) {
-            $departmentId = $user->employee->department_id;
-        }
-
-        if ($departmentId) {
-            $employeeIds = Employee::where('department_id', $departmentId)->pluck('id');
-            CRUD::addClause('whereIn', 'employee_id', $employeeIds);
-        } else {
-            CRUD::addClause('where', 'id', 0);
+        switch ($scope) {
+            case 'all':
+            case 'company':
+                // No filtering - can see all leave requests
+                break;
+                
+            case 'department':
+                // Can see department's leave requests
+                $departmentId = $user->department_id;
+                if (!$departmentId && $user->employee) {
+                    $departmentId = $user->employee->department_id;
+                }
+                
+                if ($departmentId) {
+                    $employeeIds = Employee::where('department_id', $departmentId)->pluck('id');
+                    CRUD::addClause('whereIn', 'employee_id', $employeeIds);
+                } else {
+                    CRUD::addClause('where', 'id', 0);
+                }
+                break;
+                
+            case 'own':
+                // Can see only own leave requests
+                if ($user->employee) {
+                    CRUD::addClause('where', 'employee_id', $user->employee->id);
+                } else {
+                    CRUD::addClause('where', 'id', 0);
+                }
+                break;
+                
+            default:
+                CRUD::addClause('where', 'id', 0);
+                break;
         }
     }
 
     /**
-     * Setup buttons based on user role
+     * Setup buttons based on user permissions - clean approach
      */
     private function setupButtonsForRole()
     {
         $user = backpack_user();
         
-        if ($user->hasRole('Phê duyệt')) {
-            // For approver role, hide create/edit/delete buttons
+        // Remove buttons based on permissions
+        if (!PermissionHelper::can($user, 'leave.create')) {
             CRUD::removeButton('create');
+        }
+        
+        if (!PermissionHelper::can($user, 'leave.edit')) {
             CRUD::removeButton('edit');
+        }
+        
+        if (!PermissionHelper::can($user, 'leave.delete')) {
             CRUD::removeButton('delete');
-            
-            // Add custom approval buttons
+        }
+        
+        // Add approval buttons for those who can approve
+        if (PermissionHelper::can($user, 'leave.approve')) {
             CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
             CRUD::addButtonFromModelFunction('line', 'reject', 'rejectButton', 'beginning');
-        }
-        
-        // For Admin and BAN GIÁM ĐỐC - add approval and download buttons
-        if ($user->hasRole('Admin') || $user->department_id == 1) {
-            CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
             CRUD::addButtonFromModelFunction('line', 'download_pdf', 'downloadPdfButton', 'beginning');
-        }
-        
-        // For Nhân viên role - only view, no create/edit/delete
-        if ($user->hasRole('Nhân viên')) {
-            CRUD::removeButton('create');
-            CRUD::removeButton('edit');
-            CRUD::removeButton('delete');
         }
     }
 

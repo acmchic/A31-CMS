@@ -5,6 +5,7 @@ namespace Modules\OrganizationStructure\Http\Controllers\Admin;
 use Backpack\CRUD\app\Http\Controllers\CrudController;
 use Backpack\CRUD\app\Library\CrudPanel\CrudPanelFacade as CRUD;
 use Modules\OrganizationStructure\Models\Department;
+use App\Helpers\PermissionHelper;
 
 class DepartmentCrudController extends CrudController
 {
@@ -28,25 +29,37 @@ class DepartmentCrudController extends CrudController
     }
 
     /**
-     * Apply department filtering based on user permissions
+     * Apply department filtering based on user permissions - clean approach
      */
     private function applyDepartmentFilter()
     {
         $user = backpack_user();
+        $scope = PermissionHelper::getUserScope($user);
         
-        // Admin và BAN GIÁM ĐỐC có thể xem tất cả
-        if ($user->hasRole('Admin') || $user->department_id == 1) {
-            return; // No filtering for admin and BAN GIÁM ĐỐC
-        }
-        
-        // Lấy department_id từ user
-        $departmentId = $user->department_id;
-        
-        if ($departmentId) {
-            CRUD::addClause('where', 'id', $departmentId);
-        } else {
-            // Nếu không có department_id, không hiển thị gì
-            CRUD::addClause('where', 'id', 0);
+        switch ($scope) {
+            case 'all':
+            case 'company':
+                // No filtering - can see all departments
+                break;
+                
+            case 'department':
+                // Can see own department only
+                if ($user->department_id) {
+                    CRUD::addClause('where', 'id', $user->department_id);
+                } else {
+                    CRUD::addClause('where', 'id', 0);
+                }
+                break;
+                
+            case 'own':
+            default:
+                // Can see own department only
+                if ($user->department_id) {
+                    CRUD::addClause('where', 'id', $user->department_id);
+                } else {
+                    CRUD::addClause('where', 'id', 0);
+                }
+                break;
         }
     }
 

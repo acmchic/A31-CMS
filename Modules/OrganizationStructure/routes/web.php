@@ -19,13 +19,13 @@ Route::group([
     ),
 ], function () {
     
-    // Department routes - require view_department permission
-    Route::group(['middleware' => 'permission:view_department'], function () {
+    // Department routes - require department.view permission
+    Route::group(['middleware' => 'permission:department.view'], function () {
         Route::crud('department', DepartmentCrudController::class);
     });
     
-    // Employee routes - require view_employee permission
-    Route::group(['middleware' => 'permission:view_employee'], function () {
+    // Employee routes - require employee.view permission
+    Route::group(['middleware' => 'permission:employee.view'], function () {
         Route::crud('employee', EmployeeCrudController::class);
     });
     

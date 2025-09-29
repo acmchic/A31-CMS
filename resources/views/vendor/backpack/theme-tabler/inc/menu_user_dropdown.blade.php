@@ -10,7 +10,13 @@
         </span>
         <div class="d-none d-xl-block ps-2">
             <div>{{ backpack_user()->name }}</div>
-            <div class="mt-1 small text-muted">{{ trans('backpack::crud.admin') }}</div>
+            <div class="mt-1 small text-muted">
+                @if(backpack_user()->roles->count() > 0)
+                    {{ \App\Helpers\PermissionHelper::getRoleDisplayName(backpack_user()->roles->first()->name) }}
+                @else
+                    {{ trans('backpack::crud.admin') }}
+                @endif
+            </div>
         </div>
     </a>
     <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">

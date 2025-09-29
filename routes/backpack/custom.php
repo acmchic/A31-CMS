@@ -16,7 +16,7 @@ Route::group([
     ),
     'namespace' => 'App\Http\Controllers\Admin',
 ], function () { // custom admin routes
-    Route::get('dashboard', 'DashboardController@dashboard')->name('backpack.dashboard')->middleware('permission:view dashboard');
+    Route::get('dashboard', 'DashboardController@dashboard')->name('backpack.dashboard');
     
     // Profile routes
     Route::get('edit-account-info', 'ProfileController@edit')->name('admin.profile.edit');

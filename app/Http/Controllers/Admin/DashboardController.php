@@ -9,6 +9,7 @@ use Modules\OrganizationStructure\Models\Department;
 use Modules\OrganizationStructure\Models\Employee;
 use Modules\PersonnelReport\Models\EmployeeLeave;
 use Modules\PersonnelReport\Models\DailyPersonnelReport;
+use App\Helpers\PermissionHelper;
 
 class DashboardController extends Controller
 {
@@ -17,6 +18,11 @@ class DashboardController extends Controller
      */
     public function dashboard()
     {
+        // Check dashboard permission
+        if (!PermissionHelper::userCan('dashboard.view')) {
+            abort(403, 'Bạn không có quyền truy cập dashboard.');
+        }
+        
         // Get statistics
         $stats = [
             'departments' => Department::count(),
@@ -29,8 +35,21 @@ class DashboardController extends Controller
         // Base modules that all users can see
         $modules = [];
         
-        // Add department management only for admin and BAN GIÁM ĐỐC
-        if (backpack_user()->hasRole('Admin') || backpack_user()->department_id == 1) {
+        // System Management Module
+        if (PermissionHelper::userCan('user.view') || PermissionHelper::userCan('role.view')) {
+            $modules[] = [
+                'name' => 'Quản lý hệ thống',
+                'description' => 'Quản lý người dùng, vai trò và quyền hạn',
+                'icon' => 'la la-cogs',
+                'url' => PermissionHelper::userCan('user.view') ? backpack_url('user') : backpack_url('role'),
+                'status' => 'active',
+                'count' => $stats['users'],
+                'color' => 'danger'
+            ];
+        }
+
+        // Department Management
+        if (PermissionHelper::userCan('department.view')) {
             $modules[] = [
                 'name' => 'Quản lý phòng ban',
                 'description' => 'Quản lý cơ cấu phòng ban, phân xưởng',
@@ -42,9 +61,9 @@ class DashboardController extends Controller
             ];
         }
         
-        // Add other modules
-        $modules = array_merge($modules, [
-            [
+        // Employee Management
+        if (PermissionHelper::userCan('employee.view')) {
+            $modules[] = [
                 'name' => 'Quản lý nhân sự',
                 'description' => 'Quản lý thông tin cán bộ, nhân viên',
                 'icon' => 'la la-users',
@@ -52,8 +71,12 @@ class DashboardController extends Controller
                 'status' => 'active',
                 'count' => $stats['employees'],
                 'color' => 'info'
-            ],
-            [
+            ];
+        }
+
+        // Reports
+        if (PermissionHelper::userCan('report.view')) {
+            $modules[] = [
                 'name' => 'Báo cáo quân số',
                 'description' => 'Báo cáo và thống kê nhân sự',
                 'icon' => 'la la-chart-bar',
@@ -61,8 +84,12 @@ class DashboardController extends Controller
                 'status' => 'active',
                 'count' => $stats['reports'],
                 'color' => 'primary'
-            ],
-            [
+            ];
+        }
+
+        // Leave Requests
+        if (PermissionHelper::userCan('leave.view')) {
+            $modules[] = [
                 'name' => 'Đăng ký nghỉ phép',
                 'description' => 'Quản lý đơn xin nghỉ phép',
                 'icon' => 'la la-calendar-check',
@@ -70,53 +97,10 @@ class DashboardController extends Controller
                 'status' => 'active',
                 'count' => $stats['leave_requests'],
                 'color' => 'warning'
-            ],
-            [
-                'name' => 'Cài đặt hệ thống',
-                'description' => 'Cấu hình và thiết lập hệ thống',
-                'icon' => 'la la-cog',
-                'url' => '#',
-                'status' => 'development',
-                'count' => 0,
-                'color' => 'secondary'
-            ]
-        ]);
-
-        // Add user management modules only for admin
-        if (backpack_user()->hasRole('Admin')) {
-            $userManagementModules = [
-                [
-                    'name' => 'Quản lý người dùng',
-                    'description' => 'Quản lý thông tin người dùng hệ thống',
-                    'icon' => 'la la-user',
-                    'url' => backpack_url('user'),
-                    'status' => 'active',
-                    'count' => $stats['users'],
-                    'color' => 'success'
-                ],
-                [
-                    'name' => 'Quản lý vai trò',
-                    'description' => 'Quản lý vai trò và phân quyền',
-                    'icon' => 'la la-user-shield',
-                    'url' => backpack_url('role'),
-                    'status' => 'active',
-                    'count' => \Spatie\Permission\Models\Role::count(),
-                    'color' => 'danger'
-                ],
-                [
-                    'name' => 'Quản lý quyền',
-                    'description' => 'Quản lý quyền trong hệ thống',
-                    'icon' => 'la la-key',
-                    'url' => backpack_url('permission'),
-                    'status' => 'active',
-                    'count' => \Spatie\Permission\Models\Permission::count(),
-                    'color' => 'info'
-                ]
             ];
-            
-            // Insert user management modules at the beginning
-            $modules = array_merge($userManagementModules, $modules);
         }
+
+        // No more hardcode - everything handled above
 
         $data = [
             'title' => 'Bảng điều khiển - A31 CMS',
