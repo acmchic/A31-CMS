@@ -9,6 +9,7 @@ use Spatie\Permission\PermissionRegistrar;
 
 class RoleCrudController extends BaseRoleCrudController
 {
+    use \Backpack\CRUD\app\Http\Controllers\Operations\UpdateOperation { update as traitUpdate; }
     public function setupListOperation()
     {
         /**
@@ -71,6 +72,49 @@ class RoleCrudController extends BaseRoleCrudController
         app()->make(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
+    public function store()
+    {
+        $this->crud->setRequest($this->crud->validateRequest());
+        
+        // Get the permissions from request
+        $permissionIds = request()->get('permissions', []);
+        
+        \Log::info('Role Store Request Data:', [
+            'permissions' => $permissionIds,
+            'permissions_count' => count($permissionIds)
+        ]);
+        
+        $this->crud->unsetValidation();
+
+        // Create the role first
+        $response = $this->crud->performSaveAction();
+        
+        // After successful creation, sync permissions
+        if ($response instanceof \Illuminate\Http\RedirectResponse && $response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
+            $role = $this->crud->entry;
+            
+            if ($role && is_array($permissionIds) && count($permissionIds) > 0) {
+                // Convert permission IDs to integers and filter out invalid ones
+                $validPermissionIds = array_filter(array_map('intval', $permissionIds), function($id) {
+                    return $id > 0;
+                });
+                
+                // Sync permissions with the role
+                $role->permissions()->sync($validPermissionIds);
+                
+                // Clear permission cache
+                app()->make(PermissionRegistrar::class)->forgetCachedPermissions();
+                
+                \Log::info('Role permissions synced on create:', [
+                    'role_id' => $role->id,
+                    'permission_count' => count($validPermissionIds)
+                ]);
+            }
+        }
+        
+        return $response;
+    }
+
     public function setupUpdateOperation()
     {
         $this->addFields();
@@ -78,6 +122,50 @@ class RoleCrudController extends BaseRoleCrudController
 
         //otherwise, changes won't have effect
         app()->make(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    public function update()
+    {
+        $this->crud->setRequest($this->crud->validateRequest());
+        
+        // Get the permissions from request
+        $permissionIds = request()->get('permissions', []);
+        
+        \Log::info('Role Update Request Data:', [
+            'all' => request()->all(),
+            'permissions' => $permissionIds,
+            'permissions_count' => count($permissionIds)
+        ]);
+        
+        $this->crud->unsetValidation(); // validation has already been run
+
+        // Update the role first
+        $response = $this->traitUpdate();
+        
+        // After successful update, sync permissions
+        if ($response instanceof \Illuminate\Http\RedirectResponse && $response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
+            $role = $this->crud->getCurrentEntry();
+            
+            if ($role && is_array($permissionIds) && count($permissionIds) > 0) {
+                // Convert permission IDs to integers and filter out invalid ones
+                $validPermissionIds = array_filter(array_map('intval', $permissionIds), function($id) {
+                    return $id > 0;
+                });
+                
+                // Sync permissions with the role
+                $role->permissions()->sync($validPermissionIds);
+                
+                // Clear permission cache
+                app()->make(PermissionRegistrar::class)->forgetCachedPermissions();
+                
+                \Log::info('Role permissions synced successfully:', [
+                    'role_id' => $role->id,
+                    'permission_count' => count($validPermissionIds)
+                ]);
+            }
+        }
+        
+        return $response;
     }
 
     private function addFields()
@@ -99,27 +187,93 @@ class RoleCrudController extends BaseRoleCrudController
 
         $this->crud->addField([
             'label'     => mb_ucfirst(trans('backpack::permissionmanager.permission_plural')),
-            'type'      => 'checklist',
+            'type'      => 'permission_groups',
             'name'      => 'permissions',
             'entity'    => 'permissions',
             'attribute' => 'name',
             'model'     => $this->permission_model,
             'pivot'     => true,
-            'options'   => function() {
-                $permissionModel = config('backpack.permissionmanager.models.permission');
-                $permissions = $permissionModel::all();
-                $options = [];
-                
-                foreach ($permissions as $permission) {
-                    $translatedName = $this->translatePermission($permission->name);
-                    $options[$permission->id] = $translatedName;
-                }
-                
-                return $options;
-            },
+            'wrapper'   => [
+                'class'   => 'form-group col-sm-12',
+            ],
+            'attributes' => [
+                'data-init' => 'permission_groups_field'
+            ],
         ]);
     }
 
+
+    private function getPermissionModules()
+    {
+        return [
+            'dashboard' => 'Bảng Điều Khiển',
+            'data_management' => 'Quản Lý Dữ Liệu',
+            'user_management' => 'Quản Lý Người Dùng',
+            'department_management' => 'Quản Lý Phòng Ban',
+            'leave_management' => 'Quản Lý Nghỉ Phép',
+            'vehicle_management' => 'Quản Lý Phương Tiện',
+            'reports' => 'Báo Cáo',
+            'employee_management' => 'Quản Lý Nhân Viên',
+            'system_settings' => 'Cài Đặt Hệ Thống',
+            'pdf_signatures' => 'Ký Số PDF',
+        ];
+    }
+
+    private function getGroupedPermissionOptions()
+    {
+        $permissionModel = config('backpack.permissionmanager.models.permission');
+        $permissions = $permissionModel::all();
+        $options = [];
+        
+        // Define permission groups
+        $groups = [
+            'dashboard' => '📊 Bảng Điều Khiển',
+            'data_management' => '💾 Quản Lý Dữ Liệu',
+            'user_management' => '👥 Quản Lý Người Dùng',
+            'department_management' => '🏢 Quản Lý Phòng Ban',
+            'leave_management' => '🏖️ Quản Lý Nghỉ Phép',
+            'vehicle_management' => '🚗 Quản Lý Phương Tiện',
+            'reports' => '📈 Báo Cáo',
+            'employee_management' => '👤 Quản Lý Nhân Viên',
+            'system_settings' => '⚙️ Cài Đặt Hệ Thống',
+            'pdf_signatures' => '📝 Ký Số PDF',
+        ];
+        
+        // Group permissions by category
+        $groupedPermissions = [
+            'dashboard' => ['view dashboard'],
+            'data_management' => ['view own data', 'edit own data', 'delete own data', 'view all data', 'edit all data', 'delete all data'],
+            'user_management' => ['manage users', 'manage roles', 'manage permissions', 'view_user_profile'],
+            'department_management' => ['manage departments', 'view all departments', 'edit all departments', 'manage department users', 'view_department'],
+            'leave_management' => ['approve leaves', 'approve-leave-request', 'reject-leave-request', 'view-leave-request', 'view_leave_request'],
+            'vehicle_management' => ['manage vehicles', 'assign vehicles', 'view vehicle requests', 'approve vehicle step2'],
+            'reports' => ['view reports', 'view_daily_report'],
+            'employee_management' => ['view_employee'],
+            'system_settings' => ['system settings'],
+            'pdf_signatures' => ['sign-pdf'],
+        ];
+        
+        // Build options with groups
+        foreach ($groups as $groupKey => $groupTitle) {
+            $groupPermissions = $groupedPermissions[$groupKey] ?? [];
+            $hasPermissions = false;
+            
+            foreach ($permissions as $permission) {
+                if (in_array($permission->name, $groupPermissions)) {
+                    $translatedName = $this->translatePermission($permission->name);
+                    $options[$permission->id] = $groupTitle . ' - ' . $translatedName;
+                    $hasPermissions = true;
+                }
+            }
+            
+            // Add separator if group has permissions
+            if ($hasPermissions) {
+                $options['separator_' . $groupKey] = '─────────────────────────';
+            }
+        }
+        
+        return $options;
+    }
 
     private function translatePermission($permissionName)
     {

@@ -7,7 +7,7 @@
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
     <div class="wrapper">
-        @include('vendor.backpack.ui.inc.main_header')
+        @include('backpack::inc.main_header')
         @include('backpack::inc.sidebar')
         @yield('content')
         @include('backpack::inc.footer')

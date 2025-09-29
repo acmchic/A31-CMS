@@ -19,8 +19,14 @@ Route::group([
     ),
 ], function () {
     
-    // Organization Structure CRUD routes
-    Route::crud('department', DepartmentCrudController::class);
-    Route::crud('employee', EmployeeCrudController::class);
+    // Department routes - require view_department permission
+    Route::group(['middleware' => 'permission:view_department'], function () {
+        Route::crud('department', DepartmentCrudController::class);
+    });
+    
+    // Employee routes - require view_employee permission
+    Route::group(['middleware' => 'permission:view_employee'], function () {
+        Route::crud('employee', EmployeeCrudController::class);
+    });
     
 });

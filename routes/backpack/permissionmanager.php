@@ -10,7 +10,7 @@
 |
 */
 
-// Custom Role routes - Only for admin
+// Custom Role routes - require admin role
 Route::group([
     'prefix'     => config('backpack.base.route_prefix', 'admin'),
     'middleware' => ['web', backpack_middleware(), 'admin.role'],
@@ -18,7 +18,7 @@ Route::group([
     Route::crud('role', 'App\Http\Controllers\Admin\RoleCrudController');
 });
 
-// Custom Permission routes - Only for admin
+// Custom Permission routes - require admin role
 Route::group([
     'prefix'     => config('backpack.base.route_prefix', 'admin'),
     'middleware' => ['web', backpack_middleware(), 'admin.role'],
@@ -26,7 +26,7 @@ Route::group([
     Route::crud('permission', 'App\Http\Controllers\Admin\PermissionCrudController');
 });
 
-// Custom User routes with department field - Only for admin
+// Custom User routes - require admin role
 Route::group([
     'prefix'     => config('backpack.base.route_prefix', 'admin'),
     'middleware' => ['web', backpack_middleware(), 'admin.role'],
