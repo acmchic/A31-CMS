@@ -27,6 +27,8 @@ class User extends Authenticatable
         'department_id',
         'profile_photo_path',
         'signature_path',
+        'certificate_pin',
+        'certificate_path',
     ];
 
     /**

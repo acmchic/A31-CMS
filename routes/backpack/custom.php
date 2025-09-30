@@ -26,6 +26,7 @@ Route::group([
     Route::put('profile/upload-photo', 'ProfileController@uploadPhoto')->name('admin.profile.upload-photo');
     Route::put('profile/upload-signature', 'ProfileController@uploadSignature')->name('admin.profile.upload-signature');
     Route::put('profile/change-password', 'ProfileController@changePassword')->name('admin.profile.change-password');
+    Route::put('profile/update-pin', 'ProfileController@updatePin')->name('admin.profile.update-pin');
     Route::delete('profile/delete-photo', 'ProfileController@deleteProfilePhoto')->name('admin.profile.delete-photo');
     Route::delete('profile/delete-signature', 'ProfileController@deleteSignature')->name('admin.profile.delete-signature');
 }); // this should be the absolute last line of this file

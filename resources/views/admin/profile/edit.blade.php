@@ -193,7 +193,7 @@
 
                             <!-- Chữ ký số -->
                             <div class="col-md-6">
-                                <h6><i class="la la-pen"></i> Chữ ký số</h6>
+                                <h6><i class="la la-pen"></i> Chữ ký số (Hình ảnh trực quan)</h6>
                                 <div class="text-center mb-3">
                                     @if($user->signature_path)
                                         <img src="{{ Storage::url($user->signature_path) }}"
@@ -239,6 +239,75 @@
                             </div>
                         </div>
 
+                        <hr class="my-4">
+
+                        <!-- PIN cho chữ ký số -->
+                        <div class="row">
+                            <div class="col-12">
+                                <h5><i class="la la-lock"></i> Mã PIN cho chữ ký số</h5>
+                                <div class="alert alert-info">
+                                    <i class="la la-info-circle"></i> 
+                                    <strong>Lưu ý:</strong> Mã PIN này sẽ được sử dụng để xác thực khi bạn ký số các tài liệu. 
+                                    Mỗi người có mã PIN riêng để bảo mật chữ ký số của mình.
+                                </div>
+
+                                <form method="POST" action="{{ route('admin.profile.update-pin') }}">
+                                    @csrf
+                                    @method('PUT')
+
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="certificate_pin" class="form-label">
+                                                    Mã PIN chữ ký số 
+                                                    @if($user->certificate_pin)
+                                                        <span class="badge bg-success">Đã thiết lập</span>
+                                                    @else
+                                                        <span class="badge bg-warning">Chưa thiết lập</span>
+                                                    @endif
+                                                </label>
+                                                <input type="password" 
+                                                       class="form-control @if($errors->has('certificate_pin')) is-invalid @endif"
+                                                       id="certificate_pin" 
+                                                       name="certificate_pin" 
+                                                       placeholder="Nhập mã PIN (ít nhất 6 ký tự)"
+                                                       value="{{ old('certificate_pin') }}">
+                                                <div class="form-text">
+                                                    @if($user->certificate_pin)
+                                                        <i class="la la-check-circle text-success"></i> Để trống nếu không muốn thay đổi PIN hiện tại
+                                                    @else
+                                                        <i class="la la-exclamation-triangle text-warning"></i> Bạn cần thiết lập PIN để sử dụng chữ ký số
+                                                    @endif
+                                                </div>
+                                                @if($errors->has('certificate_pin'))
+                                                    <div class="invalid-feedback">{{ $errors->first('certificate_pin') }}</div>
+                                                @endif
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="certificate_pin_confirmation" class="form-label">Xác nhận mã PIN</label>
+                                                <input type="password" 
+                                                       class="form-control @if($errors->has('certificate_pin_confirmation')) is-invalid @endif"
+                                                       id="certificate_pin_confirmation" 
+                                                       name="certificate_pin_confirmation" 
+                                                       placeholder="Nhập lại mã PIN">
+                                                @if($errors->has('certificate_pin_confirmation'))
+                                                    <div class="invalid-feedback">{{ $errors->first('certificate_pin_confirmation') }}</div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="text-end">
+                                        <button type="submit" class="btn btn-success">
+                                            <i class="la la-save"></i> {{ $user->certificate_pin ? 'Cập nhật PIN' : 'Thiết lập PIN' }}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
 
                     </div>
                 </div>

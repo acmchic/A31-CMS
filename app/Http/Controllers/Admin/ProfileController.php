@@ -240,4 +240,30 @@ class ProfileController extends Controller
 
         return redirect()->back()->with('success', 'Chữ ký đã được cập nhật!');
     }
+
+    /**
+     * Update certificate PIN
+     */
+    public function updatePin(Request $request)
+    {
+        $user = backpack_user();
+        
+        $request->validate([
+            'certificate_pin' => 'nullable|string|min:6|confirmed',
+        ], [
+            'certificate_pin.min' => 'Mã PIN phải có ít nhất 6 ký tự.',
+            'certificate_pin.confirmed' => 'Xác nhận mã PIN không khớp.',
+        ]);
+
+        // Only update if PIN is provided
+        if ($request->filled('certificate_pin')) {
+            $user->update([
+                'certificate_pin' => $request->certificate_pin
+            ]);
+            
+            return redirect()->back()->with('success', 'Mã PIN chữ ký số đã được cập nhật thành công!');
+        }
+
+        return redirect()->back()->with('error', 'Vui lòng nhập mã PIN.');
+    }
 }

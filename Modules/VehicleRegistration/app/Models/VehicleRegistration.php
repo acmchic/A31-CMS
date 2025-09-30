@@ -178,65 +178,110 @@ class VehicleRegistration extends Model
 
     public function approveButton()
     {
-        // Step 3: Ban Giám Đốc phê duyệt - show button for testing
+        // Step 3: Ban Giám Đốc phê duyệt - Yêu cầu nhập PIN để xác thực
         if ($this->workflow_status === 'dept_review' && $this->vehicle_id) {
-            return '<button class="btn btn-sm btn-success approve-btn" 
-                        onclick="
-                            var pin = prompt(\'Nhập PIN chứng thư số A1:\', \'\');
-                            if (pin) {
-                                if (confirm(\'Xác nhận phê duyệt với PIN: \' + pin + \'?\')) {
-                                    var form = document.createElement(\'form\');
-                                    form.method = \'POST\';
-                                    form.action = \'' . route('vehicle-registration.approve-with-pin', $this->id) . '\';
-                                    
-                                    var csrfToken = document.createElement(\'input\');
-                                    csrfToken.type = \'hidden\';
-                                    csrfToken.name = \'_token\';
-                                    csrfToken.value = document.querySelector(\'meta[name=csrf-token]\').getAttribute(\'content\');
-                                    form.appendChild(csrfToken);
-                                    
-                                    var pinInput = document.createElement(\'input\');
-                                    pinInput.type = \'hidden\';
-                                    pinInput.name = \'certificate_pin\';
-                                    pinInput.value = pin;
-                                    form.appendChild(pinInput);
-                                    
-                                    var regInput = document.createElement(\'input\');
-                                    regInput.type = \'hidden\';
-                                    regInput.name = \'registration_id\';
-                                    regInput.value = \'' . $this->id . '\';
-                                    form.appendChild(regInput);
-                                    
-                                    document.body.appendChild(form);
-                                    
-                                    // Submit with AJAX
-                                    var formData = new FormData(form);
-                                    fetch(form.action, {
-                                        method: \'POST\',
-                                        body: formData,
-                                        headers: {
-                                            \'X-Requested-With\': \'XMLHttpRequest\'
-                                        }
-                                    })
-                                    .then(response => response.json())
-                                    .then(data => {
-                                        if (data.success) {
-                                            alert(\'✅ Phê duyệt thành công! PDF đã được ký số.\');
-                                            window.location.reload();
-                                        } else {
-                                            alert(\'❌ Lỗi: \' + (data.message || \'Không thể phê duyệt\'));
-                                        }
-                                    })
-                                    .catch(error => {
-                                        alert(\'❌ Có lỗi xảy ra: \' + error);
-                                    });
-                                    
-                                    document.body.removeChild(form);
-                                }
-                            }
-                        ">
-                <i class="la la-check"></i> Phê duyệt với PIN
-            </button>';
+            $modalId = 'pinModal_' . $this->id;
+            
+            return '
+            <button class="btn btn-sm btn-success" onclick="showPinModal_' . $this->id . '()">
+                <i class="la la-check"></i> Phê duyệt & Ký số
+            </button>
+            <script>
+            function showPinModal_' . $this->id . '() {
+                // Tạo modal động và append vào body
+                var modalHtml = `
+                <div class="modal fade" id="' . $modalId . '" tabindex="-1" data-bs-backdrop="static" style="z-index: 99999 !important;">
+                    <div class="modal-dialog" style="z-index: 100000 !important;">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Xác nhận Phê duyệt & Ký số</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="mb-3">Vui lòng nhập mã PIN chữ ký số của bạn để xác thực:</p>
+                                <div class="mb-3">
+                                    <label class="form-label">Mã PIN</label>
+                                    <input type="password" class="form-control" id="pin_input_' . $this->id . '" placeholder="Nhập mã PIN" autofocus>
+                                    <div class="form-text">Mã PIN này đã được thiết lập trong trang Thông tin cá nhân</div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                <button type="button" class="btn btn-success" onclick="submitApproval_' . $this->id . '()">
+                                    <i class="la la-check"></i> Xác nhận Ký số
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+                
+                // Remove existing modal if any
+                var existingModal = document.getElementById(\'' . $modalId . '\');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+                
+                // Append to body
+                document.body.insertAdjacentHTML(\'beforeend\', modalHtml);
+                
+                // Show modal
+                var modal = new bootstrap.Modal(document.getElementById(\'' . $modalId . '\'));
+                modal.show();
+                
+                // Focus on input when shown
+                document.getElementById(\'' . $modalId . '\').addEventListener(\'shown.bs.modal\', function() {
+                    document.getElementById(\'pin_input_' . $this->id . '\').focus();
+                });
+                
+                // Cleanup on hide
+                document.getElementById(\'' . $modalId . '\').addEventListener(\'hidden.bs.modal\', function() {
+                    this.remove();
+                });
+            }
+            
+            function submitApproval_' . $this->id . '() {
+                var pin = document.getElementById(\'pin_input_' . $this->id . '\').value;
+                if (!pin || pin.trim() === \'\') {
+                    alert(\'Vui lòng nhập mã PIN!\');
+                    return;
+                }
+                
+                var formData = new FormData();
+                formData.append(\'_token\', document.querySelector(\'meta[name=csrf-token]\').getAttribute(\'content\'));
+                formData.append(\'certificate_pin\', pin);
+                formData.append(\'registration_id\', \'' . $this->id . '\');
+                
+                fetch(\'' . route('vehicle-registration.approve-with-pin', $this->id) . '\', {
+                    method: \'POST\',
+                    body: formData,
+                    headers: {
+                        \'X-Requested-With\': \'XMLHttpRequest\'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Close modal
+                    var modalEl = document.getElementById(\'' . $modalId . '\');
+                    var modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                    
+                    if (data.success) {
+                        alert(\'✅ Phê duyệt thành công! PDF đã được ký số.\');
+                        window.location.reload();
+                    } else {
+                        alert(\'❌ Lỗi: \' + (data.message || \'Không thể phê duyệt\'));
+                    }
+                })
+                .catch(error => {
+                    alert(\'❌ Có lỗi xảy ra: \' + error);
+                });
+            }
+            </script>
+            <style>
+                .modal-backdrop { z-index: 99998 !important; }
+                #' . $modalId . ' { z-index: 99999 !important; }
+            </style>
+            ';
         }
         return '';
     }

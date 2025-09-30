@@ -101,12 +101,13 @@ class TcpdfPdfSigner
             }
         }
         
-        // Generate filename
+        // Generate filename - save theo username của người ký
+        $approverUsername = $approver->username ?? 'user_' . $approver->id;
         $filename = 'vehicle_registration_' . $registration->id . '_' . time() . '.pdf';
-        $signedPath = 'vehicle_registrations/' . $filename;
+        $signedPath = 'vehicle_registrations/' . $approverUsername . '/' . $filename;
         $signedFullPath = Storage::disk('public')->path($signedPath);
         
-        // Ensure directory exists
+        // Ensure directory exists - tạo folder riêng cho mỗi user
         $directory = dirname($signedFullPath);
         if (!is_dir($directory)) {
             mkdir($directory, 0755, true);

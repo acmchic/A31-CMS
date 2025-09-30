@@ -108,7 +108,19 @@ class VehicleRegistrationCrudController extends CrudController
         CRUD::column('passenger_count')->label('Số người');
 
         // Show vehicle and driver info if assigned
-        CRUD::column('vehicle_id')->label('Xe được phân')->type('select')->entity('vehicle')->attribute('full_name')->default('--');
+        CRUD::column('vehicle_id')
+            ->label('Xe được phân')
+            ->type('select')
+            ->entity('vehicle')
+            ->attribute('full_name')
+            ->default('--')
+            ->searchLogic(function ($query, $column, $searchTerm) {
+                // Search trong columns thực (name, license_plate) thay vì accessor (full_name)
+                $query->orWhereHas('vehicle', function($q) use ($searchTerm) {
+                    $q->where('name', 'like', '%'.$searchTerm.'%')
+                      ->orWhere('license_plate', 'like', '%'.$searchTerm.'%');
+                });
+            });
         CRUD::column('driver_name')->label('Lái xe')->default('--');
 
         CRUD::column('status_display')->label('Trạng thái');
@@ -454,15 +466,31 @@ class VehicleRegistrationCrudController extends CrudController
             ]);
         }
 
-        // Validate input
+        // Validate input - Yêu cầu nhập PIN
         $request->validate([
             'certificate_pin' => 'required|string|min:1'
         ]);
 
-        $pin = $request->certificate_pin;
+        $inputPin = $request->certificate_pin;
         $user = backpack_user();
 
         try {
+            // Check if user has set up PIN
+            if (!$user->certificate_pin) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bạn chưa thiết lập PIN chữ ký số. Vui lòng vào trang Thông tin cá nhân để thiết lập PIN.'
+                ]);
+            }
+
+            // Validate input PIN với PIN đã lưu trong database
+            if ($inputPin !== $user->certificate_pin) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Mã PIN không hợp lệ. Vui lòng thử lại.'
+                ]);
+            }
+
             // Get user certificate
             $certificatePath = \App\Services\UserCertificateService::getUserCertificatePath($user);
             
@@ -473,8 +501,12 @@ class VehicleRegistrationCrudController extends CrudController
                 ]);
             }
 
-            // Validate certificate with PIN
-            $validation = \App\Services\UserCertificateService::validateCertificate($certificatePath, $pin);
+            // Lấy password của certificate file (KHÔNG phải PIN của user!)
+            // PIN của user chỉ để xác thực, password certificate để mở file .pfx
+            $certificatePassword = config('pdf-sign.certificate_password', 'A31Factory2025');
+
+            // Validate certificate với certificate password
+            $validation = \App\Services\UserCertificateService::validateCertificate($certificatePath, $certificatePassword);
             
             if (!$validation['valid']) {
                 return response()->json([
@@ -501,7 +533,7 @@ class VehicleRegistrationCrudController extends CrudController
             $pdfPath = \App\Services\TcpdfPdfSigner::generateApprovalPdfWithPin(
                 $registration, 
                 $certificatePath, 
-                $pin
+                $certificatePassword
             );
             
             \Log::info('PDF Generated with PIN for vehicle registration:', [

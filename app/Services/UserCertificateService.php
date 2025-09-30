@@ -13,24 +13,49 @@ class UserCertificateService
     public static function getUserCertificatePath(User $user): ?string
     {
         // Thứ tự ưu tiên tìm certificate:
-        // 1. Certificate riêng của user (nếu có)
-        // 2. Certificate chung của công ty
+        // 1. Certificate riêng của user (nếu có trong database)
+        // 2. Certificate riêng của user (theo username trong folder)
+        // 3. Certificate chung của công ty
         
+        // Check database certificate path
+        if ($user->certificate_path && file_exists($user->certificate_path)) {
+            return $user->certificate_path;
+        }
+        
+        // Check username-based certificate
         $userCertDir = storage_path('app/certificates/users/');
-        $companyCertPath = storage_path('app/certificates/a31_factory.pfx');
+        $userCertPathByUsername = $userCertDir . $user->username . '.pfx';
+        if (file_exists($userCertPathByUsername)) {
+            return $userCertPathByUsername;
+        }
         
-        // Tìm certificate riêng của user
+        // Check user ID-based certificate (legacy)
         $userCertPath = $userCertDir . 'user_' . $user->id . '.pfx';
         if (file_exists($userCertPath)) {
             return $userCertPath;
         }
         
         // Fallback về certificate chung
+        $companyCertPath = storage_path('app/certificates/a31_factory.pfx');
         if (file_exists($companyCertPath)) {
             return $companyCertPath;
         }
         
         return null;
+    }
+    
+    /**
+     * Get user certificate PIN
+     */
+    public static function getUserPin(User $user): ?string
+    {
+        // Lấy PIN từ database nếu user đã thiết lập
+        if ($user->certificate_pin) {
+            return $user->certificate_pin;
+        }
+        
+        // Fallback về PIN mặc định của company certificate
+        return config('pdf-sign.certificate_password', 'A31Factory2025');
     }
     
     /**
