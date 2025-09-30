@@ -1,0 +1,11 @@
+{
+    "name": "VehicleRegistration",
+    "alias": "vehicleregistration",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\VehicleRegistration\\Providers\\VehicleRegistrationServiceProvider"
+    ],
+    "files": []
+}

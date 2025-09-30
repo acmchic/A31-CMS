@@ -2,5 +2,6 @@
     "Core": true,
     "UserManagement": true,
     "OrganizationStructure": true,
-    "PersonnelReport": true
+    "PersonnelReport": true,
+    "VehicleRegistration": true
 }
