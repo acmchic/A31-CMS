@@ -80,3 +80,12 @@
     </div>
 </li>
 @endif
+
+{{-- Vehicle Registration --}}
+@if(\App\Helpers\PermissionHelper::userCan('vehicle_registration.view'))
+<li class="nav-item">
+    <a class="nav-link" href="{{ backpack_url('vehicle-registration') }}">
+        <i class="la la-car nav-icon"></i> Đăng ký xe
+    </a>
+</li>
+@endif

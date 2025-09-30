@@ -93,6 +93,7 @@ class VehicleRegistrationCrudController extends CrudController
             CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
             CRUD::addButtonFromModelFunction('line', 'reject', 'rejectButton', 'beginning');
             CRUD::addButtonFromModelFunction('line', 'download_pdf', 'downloadPdfButton', 'beginning');
+            CRUD::addButtonFromModelFunction('line', 'check_signature', 'checkSignatureButton', 'beginning');
         }
     }
 
@@ -113,6 +114,9 @@ class VehicleRegistrationCrudController extends CrudController
         CRUD::column('status_display')->label('Trạng thái');
         CRUD::column('workflow_status_display')->label('Quy trình');
         CRUD::column('created_at')->label('Ngày tạo')->type('datetime');
+        
+        // Add modal to the view - inject via JavaScript
+        CRUD::addClause('whereRaw', '1=1'); // Dummy clause to ensure setup runs
     }
 
     protected function setupCreateOperation()
@@ -433,6 +437,129 @@ class VehicleRegistrationCrudController extends CrudController
             ]);
             
             return redirect()->back()->with('error', 'Lỗi khi tạo PDF: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Approve with PIN (new method)
+     */
+    public function approveWithPin(Request $request, $id)
+    {
+        $registration = VehicleRegistration::findOrFail($id);
+
+        if (!PermissionHelper::userCan('vehicle_registration.approve')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bạn không có quyền phê duyệt.'
+            ]);
+        }
+
+        // Validate input
+        $request->validate([
+            'certificate_pin' => 'required|string|min:1'
+        ]);
+
+        $pin = $request->certificate_pin;
+        $user = backpack_user();
+
+        try {
+            // Get user certificate
+            $certificatePath = \App\Services\UserCertificateService::getUserCertificatePath($user);
+            
+            if (!$certificatePath) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Không tìm thấy chứng thư số. Vui lòng liên hệ quản trị viên.'
+                ]);
+            }
+
+            // Validate certificate with PIN
+            $validation = \App\Services\UserCertificateService::validateCertificate($certificatePath, $pin);
+            
+            if (!$validation['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $validation['error']
+                ]);
+            }
+
+            // Update approval info
+            $registration->update([
+                'status' => 'approved',
+                'workflow_status' => 'approved',
+                'director_approved_by' => $user->id,
+                'director_approved_at' => now(),
+            ]);
+
+            // Use TCPDF signer (Adobe Reader compatible - shows Signature Panel)
+            \Log::info('Using TcpdfPdfSigner (Adobe Reader compatible)', [
+                'registration_id' => $registration->id,
+                'certificate_path' => $certificatePath,
+                'php_openssl_loaded' => extension_loaded('openssl')
+            ]);
+            
+            $pdfPath = \App\Services\TcpdfPdfSigner::generateApprovalPdfWithPin(
+                $registration, 
+                $certificatePath, 
+                $pin
+            );
+            
+            \Log::info('PDF Generated with PIN for vehicle registration:', [
+                'registration_id' => $registration->id,
+                'pdf_path' => $pdfPath,
+                'approver' => $user->name,
+                'certificate_used' => basename($certificatePath)
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Phê duyệt thành công! PDF đã được ký số.',
+                'download_url' => route('vehicle-registration.download-pdf', $id),
+                'pdf_path' => $pdfPath
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('PDF Generation Error with PIN:', [
+                'registration_id' => $registration->id,
+                'error' => $e->getMessage(),
+                'user' => $user->name
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Lỗi khi tạo PDF: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Check PDF signature validity
+     */
+    public function checkSignature($id)
+    {
+        $registration = VehicleRegistration::findOrFail($id);
+
+        if (!$registration->signed_pdf_path) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Không tìm thấy PDF đã ký'
+            ]);
+        }
+
+        try {
+            $validation = VehicleRegistrationPdfService::validatePdfSignature($registration->signed_pdf_path);
+            
+            return response()->json([
+                'success' => true,
+                'validation' => $validation,
+                'message' => $validation['valid'] ? 'PDF có chữ ký hợp lệ' : 'PDF không có chữ ký số hoặc chữ ký không hợp lệ'
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lỗi khi kiểm tra chữ ký: ' . $e->getMessage()
+            ]);
         }
     }
 

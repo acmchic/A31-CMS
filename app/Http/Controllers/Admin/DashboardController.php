@@ -9,6 +9,7 @@ use Modules\OrganizationStructure\Models\Department;
 use Modules\OrganizationStructure\Models\Employee;
 use Modules\PersonnelReport\Models\EmployeeLeave;
 use Modules\PersonnelReport\Models\DailyPersonnelReport;
+use Modules\VehicleRegistration\Models\VehicleRegistration;
 use App\Helpers\PermissionHelper;
 
 class DashboardController extends Controller
@@ -29,6 +30,7 @@ class DashboardController extends Controller
             'employees' => Employee::count(),
             'leave_requests' => EmployeeLeave::count(),
             'reports' => DailyPersonnelReport::count(),
+            'vehicle_registrations' => VehicleRegistration::count(),
             'users' => User::count(),
         ];
 
@@ -97,6 +99,19 @@ class DashboardController extends Controller
                 'status' => 'active',
                 'count' => $stats['leave_requests'],
                 'color' => 'warning'
+            ];
+        }
+
+        // Vehicle Registration
+        if (PermissionHelper::userCan('vehicle_registration.view')) {
+            $modules[] = [
+                'name' => 'Đăng ký xe',
+                'description' => 'Quản lý đăng ký sử dụng xe công vụ',
+                'icon' => 'la la-car',
+                'url' => backpack_url('vehicle-registration'),
+                'status' => 'active',
+                'count' => $stats['vehicle_registrations'],
+                'color' => 'secondary'
             ];
         }
 

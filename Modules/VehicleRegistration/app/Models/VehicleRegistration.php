@@ -178,16 +178,65 @@ class VehicleRegistration extends Model
 
     public function approveButton()
     {
-        // Check permission first
-        if (!\App\Helpers\PermissionHelper::userCan('vehicle_registration.approve')) {
-            return '';
-        }
-        
-        // Step 3: Ban Giám Đốc phê duyệt
+        // Step 3: Ban Giám Đốc phê duyệt - show button for testing
         if ($this->workflow_status === 'dept_review' && $this->vehicle_id) {
-            return '<a class="btn btn-sm btn-success" href="' . backpack_url('vehicle-registration/' . $this->id . '/approve') . '">
-                <i class="la la-check"></i> Phê duyệt
-            </a>';
+            return '<button class="btn btn-sm btn-success approve-btn" 
+                        onclick="
+                            var pin = prompt(\'Nhập PIN chứng thư số A1:\', \'\');
+                            if (pin) {
+                                if (confirm(\'Xác nhận phê duyệt với PIN: \' + pin + \'?\')) {
+                                    var form = document.createElement(\'form\');
+                                    form.method = \'POST\';
+                                    form.action = \'' . route('vehicle-registration.approve-with-pin', $this->id) . '\';
+                                    
+                                    var csrfToken = document.createElement(\'input\');
+                                    csrfToken.type = \'hidden\';
+                                    csrfToken.name = \'_token\';
+                                    csrfToken.value = document.querySelector(\'meta[name=csrf-token]\').getAttribute(\'content\');
+                                    form.appendChild(csrfToken);
+                                    
+                                    var pinInput = document.createElement(\'input\');
+                                    pinInput.type = \'hidden\';
+                                    pinInput.name = \'certificate_pin\';
+                                    pinInput.value = pin;
+                                    form.appendChild(pinInput);
+                                    
+                                    var regInput = document.createElement(\'input\');
+                                    regInput.type = \'hidden\';
+                                    regInput.name = \'registration_id\';
+                                    regInput.value = \'' . $this->id . '\';
+                                    form.appendChild(regInput);
+                                    
+                                    document.body.appendChild(form);
+                                    
+                                    // Submit with AJAX
+                                    var formData = new FormData(form);
+                                    fetch(form.action, {
+                                        method: \'POST\',
+                                        body: formData,
+                                        headers: {
+                                            \'X-Requested-With\': \'XMLHttpRequest\'
+                                        }
+                                    })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            alert(\'✅ Phê duyệt thành công! PDF đã được ký số.\');
+                                            window.location.reload();
+                                        } else {
+                                            alert(\'❌ Lỗi: \' + (data.message || \'Không thể phê duyệt\'));
+                                        }
+                                    })
+                                    .catch(error => {
+                                        alert(\'❌ Có lỗi xảy ra: \' + error);
+                                    });
+                                    
+                                    document.body.removeChild(form);
+                                }
+                            }
+                        ">
+                <i class="la la-check"></i> Phê duyệt với PIN
+            </button>';
         }
         return '';
     }
@@ -220,6 +269,22 @@ class VehicleRegistration extends Model
         if ($this->status === 'approved') {
             return '<a class="btn btn-sm btn-info" href="' . backpack_url('vehicle-registration/' . $this->id . '/download-pdf') . '" target="_blank">
                 <i class="la la-download"></i> Tải PDF
+            </a>';
+        }
+        return '';
+    }
+    
+    public function checkSignatureButton()
+    {
+        // Check permission first
+        if (!\App\Helpers\PermissionHelper::userCan('vehicle_registration.approve')) {
+            return '';
+        }
+        
+        // Kiểm tra chữ ký khi đã có PDF
+        if ($this->status === 'approved' && $this->signed_pdf_path) {
+            return '<a class="btn btn-sm btn-warning" href="' . backpack_url('vehicle-registration/' . $this->id . '/check-signature') . '" target="_blank">
+                <i class="la la-certificate"></i> Kiểm tra chữ ký
             </a>';
         }
         return '';
