@@ -156,7 +156,7 @@
         </div>
         <div class="info-row">
             <div class="info-label">Ngày đăng ký:</div>
-            <div class="info-value">{{ $registration->created_at->format('d/m/Y H:i') }}</div>
+            <div class="info-value">{{ $registration->created_at->format('d/m/Y') }}</div>
         </div>
         <div class="info-row">
             <div class="info-label">Trạng thái:</div>
@@ -171,15 +171,15 @@
     <div class="section-title">II. THÔNG TIN CHUYẾN ĐI</div>
     <div class="info-section">
         <div class="info-row">
-            <div class="info-label">Ngày giờ đi:</div>
+            <div class="info-label">Ngày đi:</div>
             <div class="info-value">
-                {{ $registration->departure_datetime ? \Carbon\Carbon::parse($registration->departure_datetime)->format('d/m/Y H:i') : 'N/A' }}
+                {{ $registration->departure_datetime ? \Carbon\Carbon::parse($registration->departure_datetime)->format('d/m/Y') : 'N/A' }}
             </div>
         </div>
         <div class="info-row">
-            <div class="info-label">Ngày giờ về:</div>
+            <div class="info-label">Ngày về:</div>
             <div class="info-value">
-                {{ $registration->return_datetime ? \Carbon\Carbon::parse($registration->return_datetime)->format('d/m/Y H:i') : 'N/A' }}
+                {{ $registration->return_datetime ? \Carbon\Carbon::parse($registration->return_datetime)->format('d/m/Y') : 'N/A' }}
             </div>
         </div>
         <div class="info-row">

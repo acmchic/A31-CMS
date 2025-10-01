@@ -128,7 +128,6 @@ $(document).ready(function() {
         'vehicle_registration.approve': 'Phê duyệt đăng ký xe',
         'vehicle_registration.reject': 'Từ chối đăng ký xe',
         'vehicle_registration.download_pdf': 'Tải PDF đã ký',
-        'vehicle_registration.check_signature': 'Kiểm tra chữ ký số',
         'report.view': 'Xem báo cáo quân số',
         'report.create': 'Tạo báo cáo quân số',
         'report.edit': 'Sửa báo cáo quân số',

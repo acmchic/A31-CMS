@@ -20,15 +20,14 @@ class VehicleRegistrationPermissionSeeder extends Seeder
             'vehicle_registration.create' => 'Tạo đăng ký xe mới',
             'vehicle_registration.edit' => 'Sửa đăng ký xe',
             'vehicle_registration.delete' => 'Xóa đăng ký xe',
-            
+
             // Workflow permissions
             'vehicle_registration.assign' => 'Phân công xe và lái xe (Đội trưởng xe)',
             'vehicle_registration.approve' => 'Phê duyệt đăng ký xe (Ban Giám Đốc)',
             'vehicle_registration.reject' => 'Từ chối đăng ký xe',
-            
+
             // Additional permissions
             'vehicle_registration.download_pdf' => 'Tải PDF đã ký',
-            'vehicle_registration.check_signature' => 'Kiểm tra chữ ký số',
         ];
 
         foreach ($permissions as $name => $description) {

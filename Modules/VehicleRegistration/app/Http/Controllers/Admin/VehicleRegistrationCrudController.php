@@ -68,17 +68,17 @@ class VehicleRegistrationCrudController extends CrudController
     {
         $user = backpack_user();
 
-        // CRUD buttons
+        // CRUD buttons - Deny access to operations if no permission
         if (!PermissionHelper::can($user, 'vehicle_registration.create')) {
-            CRUD::removeButton('create');
+            CRUD::denyAccess('create');
         }
 
         if (!PermissionHelper::can($user, 'vehicle_registration.edit')) {
-            CRUD::removeButton('edit');
+            CRUD::denyAccess('update');
         }
 
         if (!PermissionHelper::can($user, 'vehicle_registration.delete')) {
-            CRUD::removeButton('delete');
+            CRUD::denyAccess('delete');
         }
 
         // 3-Step Workflow Buttons
@@ -93,7 +93,6 @@ class VehicleRegistrationCrudController extends CrudController
             CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
             CRUD::addButtonFromModelFunction('line', 'reject', 'rejectButton', 'beginning');
             CRUD::addButtonFromModelFunction('line', 'download_pdf', 'downloadPdfButton', 'beginning');
-            CRUD::addButtonFromModelFunction('line', 'check_signature', 'checkSignatureButton', 'beginning');
         }
     }
 
@@ -101,8 +100,8 @@ class VehicleRegistrationCrudController extends CrudController
     {
         CRUD::column('id')->label('ID');
         CRUD::column('user_id')->label('Người đăng ký')->type('select')->entity('user')->attribute('name');
-        CRUD::column('departure_datetime')->label('Ngày giờ đi')->type('datetime');
-        CRUD::column('return_datetime')->label('Ngày giờ về')->type('datetime');
+        CRUD::column('departure_datetime')->label('Ngày đi')->type('date');
+        CRUD::column('return_datetime')->label('Ngày về')->type('date');
         CRUD::column('route')->label('Tuyến đường')->limit(50);
         CRUD::column('purpose')->label('Mục đích')->limit(50);
         CRUD::column('passenger_count')->label('Số người');
@@ -126,7 +125,7 @@ class VehicleRegistrationCrudController extends CrudController
         CRUD::column('status_display')->label('Trạng thái');
         CRUD::column('workflow_status_display')->label('Quy trình');
         CRUD::column('created_at')->label('Ngày tạo')->type('datetime');
-        
+
         // Add modal to the view - inject via JavaScript
         CRUD::addClause('whereRaw', '1=1'); // Dummy clause to ensure setup runs
     }
@@ -142,10 +141,41 @@ class VehicleRegistrationCrudController extends CrudController
         $this->addBasicFields();
     }
 
+    protected function setupShowOperation()
+    {
+        // Use custom view for show operation
+        CRUD::setShowView('vehicleregistration::show');
+    }
+
     private function addBasicFields()
     {
-        CRUD::field('departure_datetime')->label('Ngày đi, Giờ đi')->type('datetime')->attributes(['required' => true]);
-        CRUD::field('return_datetime')->label('Ngày về, Giờ về')->type('datetime')->attributes(['required' => true]);
+        // Departure and Return date on the same row (no time)
+        CRUD::field([
+            'name' => 'departure_datetime',
+            'label' => 'Ngày đi',
+            'type' => 'date',
+            'allows_null' => false,
+            'wrapper' => [
+                'class' => 'form-group col-md-6'
+            ],
+            'attributes' => [
+                'required' => true
+            ]
+        ]);
+
+        CRUD::field([
+            'name' => 'return_datetime',
+            'label' => 'Ngày về',
+            'type' => 'date',
+            'allows_null' => false,
+            'wrapper' => [
+                'class' => 'form-group col-md-6'
+            ],
+            'attributes' => [
+                'required' => true
+            ]
+        ]);
+
         CRUD::field('route')->label('Tuyến đường')->type('textarea')->attributes(['required' => true]);
         CRUD::field('purpose')->label('Mục đích sử dụng')->type('textarea')->attributes(['required' => true]);
         CRUD::field('passenger_count')->label('Số lượng người')->type('number')->default(1);
@@ -222,17 +252,17 @@ class VehicleRegistrationCrudController extends CrudController
         }
 
         // Extract dates from datetime fields for compatibility
-        $departureDate = $registration->departure_datetime ? 
-            \Carbon\Carbon::parse($registration->departure_datetime)->toDateString() : 
+        $departureDate = $registration->departure_datetime ?
+            \Carbon\Carbon::parse($registration->departure_datetime)->toDateString() :
             $registration->departure_date;
-        $returnDate = $registration->return_datetime ? 
-            \Carbon\Carbon::parse($registration->return_datetime)->toDateString() : 
+        $returnDate = $registration->return_datetime ?
+            \Carbon\Carbon::parse($registration->return_datetime)->toDateString() :
             $registration->return_date;
-            
+
         // Get available vehicles and drivers for the dates
         $availableVehicles = $this->getAvailableVehicles($departureDate, $returnDate);
         $availableDrivers = $this->getAvailableDrivers($departureDate, $returnDate);
-        
+
         // Get available vehicles and drivers (employees with driver role)
         $availableVehicles = \Modules\VehicleRegistration\Models\Vehicle::available()
             ->forDateRange($departureDate, $returnDate)
@@ -271,17 +301,17 @@ class VehicleRegistrationCrudController extends CrudController
 
         $request->validate([
             'vehicle_id' => 'required|exists:vehicles,id',
-            'driver_id' => 'nullable|exists:employees,id',
-            'driver_name' => 'required_without:driver_id|string',
-            'driver_license' => 'required_without:driver_id|string',
+            'driver_id' => 'required|exists:employees,id',
         ]);
+
+        // Get driver info
+        $driver = \Modules\OrganizationStructure\Models\Employee::find($request->driver_id);
 
         // Update registration
         $registration->update([
             'vehicle_id' => $request->vehicle_id,
             'driver_id' => $request->driver_id,
-            'driver_name' => $request->driver_name,
-            'driver_license' => $request->driver_license,
+            'driver_name' => $driver ? $driver->name : null,
             'workflow_status' => 'dept_review',
             'updated_by' => backpack_user()->name
         ]);
@@ -382,21 +412,21 @@ class VehicleRegistrationCrudController extends CrudController
         // Generate PDF with digital signature
         try {
             $pdfPath = VehicleRegistrationPdfService::generateApprovalPdf($registration);
-            
+
             \Log::info('PDF Generated for vehicle registration:', [
                 'registration_id' => $registration->id,
                 'pdf_path' => $pdfPath,
                 'approver' => backpack_user()->name
             ]);
-            
+
             return redirect(backpack_url('vehicle-registration'))->with('success', 'Đã phê duyệt và tạo PDF thành công! Chữ ký số đã được áp dụng.');
-            
+
         } catch (\Exception $e) {
             \Log::error('PDF Generation Error:', [
                 'registration_id' => $registration->id,
                 'error' => $e->getMessage()
             ]);
-            
+
             return redirect(backpack_url('vehicle-registration'))->with('warning', 'Đã phê duyệt thành công nhưng có lỗi khi tạo PDF: ' . $e->getMessage());
         }
     }
@@ -436,22 +466,22 @@ class VehicleRegistrationCrudController extends CrudController
             if ($registration->signed_pdf_path && Storage::disk('public')->exists($registration->signed_pdf_path)) {
                 return Storage::disk('public')->download($registration->signed_pdf_path, 'Dang_ky_xe_' . $registration->id . '.pdf');
             }
-            
+
             // Generate PDF on-the-fly if not exists
             $pdfPath = VehicleRegistrationPdfService::generatePdf($registration, true);
-            
+
             return Storage::disk('public')->download($pdfPath, 'Dang_ky_xe_' . $registration->id . '.pdf');
-            
+
         } catch (\Exception $e) {
             \Log::error('PDF Download Error:', [
                 'registration_id' => $registration->id,
                 'error' => $e->getMessage()
             ]);
-            
+
             return redirect()->back()->with('error', 'Lỗi khi tạo PDF: ' . $e->getMessage());
         }
     }
-    
+
     /**
      * Approve with PIN (new method)
      */
@@ -493,7 +523,7 @@ class VehicleRegistrationCrudController extends CrudController
 
             // Get user certificate
             $certificatePath = \App\Services\UserCertificateService::getUserCertificatePath($user);
-            
+
             if (!$certificatePath) {
                 return response()->json([
                     'success' => false,
@@ -507,7 +537,7 @@ class VehicleRegistrationCrudController extends CrudController
 
             // Validate certificate với certificate password
             $validation = \App\Services\UserCertificateService::validateCertificate($certificatePath, $certificatePassword);
-            
+
             if (!$validation['valid']) {
                 return response()->json([
                     'success' => false,
@@ -529,34 +559,34 @@ class VehicleRegistrationCrudController extends CrudController
                 'certificate_path' => $certificatePath,
                 'php_openssl_loaded' => extension_loaded('openssl')
             ]);
-            
+
             $pdfPath = \App\Services\TcpdfPdfSigner::generateApprovalPdfWithPin(
-                $registration, 
-                $certificatePath, 
+                $registration,
+                $certificatePath,
                 $certificatePassword
             );
-            
+
             \Log::info('PDF Generated with PIN for vehicle registration:', [
                 'registration_id' => $registration->id,
                 'pdf_path' => $pdfPath,
                 'approver' => $user->name,
                 'certificate_used' => basename($certificatePath)
             ]);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Phê duyệt thành công! PDF đã được ký số.',
                 'download_url' => route('vehicle-registration.download-pdf', $id),
                 'pdf_path' => $pdfPath
             ]);
-            
+
         } catch (\Exception $e) {
             \Log::error('PDF Generation Error with PIN:', [
                 'registration_id' => $registration->id,
                 'error' => $e->getMessage(),
                 'user' => $user->name
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Lỗi khi tạo PDF: ' . $e->getMessage()
@@ -580,13 +610,13 @@ class VehicleRegistrationCrudController extends CrudController
 
         try {
             $validation = VehicleRegistrationPdfService::validatePdfSignature($registration->signed_pdf_path);
-            
+
             return response()->json([
                 'success' => true,
                 'validation' => $validation,
                 'message' => $validation['valid'] ? 'PDF có chữ ký hợp lệ' : 'PDF không có chữ ký số hoặc chữ ký không hợp lệ'
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
