@@ -70,27 +70,14 @@
                                 </div>
                             </div>
 
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Phòng ban</label>
-                                        <input type="text" class="form-control" value="{{ $user->department ? $user->department->name : 'Chưa phân công' }}" readonly>
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Email</label>
-                                        <input type="text" class="form-control" value="{{ $user->email }}" readonly>
-                                    </div>
-                                </div>
+                            <div class="mb-3">
+                                <label class="form-label">Phòng ban</label>
+                                <input type="text" class="form-control" value="{{ $user->department ? $user->department->name : '--' }}" readonly>
                             </div>
 
-                            <div class="text-end">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="la la-save"></i> Cập nhật thông tin
-                                </button>
-                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="la la-save"></i> Cập nhật thông tin
+                            </button>
                         </form>
                     </div>
 
@@ -147,101 +134,114 @@
                         <div class="row mb-4">
                             <div class="col-md-6">
                                 <h6><i class="la la-user-circle"></i> Ảnh đại diện</h6>
-                                <div class="text-center mb-3">
-                                    @if($user->profile_photo_path)
-                                        <img src="{{ Storage::url($user->profile_photo_path) }}"
+                                <form method="POST" action="{{ route('admin.profile.upload-photo') }}" enctype="multipart/form-data" id="photoForm">
+                                    @csrf
+                                    @method('PUT')
+                                    
+                                    <div class="text-center mb-3" onclick="document.getElementById('profile_photo').click()" style="cursor: pointer;">
+                                        <img id="photo_preview" 
+                                             src="{{ $user->profile_photo_path ? Storage::url($user->profile_photo_path) : '' }}"
                                              alt="Ảnh đại diện"
-                                             class="img-thumbnail"
+                                             class="img-thumbnail {{ $user->profile_photo_path ? '' : 'd-none' }}"
                                              style="width: 150px; height: 150px; object-fit: cover;">
-                                    @else
-                                        <div class="bg-light d-flex align-items-center justify-content-center"
+                                        
+                                        <div id="photo_placeholder" class="bg-light d-flex align-items-center justify-content-center {{ $user->profile_photo_path ? 'd-none' : '' }}"
                                              style="width: 150px; height: 150px; margin: 0 auto; border: 2px dashed #ccc;">
-                                            <i class="la la-user fa-3x text-muted"></i>
+                                            <div class="text-center">
+                                                <i class="la la-user fa-3x text-muted"></i>
+                                                <p class="text-muted small mt-2 mb-0">Click để chọn ảnh</p>
+                                            </div>
                                         </div>
+                                    </div>
+
+                                    <input type="file" class="d-none" id="profile_photo" name="profile_photo" accept="image/*">
+                                    
+                                    <div class="text-center">
+                                        <small class="text-muted">JPEG, PNG, JPG, GIF. Tối đa 2MB</small>
+                                    </div>
+                                    
+                                    @if($errors->has('profile_photo'))
+                                        <div class="alert alert-danger mt-2">{{ $errors->first('profile_photo') }}</div>
                                     @endif
-                                </div>
 
-                                <form method="POST" action="{{ route('admin.profile.upload-photo') }}" enctype="multipart/form-data">
-                                    @csrf
-                                    @method('PUT')
-
-                                    <div class="mb-3">
-                                        <label for="profile_photo" class="form-label">Chọn ảnh đại diện</label>
-                                        <input type="file" class="form-control @if($errors->has('profile_photo')) is-invalid @endif"
-                                               id="profile_photo" name="profile_photo" accept="image/*">
-                                        <div class="form-text">Định dạng: JPEG, PNG, JPG, GIF. Kích thước tối đa: 2MB</div>
-                                        @if($errors->has('profile_photo'))
-                                            <div class="invalid-feedback">{{ $errors->first('profile_photo') }}</div>
-                                        @endif
+                                    @if($user->profile_photo_path)
+                                    <div class="text-center mt-2">
+                                        <a href="{{ route('admin.profile.delete-photo') }}"
+                                           class="btn btn-danger btn-sm"
+                                           onclick="event.preventDefault(); if(confirm('Bạn có chắc chắn muốn xóa ảnh đại diện?')) { this.closest('form').nextElementSibling.submit(); }">
+                                            <i class="la la-trash"></i> Xóa ảnh
+                                        </a>
                                     </div>
-
-                                    <div class="d-flex gap-2">
-                                        <button type="submit" class="btn btn-primary btn-sm">
-                                            <i class="la la-upload"></i> Tải lên
-                                        </button>
-
-                                        @if($user->profile_photo_path)
-                                            <a href="{{ route('admin.profile.delete-photo') }}"
-                                               class="btn btn-danger btn-sm"
-                                               onclick="return confirm('Bạn có chắc chắn muốn xóa ảnh đại diện?')">
-                                                <i class="la la-trash"></i> Xóa ảnh
-                                            </a>
-                                        @endif
-                                    </div>
+                                    @endif
                                 </form>
+                                
+                                @if($user->profile_photo_path)
+                                <form method="POST" action="{{ route('admin.profile.delete-photo') }}" class="d-none" id="deletePhotoForm">
+                                    @csrf
+                                    @method('DELETE')
+                                </form>
+                                @endif
                             </div>
 
-                            <!-- Chữ ký số -->
+                            <!-- Chữ ký số - chỉ hiển thị cho Admin, Trưởng phòng, Ban Giám đốc -->
+                            @if($user->hasRole('Admin') || $user->hasRole('Trưởng phòng') || $user->hasRole('Ban Giám đốc'))
                             <div class="col-md-6">
-                                <h6><i class="la la-pen"></i> Chữ ký số (Hình ảnh trực quan)</h6>
-                                <div class="text-center mb-3">
-                                    @if($user->signature_path)
-                                        <img src="{{ Storage::url($user->signature_path) }}"
-                                             alt="Chữ ký"
-                                             class="img-thumbnail"
-                                             style="width: 200px; height: 100px; object-fit: contain;">
-                                    @else
-                                        <div class="bg-light d-flex align-items-center justify-content-center"
-                                             style="width: 200px; height: 100px; margin: 0 auto; border: 2px dashed #ccc;">
-                                            <i class="la la-pen fa-2x text-muted"></i>
-                                        </div>
-                                    @endif
-                                </div>
-
-                                <form method="POST" action="{{ route('admin.profile.upload-signature') }}" enctype="multipart/form-data">
+                                <h6><i class="la la-pen"></i> Chữ ký số</h6>
+                                <form method="POST" action="{{ route('admin.profile.upload-signature') }}" enctype="multipart/form-data" id="signatureForm">
                                     @csrf
                                     @method('PUT')
-
-                                    <div class="mb-3">
-                                        <label for="signature" class="form-label">Chọn ảnh chữ ký</label>
-                                        <input type="file" class="form-control @if($errors->has('signature')) is-invalid @endif"
-                                               id="signature" name="signature" accept="image/*">
-                                        <div class="form-text">Định dạng: JPEG, PNG, JPG, GIF. Kích thước tối đa: 2MB</div>
-                                        @if($errors->has('signature'))
-                                            <div class="invalid-feedback">{{ $errors->first('signature') }}</div>
-                                        @endif
+                                    
+                                    <div class="text-center mb-3" onclick="document.getElementById('signature').click()" style="cursor: pointer;">
+                                        <img id="signature_preview" 
+                                             src="{{ $user->signature_path ? Storage::url($user->signature_path) : '' }}"
+                                             alt="Chữ ký"
+                                             class="img-thumbnail {{ $user->signature_path ? '' : 'd-none' }}"
+                                             style="width: 200px; height: 100px; object-fit: contain;">
+                                        
+                                        <div id="signature_placeholder" class="bg-light d-flex align-items-center justify-content-center {{ $user->signature_path ? 'd-none' : '' }}"
+                                             style="width: 200px; height: 100px; margin: 0 auto; border: 2px dashed #ccc;">
+                                            <div class="text-center">
+                                                <i class="la la-pen fa-2x text-muted"></i>
+                                                <p class="text-muted small mt-2 mb-0">Click để chọn chữ ký</p>
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    <div class="d-flex gap-2">
-                                        <button type="submit" class="btn btn-primary btn-sm">
-                                            <i class="la la-upload"></i> Tải lên
-                                        </button>
-
-                                        @if($user->signature_path)
-                                            <a href="{{ route('admin.profile.delete-signature') }}"
-                                               class="btn btn-danger btn-sm"
-                                               onclick="return confirm('Bạn có chắc chắn muốn xóa chữ ký?')">
-                                                <i class="la la-trash"></i> Xóa chữ ký
-                                            </a>
-                                        @endif
+                                    <input type="file" class="d-none" id="signature" name="signature" accept="image/*">
+                                    
+                                    <div class="text-center">
+                                        <small class="text-muted">JPEG, PNG, JPG, GIF. Tối đa 2MB</small>
                                     </div>
+                                    
+                                    @if($errors->has('signature'))
+                                        <div class="alert alert-danger mt-2">{{ $errors->first('signature') }}</div>
+                                    @endif
+
+                                    @if($user->signature_path)
+                                    <div class="text-center mt-2">
+                                        <a href="{{ route('admin.profile.delete-signature') }}"
+                                           class="btn btn-danger btn-sm"
+                                           onclick="event.preventDefault(); if(confirm('Bạn có chắc chắn muốn xóa chữ ký?')) { document.getElementById('deleteSignatureForm').submit(); }">
+                                            <i class="la la-trash"></i> Xóa chữ ký
+                                        </a>
+                                    </div>
+                                    @endif
                                 </form>
+                                
+                                @if($user->signature_path)
+                                <form method="POST" action="{{ route('admin.profile.delete-signature') }}" class="d-none" id="deleteSignatureForm">
+                                    @csrf
+                                    @method('DELETE')
+                                </form>
+                                @endif
                             </div>
+                            @endif
                         </div>
 
+                        <!-- PIN cho chữ ký số - chỉ hiển thị cho Admin, Trưởng phòng, Ban Giám đốc -->
+                        @if($user->hasRole('Admin') || $user->hasRole('Trưởng phòng') || $user->hasRole('Ban Giám đốc'))
                         <hr class="my-4">
-
-                        <!-- PIN cho chữ ký số -->
+                        
                         <div class="row">
                             <div class="col-12">
                                 <h5><i class="la la-lock"></i> Mã PIN cho chữ ký số</h5>
@@ -308,6 +308,7 @@
                                 </form>
                             </div>
                         </div>
+                        @endif
 
                     </div>
                 </div>
@@ -319,27 +320,75 @@
 
 @section('after_scripts')
 <script>
-    // Preview image before upload
+    // ✅ Auto preview and submit for profile photo
     document.getElementById('profile_photo').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
+            // Validate file size (2MB max)
+            if (file.size > 2 * 1024 * 1024) {
+                alert('Kích thước ảnh không được vượt quá 2MB');
+                this.value = '';
+                return;
+            }
+            
+            // Validate file type
+            if (!file.type.match('image.*')) {
+                alert('Vui lòng chọn file ảnh');
+                this.value = '';
+                return;
+            }
+            
+            // Show preview
             const reader = new FileReader();
             reader.onload = function(e) {
-                // You can add image preview functionality here
+                document.getElementById('photo_preview').src = e.target.result;
+                document.getElementById('photo_preview').classList.remove('d-none');
+                document.getElementById('photo_placeholder').classList.add('d-none');
             };
             reader.readAsDataURL(file);
+            
+            // Auto submit form
+            setTimeout(() => {
+                document.getElementById('photoForm').submit();
+            }, 500);
         }
     });
 
-    document.getElementById('signature').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                // You can add signature preview functionality here
-            };
-            reader.readAsDataURL(file);
-        }
-    });
+    // ✅ Auto preview and submit for signature (if element exists)
+    const signatureInput = document.getElementById('signature');
+    if (signatureInput) {
+        signatureInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Validate file size
+                if (file.size > 2 * 1024 * 1024) {
+                    alert('Kích thước ảnh không được vượt quá 2MB');
+                    this.value = '';
+                    return;
+                }
+                
+                // Validate file type
+                if (!file.type.match('image.*')) {
+                    alert('Vui lòng chọn file ảnh');
+                    this.value = '';
+                    return;
+                }
+                
+                // Show preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('signature_preview').src = e.target.result;
+                    document.getElementById('signature_preview').classList.remove('d-none');
+                    document.getElementById('signature_placeholder').classList.add('d-none');
+                };
+                reader.readAsDataURL(file);
+                
+                // Auto submit form
+                setTimeout(() => {
+                    document.getElementById('signatureForm').submit();
+                }, 500);
+            }
+        });
+    }
 </script>
 @endsection
