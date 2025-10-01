@@ -81,17 +81,21 @@ class VehicleRegistrationCrudController extends CrudController
             CRUD::denyAccess('delete');
         }
 
-        // 3-Step Workflow Buttons
+        // ✅ Workflow Buttons using ApprovalWorkflow module
 
-        // Step 2: Đội trưởng xe phân công (chỉ cho role Doi Truong Xe)
+        // Step 1: Đội trưởng xe phân công (specific to VehicleRegistration)
         if (PermissionHelper::can($user, 'vehicle_registration.assign')) {
             CRUD::addButtonFromModelFunction('line', 'assign_vehicle', 'assignVehicleButton', 'beginning');
         }
 
-        // Step 3: Ban Giám Đốc phê duyệt (chỉ cho role Ban Giam Doc)
+        // Step 2: Ban Giám Đốc phê duyệt (using ApprovalWorkflow buttons)
         if (PermissionHelper::can($user, 'vehicle_registration.approve')) {
             CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
             CRUD::addButtonFromModelFunction('line', 'reject', 'rejectButton', 'beginning');
+        }
+        
+        // Download PDF (using ApprovalWorkflow button)
+        if (PermissionHelper::can($user, 'vehicle_registration.view')) {
             CRUD::addButtonFromModelFunction('line', 'download_pdf', 'downloadPdfButton', 'beginning');
         }
     }
@@ -431,24 +435,8 @@ class VehicleRegistrationCrudController extends CrudController
         }
     }
 
-    /**
-     * Simple reject method
-     */
-    public function reject($id)
-    {
-        $registration = VehicleRegistration::findOrFail($id);
-
-        if (!PermissionHelper::userCan('vehicle_registration.approve')) {
-            abort(403, 'Bạn không có quyền từ chối.');
-        }
-
-        $registration->update([
-            'status' => 'rejected',
-            'workflow_status' => 'rejected',
-        ]);
-
-        return redirect(backpack_url('vehicle-registration'))->with('success', 'Đã từ chối đăng ký xe.');
-    }
+    // ❌ REMOVED: reject() method
+    // ✅ This is now handled by ApprovalWorkflow module's ApprovalController!
 
     /**
      * Download PDF with signature
@@ -482,117 +470,8 @@ class VehicleRegistrationCrudController extends CrudController
         }
     }
 
-    /**
-     * Approve with PIN (new method)
-     */
-    public function approveWithPin(Request $request, $id)
-    {
-        $registration = VehicleRegistration::findOrFail($id);
-
-        if (!PermissionHelper::userCan('vehicle_registration.approve')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Bạn không có quyền phê duyệt.'
-            ]);
-        }
-
-        // Validate input - Yêu cầu nhập PIN
-        $request->validate([
-            'certificate_pin' => 'required|string|min:1'
-        ]);
-
-        $inputPin = $request->certificate_pin;
-        $user = backpack_user();
-
-        try {
-            // Check if user has set up PIN
-            if (!$user->certificate_pin) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Bạn chưa thiết lập PIN chữ ký số. Vui lòng vào trang Thông tin cá nhân để thiết lập PIN.'
-                ]);
-            }
-
-            // Validate input PIN với PIN đã lưu trong database
-            if ($inputPin !== $user->certificate_pin) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Mã PIN không hợp lệ. Vui lòng thử lại.'
-                ]);
-            }
-
-            // Get user certificate
-            $certificatePath = \App\Services\UserCertificateService::getUserCertificatePath($user);
-
-            if (!$certificatePath) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Không tìm thấy chứng thư số. Vui lòng liên hệ quản trị viên.'
-                ]);
-            }
-
-            // Lấy password của certificate file (KHÔNG phải PIN của user!)
-            // PIN của user chỉ để xác thực, password certificate để mở file .pfx
-            $certificatePassword = config('pdf-sign.certificate_password', 'A31Factory2025');
-
-            // Validate certificate với certificate password
-            $validation = \App\Services\UserCertificateService::validateCertificate($certificatePath, $certificatePassword);
-
-            if (!$validation['valid']) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validation['error']
-                ]);
-            }
-
-            // Update approval info
-            $registration->update([
-                'status' => 'approved',
-                'workflow_status' => 'approved',
-                'director_approved_by' => $user->id,
-                'director_approved_at' => now(),
-            ]);
-
-            // Use TCPDF signer (Adobe Reader compatible - shows Signature Panel)
-            \Log::info('Using TcpdfPdfSigner (Adobe Reader compatible)', [
-                'registration_id' => $registration->id,
-                'certificate_path' => $certificatePath,
-                'php_openssl_loaded' => extension_loaded('openssl')
-            ]);
-
-            $pdfPath = \App\Services\TcpdfPdfSigner::generateApprovalPdfWithPin(
-                $registration,
-                $certificatePath,
-                $certificatePassword
-            );
-
-            \Log::info('PDF Generated with PIN for vehicle registration:', [
-                'registration_id' => $registration->id,
-                'pdf_path' => $pdfPath,
-                'approver' => $user->name,
-                'certificate_used' => basename($certificatePath)
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Phê duyệt thành công! PDF đã được ký số.',
-                'download_url' => route('vehicle-registration.download-pdf', $id),
-                'pdf_path' => $pdfPath
-            ]);
-
-        } catch (\Exception $e) {
-            \Log::error('PDF Generation Error with PIN:', [
-                'registration_id' => $registration->id,
-                'error' => $e->getMessage(),
-                'user' => $user->name
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Lỗi khi tạo PDF: ' . $e->getMessage()
-            ]);
-        }
-    }
+    // ❌ REMOVED: approveWithPin() method
+    // ✅ This is now handled by ApprovalWorkflow module's ApprovalController!
 
     /**
      * Check PDF signature validity

@@ -6,10 +6,25 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Backpack\CRUD\app\Models\Traits\CrudTrait;
+use Modules\ApprovalWorkflow\Traits\HasApprovalWorkflow;
+use Modules\ApprovalWorkflow\Traits\HasDigitalSignature;
+use Modules\ApprovalWorkflow\Traits\ApprovalButtons;
 
 class VehicleRegistration extends Model
 {
     use HasFactory, SoftDeletes, CrudTrait;
+    use HasApprovalWorkflow, HasDigitalSignature, ApprovalButtons;
+    
+    // ✅ Configure ApprovalWorkflow
+    protected $workflowType = 'two_level';
+    protected $pdfView = 'vehicleregistration::pdf.registration';
+    protected $pdfDirectory = 'vehicle_registrations';
+    
+    // ✅ Set default workflow_status for VehicleRegistration
+    protected $attributes = [
+        'workflow_status' => 'submitted', // VehicleRegistration starts with 'submitted', not 'pending'
+        'status' => 'pending',
+    ];
 
     protected $fillable = [
         'user_id',
@@ -82,6 +97,90 @@ class VehicleRegistration extends Model
     {
         return $this->belongsTo(\App\Models\User::class, 'director_approved_by');
     }
+    
+    // ✅ Map old column names to ApprovalWorkflow convention
+    public function getWorkflowLevel1ByAttribute()
+    {
+        return $this->attributes['department_approved_by'] ?? null;
+    }
+    
+    public function getWorkflowLevel1AtAttribute()
+    {
+        return isset($this->attributes['department_approved_at']) ? $this->attributes['department_approved_at'] : null;
+    }
+    
+    public function getWorkflowLevel2ByAttribute()
+    {
+        return $this->attributes['director_approved_by'] ?? null;
+    }
+    
+    public function getWorkflowLevel2AtAttribute()
+    {
+        return isset($this->attributes['director_approved_at']) ? $this->attributes['director_approved_at'] : null;
+    }
+    
+    // ✅ Override relationships để dùng cột cũ
+    public function level1Approver()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'department_approved_by');
+    }
+    
+    public function level2Approver()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'director_approved_by');
+    }
+    
+    // ✅ Override module permission
+    protected function getModulePermission(): string
+    {
+        return 'vehicle_registration';
+    }
+    
+    // ✅ Custom PDF title
+    public function getPdfTitle(): string
+    {
+        return 'Đăng ký xe số ' . $this->id;
+    }
+    
+    // ✅ Custom PDF filename for download
+    public function getPdfFilename(): string
+    {
+        return 'dang_ky_xe_' . $this->id . '.pdf';
+    }
+    
+    // ✅ Custom PDF filename pattern for saving
+    public function getCustomPdfFilename(): string
+    {
+        return 'dang_ky_xe.pdf';
+    }
+    
+    // ✅ Override PDF owner username - use requester's username
+    public function getCustomPdfOwnerUsername(): string
+    {
+        // Use username of person who requested (user_id)
+        if ($this->user) {
+            return $this->user->username ?? 'user_' . $this->user->id;
+        }
+        
+        return 'unknown';
+    }
+    
+    // ✅ Custom PDF data
+    public function getPdfData(): array
+    {
+        $baseData = [
+            'model' => $this,
+            'approver' => $this->getCurrentLevelApprover(),
+            'generated_at' => \Carbon\Carbon::now()->format('d/m/Y H:i:s'),
+        ];
+        
+        return array_merge($baseData, [
+            'registration' => $this,
+            'requester' => $this->user,
+            'vehicle' => $this->vehicle,
+            'driver' => $this->driver,
+        ]);
+    }
 
     // Accessors
     public function getStatusDisplayAttribute()
@@ -125,7 +224,8 @@ class VehicleRegistration extends Model
         return null;
     }
 
-    public function getWorkflowStatusDisplayAttribute()
+    // ✅ Override workflow status mapping for VehicleRegistration
+    public function getWorkflowStatusDisplayAttribute(): string
     {
         $workflows = [
             'submitted' => 'Đã gửi',
@@ -136,6 +236,55 @@ class VehicleRegistration extends Model
         ];
         
         return $workflows[$this->workflow_status] ?? $this->workflow_status;
+    }
+    
+    // ✅ Override getNextWorkflowStep for VehicleRegistration workflow
+    public function getNextWorkflowStep(): ?string
+    {
+        $currentStep = $this->getCurrentWorkflowStep();
+        
+        // VehicleRegistration has 3-step workflow: submitted → dept_review → approved
+        $workflowMap = [
+            'submitted' => 'dept_review',      // Step 1: Assign vehicle (dept)
+            'dept_review' => 'approved',       // Step 2: Director approve (final)
+            'director_review' => 'approved',   // Legacy support
+            'approved' => null,                // Done
+            'rejected' => null,                // Done
+        ];
+        
+        return $workflowMap[$currentStep] ?? null;
+    }
+    
+    // ✅ Override canBeApproved - check if has PDF already
+    public function canBeApproved(): bool
+    {
+        // Cannot approve if already has PDF
+        if ($this->signed_pdf_path) {
+            return false;
+        }
+        
+        if ($this->workflow_status === 'approved') {
+            return false;
+        }
+        
+        // Can approve at dept_review or director_review
+        return in_array($this->workflow_status, ['dept_review', 'director_review']);
+    }
+    
+    // ✅ Override canBeRejected
+    public function canBeRejected(): bool
+    {
+        // Cannot reject if already has PDF
+        if ($this->signed_pdf_path) {
+            return false;
+        }
+        
+        if ($this->workflow_status === 'approved') {
+            return false;
+        }
+        
+        // Can reject at submitted or dept_review
+        return in_array($this->workflow_status, ['submitted', 'dept_review', 'director_review']);
     }
 
     // Helper methods
@@ -151,15 +300,15 @@ class VehicleRegistration extends Model
 
     public function isApproved()
     {
-        return $this->status === 'approved';
+        return $this->status === 'approved' || $this->workflow_status === 'approved';
     }
 
     public function isRejected()
     {
-        return $this->status === 'rejected';
+        return $this->status === 'rejected' || $this->workflow_status === 'rejected';
     }
 
-    // 3-Step Workflow Buttons
+    // ✅ Keep assignVehicleButton - specific to VehicleRegistration
     public function assignVehicleButton()
     {
         // Check permission first
@@ -167,7 +316,7 @@ class VehicleRegistration extends Model
             return '';
         }
         
-        // Step 2: Đội trưởng xe phân công
+        // Step 1: Đội trưởng xe phân công (only for submitted status without vehicle)
         if ($this->workflow_status === 'submitted' && !$this->vehicle_id) {
             return '<a class="btn btn-sm btn-warning" href="' . backpack_url('vehicle-registration/' . $this->id . '/assign-vehicle') . '">
                 <i class="la la-car"></i> Phân xe & lái xe
@@ -175,163 +324,7 @@ class VehicleRegistration extends Model
         }
         return '';
     }
-
-    public function approveButton()
-    {
-        // Step 3: Ban Giám Đốc phê duyệt - Yêu cầu nhập PIN để xác thực
-        if ($this->workflow_status === 'dept_review' && $this->vehicle_id) {
-            $modalId = 'pinModal_' . $this->id;
-            
-            return '
-            <button class="btn btn-sm btn-success" onclick="showPinModal_' . $this->id . '()">
-                <i class="la la-check"></i> Phê duyệt & Ký số
-            </button>
-            <script>
-            function showPinModal_' . $this->id . '() {
-                // Tạo modal động và append vào body
-                var modalHtml = `
-                <div class="modal fade" id="' . $modalId . '" tabindex="-1" data-bs-backdrop="static" style="z-index: 99999 !important;">
-                    <div class="modal-dialog" style="z-index: 100000 !important;">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">Xác nhận Phê duyệt & Ký số</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <p class="mb-3">Vui lòng nhập mã PIN chữ ký số của bạn để xác thực:</p>
-                                <div class="mb-3">
-                                    <label class="form-label">Mã PIN</label>
-                                    <input type="password" class="form-control" id="pin_input_' . $this->id . '" placeholder="Nhập mã PIN" autofocus>
-                                    <div class="form-text">Mã PIN này đã được thiết lập trong trang Thông tin cá nhân</div>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                                <button type="button" class="btn btn-success" onclick="submitApproval_' . $this->id . '()">
-                                    <i class="la la-check"></i> Xác nhận Ký số
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-                
-                // Remove existing modal if any
-                var existingModal = document.getElementById(\'' . $modalId . '\');
-                if (existingModal) {
-                    existingModal.remove();
-                }
-                
-                // Append to body
-                document.body.insertAdjacentHTML(\'beforeend\', modalHtml);
-                
-                // Show modal
-                var modal = new bootstrap.Modal(document.getElementById(\'' . $modalId . '\'));
-                modal.show();
-                
-                // Focus on input when shown
-                document.getElementById(\'' . $modalId . '\').addEventListener(\'shown.bs.modal\', function() {
-                    document.getElementById(\'pin_input_' . $this->id . '\').focus();
-                });
-                
-                // Cleanup on hide
-                document.getElementById(\'' . $modalId . '\').addEventListener(\'hidden.bs.modal\', function() {
-                    this.remove();
-                });
-            }
-            
-            function submitApproval_' . $this->id . '() {
-                var pin = document.getElementById(\'pin_input_' . $this->id . '\').value;
-                if (!pin || pin.trim() === \'\') {
-                    alert(\'Vui lòng nhập mã PIN!\');
-                    return;
-                }
-                
-                var formData = new FormData();
-                formData.append(\'_token\', document.querySelector(\'meta[name=csrf-token]\').getAttribute(\'content\'));
-                formData.append(\'certificate_pin\', pin);
-                formData.append(\'registration_id\', \'' . $this->id . '\');
-                
-                fetch(\'' . route('vehicle-registration.approve-with-pin', $this->id) . '\', {
-                    method: \'POST\',
-                    body: formData,
-                    headers: {
-                        \'X-Requested-With\': \'XMLHttpRequest\'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // Close modal
-                    var modalEl = document.getElementById(\'' . $modalId . '\');
-                    var modal = bootstrap.Modal.getInstance(modalEl);
-                    if (modal) modal.hide();
-                    
-                    if (data.success) {
-                        alert(\'✅ Phê duyệt thành công! PDF đã được ký số.\');
-                        window.location.reload();
-                    } else {
-                        alert(\'❌ Lỗi: \' + (data.message || \'Không thể phê duyệt\'));
-                    }
-                })
-                .catch(error => {
-                    alert(\'❌ Có lỗi xảy ra: \' + error);
-                });
-            }
-            </script>
-            <style>
-                .modal-backdrop { z-index: 99998 !important; }
-                #' . $modalId . ' { z-index: 99999 !important; }
-            </style>
-            ';
-        }
-        return '';
-    }
-
-    public function rejectButton()
-    {
-        // Check permission first
-        if (!\App\Helpers\PermissionHelper::userCan('vehicle_registration.approve')) {
-            return '';
-        }
-        
-        // Có thể từ chối ở bất kỳ step nào
-        if (in_array($this->workflow_status, ['submitted', 'dept_review'])) {
-            return '<a class="btn btn-sm btn-danger" href="' . backpack_url('vehicle-registration/' . $this->id . '/reject') . '" 
-                onclick="return confirm(\'Bạn có chắc chắn muốn từ chối đăng ký này?\')">
-                <i class="la la-times"></i> Từ chối
-            </a>';
-        }
-        return '';
-    }
-
-    public function downloadPdfButton()
-    {
-        // Check permission first - anyone who can view can download
-        if (!\App\Helpers\PermissionHelper::userCan('vehicle_registration.view')) {
-            return '';
-        }
-        
-        // Tải PDF khi đã approved
-        if ($this->status === 'approved') {
-            return '<a class="btn btn-sm btn-info" href="' . backpack_url('vehicle-registration/' . $this->id . '/download-pdf') . '" target="_blank">
-                <i class="la la-download"></i> Tải PDF
-            </a>';
-        }
-        return '';
-    }
     
-    public function checkSignatureButton()
-    {
-        // Check permission first
-        if (!\App\Helpers\PermissionHelper::userCan('vehicle_registration.approve')) {
-            return '';
-        }
-        
-        // Kiểm tra chữ ký khi đã có PDF
-        if ($this->status === 'approved' && $this->signed_pdf_path) {
-            return '<a class="btn btn-sm btn-warning" href="' . backpack_url('vehicle-registration/' . $this->id . '/check-signature') . '" target="_blank">
-                <i class="la la-certificate"></i> Kiểm tra chữ ký
-            </a>';
-        }
-        return '';
-    }
+    // ❌ REMOVED: approveButton(), rejectButton(), downloadPdfButton()
+    // ✅ These are now provided by ApprovalButtons trait from ApprovalWorkflow module!
 }

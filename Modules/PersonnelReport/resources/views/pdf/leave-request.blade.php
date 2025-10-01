@@ -220,11 +220,8 @@
     </div>
     @endif
 
-    <div style="margin-top: 15px; text-align: center; font-size: 7px; color: #888; border-top: 1px solid #ddd; padding-top: 8px;">
-        <p style="margin: 2px 0;">Tài liệu được tạo tự động - {{ $generated_at }}</p>
-        @if($leave->isApproved() || $leave->workflow_status === 'approved_by_director')
-        <p style="font-style: italic; margin: 2px 0;">Chữ ký số hợp lệ - Xác thực bởi Nhà máy A31</p>
-        @endif
+    <div style="margin-top: 15px; text-align: center; font-size: 8px; color: #666; border-top: 1px solid #ddd; padding-top: 8px;">
+        <p style="margin: 0;">Nhà máy A31</p>
     </div>
 </body>
 </html>

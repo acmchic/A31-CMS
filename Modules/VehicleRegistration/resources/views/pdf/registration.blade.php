@@ -1,279 +1,183 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đăng Ký Sử Dụng Xe - #{{ $registration->id }}</title>
+    <meta charset="utf-8">
+    <title>Đăng ký xe #{{ $registration->id }}</title>
     <style>
         body {
             font-family: 'DejaVu Sans', sans-serif;
-            font-size: 12px;
-            line-height: 1.4;
-            margin: 0;
-            padding: 20px;
+            font-size: 10px;
+            line-height: 1.3;
+            color: #000;
+            margin: 15px;
         }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 15px;
+        .header-container {
+            width: 100%;
+            margin-bottom: 5px;
         }
-        
-        .header h1 {
-            font-size: 18px;
-            font-weight: bold;
-            margin: 0;
-            color: #333;
-        }
-        
-        .header h2 {
-            font-size: 16px;
-            margin: 5px 0;
-            color: #666;
-        }
-        
-        .info-section {
-            margin-bottom: 20px;
-        }
-        
-        .info-row {
-            display: flex;
-            margin-bottom: 8px;
-        }
-        
-        .info-label {
-            width: 150px;
-            font-weight: bold;
-            color: #333;
-        }
-        
-        .info-value {
-            flex: 1;
-            border-bottom: 1px dotted #ccc;
-            padding-bottom: 2px;
-        }
-        
-        .section-title {
-            font-size: 14px;
-            font-weight: bold;
-            color: #333;
-            margin: 20px 0 10px 0;
-            border-left: 4px solid #007bff;
-            padding-left: 10px;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        
-        .status-approved {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .status-pending {
-            background-color: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-        }
-        
-        .status-rejected {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        .signature-section {
-            margin-top: 40px;
-            page-break-inside: avoid;
-        }
-        
-        .signature-box {
-            border: 1px solid #333;
-            padding: 15px;
-            margin: 10px 0;
-            min-height: 80px;
-            position: relative;
-        }
-        
-        .signature-title {
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-        
-        .signature-info {
-            font-size: 11px;
-            color: #666;
-        }
-        
-        .signature-image {
-            position: absolute;
-            right: 15px;
-            top: 15px;
-            max-width: 100px;
-            max-height: 60px;
-        }
-        
-        .footer {
-            margin-top: 30px;
+        .header-center {
             text-align: center;
             font-size: 10px;
-            color: #666;
-            border-top: 1px solid #ccc;
-            padding-top: 10px;
+            font-weight: bold;
+            line-height: 1.4;
         }
-        
-        .vehicle-info {
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 10px 0;
+        .logo {
+            width: 70px;
+            height: auto;
+            margin-bottom: 5px;
+        }
+        h1 {
+            text-align: center;
+            color: #000;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 5px 0 12px 0;
+            text-transform: uppercase;
+        }
+        h2 {
+            color: #000;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 12px 0 6px 0;
+            border-bottom: none;
+        }
+        .status-approved {
+            color: green;
+            font-weight: bold;
+        }
+        .status-rejected {
+            color: red;
+            font-weight: bold;
+        }
+        .rejection-box {
+            background-color: #ffe6e6;
+            border-left: 4px solid #cc0000;
+            padding: 8px;
+            margin: 8px 0;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>ĐĂNG KÝ SỬ DỤNG XE</h1>
-        <h2>Nhà máy A31 - Bộ Quốc Phòng</h2>
-        <p>Số: {{ str_pad($registration->id, 4, '0', STR_PAD_LEFT) }}/{{ date('Y') }}</p>
-    </div>
-
-    <div class="section-title">I. THÔNG TIN ĐĂNG KÝ</div>
-    <div class="info-section">
-        <div class="info-row">
-            <div class="info-label">Người đăng ký:</div>
-            <div class="info-value">{{ $registration->user->name ?? 'N/A' }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Phòng ban:</div>
-            <div class="info-value">{{ $registration->user->department->name ?? 'N/A' }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Ngày đăng ký:</div>
-            <div class="info-value">{{ $registration->created_at->format('d/m/Y') }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Trạng thái:</div>
-            <div class="info-value">
-                <span class="status-badge {{ $registration->status === 'approved' ? 'status-approved' : ($registration->status === 'rejected' ? 'status-rejected' : 'status-pending') }}">
-                    {{ $registration->status_display }}
-                </span>
-            </div>
+    <div class="header-container">
+        <div class="header-center">
+            <img src="{{ public_path('assets/logo/logo.png') }}" class="logo" alt="Logo"><br>
+            QUÂN CHỦNG PHÒNG KHÔNG - KHÔNG QUÂN<br>
+            NHÀ MÁY A31
         </div>
     </div>
 
-    <div class="section-title">II. THÔNG TIN CHUYẾN ĐI</div>
-    <div class="info-section">
-        <div class="info-row">
-            <div class="info-label">Ngày đi:</div>
-            <div class="info-value">
-                {{ $registration->departure_datetime ? \Carbon\Carbon::parse($registration->departure_datetime)->format('d/m/Y') : 'N/A' }}
-            </div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Ngày về:</div>
-            <div class="info-value">
-                {{ $registration->return_datetime ? \Carbon\Carbon::parse($registration->return_datetime)->format('d/m/Y') : 'N/A' }}
-            </div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Tuyến đường:</div>
-            <div class="info-value">{{ $registration->route }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Mục đích:</div>
-            <div class="info-value">{{ $registration->purpose }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Số lượng người:</div>
-            <div class="info-value">{{ $registration->passenger_count }} người</div>
-        </div>
-        @if($registration->cargo_description)
-        <div class="info-row">
-            <div class="info-label">Hàng hóa:</div>
-            <div class="info-value">{{ $registration->cargo_description }}</div>
-        </div>
-        @endif
-    </div>
+    <h1>Phiếu đăng ký sử dụng xe</h1>
+    
+    <h2>I. THÔNG TIN ĐĂNG KÝ</h2>
+    <table border="1" cellpadding="6" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 6px 0 10px 0;">
+        <tr>
+            <td style="width: 30%; background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Người đăng ký:</td>
+            <td style="width: 70%; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $requester ? $requester->name : 'N/A' }}</td>
+        </tr>
+        <tr>
+            <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Phòng ban:</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $requester && $requester->department ? $requester->department->name : 'N/A' }}</td>
+        </tr>
+        <tr>
+            <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Ngày đi:</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->departure_datetime ? \Carbon\Carbon::parse($registration->departure_datetime)->format('d/m/Y') : 'N/A' }}</td>
+        </tr>
+        <tr>
+            <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Ngày về:</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->return_datetime ? \Carbon\Carbon::parse($registration->return_datetime)->format('d/m/Y') : 'N/A' }}</td>
+        </tr>
+        <tr>
+            <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Tuyến đường:</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->route ?? 'N/A' }}</td>
+        </tr>
+        <tr>
+            <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Mục đích:</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->purpose ?? 'N/A' }}</td>
+        </tr>
+        <tr>
+            <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Số người:</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->passenger_count }}</td>
+        </tr>
+    </table>
 
-    @if($registration->vehicle_id || $registration->driver_name)
-    <div class="section-title">III. THÔNG TIN XE VÀ LÁI XE</div>
-    <div class="vehicle-info">
-        @if($registration->vehicle)
-        <div class="info-row">
-            <div class="info-label">Xe được phân:</div>
-            <div class="info-value">{{ $registration->vehicle->full_name ?? 'N/A' }}</div>
-        </div>
-        @endif
-        
-        <div class="info-row">
-            <div class="info-label">Lái xe:</div>
-            <div class="info-value">
-                {{ $registration->driver->name ?? $registration->driver_name ?? 'N/A' }}
-            </div>
-        </div>
-        
+    <h2>II. THÔNG TIN XE VÀ LÁI XE</h2>
+    <table border="1" cellpadding="6" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 6px 0 10px 0;">
+        <tr>
+            <td style="width: 30%; background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Xe được phân:</td>
+            <td style="width: 70%; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $vehicle ? $vehicle->full_name : 'Chưa phân' }}</td>
+        </tr>
+        <tr>
+            <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Lái xe:</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->driver_name ?? 'Chưa phân' }}</td>
+        </tr>
         @if($registration->driver_license)
-        <div class="info-row">
-            <div class="info-label">Số bằng lái:</div>
-            <div class="info-value">{{ $registration->driver_license }}</div>
-        </div>
+        <tr>
+            <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Bằng lái:</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->driver_license }}</td>
+        </tr>
         @endif
+    </table>
+
+    @if($registration->isApproved() || $registration->workflow_status === 'approved')
+    <h2>III. PHÊ DUYỆT</h2>
+    <table border="1" cellpadding="6" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 6px 0 10px 0;">
+        @if($registration->level1Approver || $registration->departmentApprover)
+        <tr>
+            <td style="width: 30%; background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Phòng ban - Người duyệt:</td>
+            <td style="width: 70%; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->level1Approver ? $registration->level1Approver->name : ($registration->departmentApprover ? $registration->departmentApprover->name : 'N/A') }}</td>
+        </tr>
+        <tr>
+            <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Phòng ban - Thời gian:</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->workflow_level1_at ? \Carbon\Carbon::parse($registration->workflow_level1_at)->format('d/m/Y H:i') : ($registration->department_approved_at ? \Carbon\Carbon::parse($registration->department_approved_at)->format('d/m/Y H:i') : '--') }}</td>
+        </tr>
+        @endif
+
+        @if($registration->level2Approver || $registration->directorApprover)
+        <tr>
+            <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Ban giám đốc - Người duyệt:</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->level2Approver ? $registration->level2Approver->name : ($registration->directorApprover ? $registration->directorApprover->name : 'N/A') }}</td>
+        </tr>
+        <tr>
+            <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Ban giám đốc - Thời gian:</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->workflow_level2_at ? \Carbon\Carbon::parse($registration->workflow_level2_at)->format('d/m/Y H:i') : ($registration->director_approved_at ? \Carbon\Carbon::parse($registration->director_approved_at)->format('d/m/Y H:i') : '--') }}</td>
+        </tr>
+        @endif
+    </table>
+
+    <div style="margin-top: 20px;">
+        <table border="0" cellpadding="5" cellspacing="0" style="width: 100%; border: none;">
+            <tr>
+                <td style="width: 50%; border: none; text-align: center; vertical-align: top;">
+                    <p style="font-weight: bold; font-size: 10px; margin: 0;">NGƯỜI ĐĂNG KÝ</p>
+                    <p style="font-style: italic; font-size: 8px; color: #666; margin: 3px 0 35px 0;">(Ký và ghi rõ họ tên)</p>
+                    <p style="font-weight: bold; font-size: 10px; margin: 0;">{{ $requester ? $requester->name : '' }}</p>
+                </td>
+                <td style="width: 50%; border: none; text-align: center; vertical-align: top;">
+                    <p style="font-weight: bold; font-size: 10px; margin: 0;">{{ $approver && $approver->department ? strtoupper($approver->department->name) : 'BAN GIÁM ĐỐC' }}</p>
+                    <p style="font-style: italic; font-size: 8px; color: #666; margin: 3px 0;">
+                        (Đã ký số)
+                        @if($registration->workflow_level2_at)
+                        <br>Ngày {{ \Carbon\Carbon::parse($registration->workflow_level2_at)->format('d/m/Y') }}
+                        @elseif($registration->director_approved_at)
+                        <br>Ngày {{ \Carbon\Carbon::parse($registration->director_approved_at)->format('d/m/Y') }}
+                        @endif
+                    </p>
+                    <p style="font-weight: bold; font-size: 10px; margin: 35px 0 0 0;">{{ $approver ? $approver->name : '' }}</p>
+                </td>
+            </tr>
+        </table>
     </div>
     @endif
 
-    @if($registration->status === 'approved')
-    <div class="section-title">IV. PHÊ DUYỆT</div>
-    <div class="signature-section">
-        @if($registration->director_approved_at)
-        <div class="signature-box">
-            <div class="signature-title">NGƯỜI PHÊ DUYỆT</div>
-            <div class="signature-info">
-                <strong>Họ tên:</strong> {{ $registration->directorApprover->name ?? 'N/A' }}<br>
-                <strong>Chức vụ:</strong> {{ $registration->directorApprover->position_display ?? 'N/A' }}<br>
-                <strong>Thời gian:</strong> {{ $registration->director_approved_at->format('d/m/Y H:i') }}<br>
-                <strong>Ý kiến:</strong> Đồng ý cho sử dụng xe theo đăng ký
-            </div>
-            
-            @if($registration->directorApprover && $registration->directorApprover->signature_path)
-            <img src="{{ public_path('storage/' . $registration->directorApprover->signature_path) }}" 
-                 alt="Chữ ký" class="signature-image">
-            @endif
-            
-            <div style="position: absolute; bottom: 15px; right: 15px; font-size: 10px; color: #999;">
-                Ký số: {{ $registration->director_approved_at->format('dmY_His') }}
-            </div>
-        </div>
-        @endif
+    @if($registration->isRejected() && $registration->rejection_reason)
+    <h2>III. TỪ CHỐI</h2>
+    <div class="rejection-box">
+        <strong>Lý do:</strong> {{ $registration->rejection_reason }}
     </div>
     @endif
 
-    @if($registration->status === 'rejected')
-    <div class="section-title">IV. TỪ CHỐI</div>
-    <div class="info-section">
-        <div class="info-row">
-            <div class="info-label">Lý do từ chối:</div>
-            <div class="info-value">{{ $registration->rejection_reason ?? 'Không đáp ứng yêu cầu' }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Cấp từ chối:</div>
-            <div class="info-value">{{ $registration->rejection_level === 'department' ? 'Phòng ban' : 'Ban Giám Đốc' }}</div>
-        </div>
-    </div>
-    @endif
-
-    <div class="footer">
-        <p>Tài liệu được tạo tự động bởi hệ thống A31 CMS</p>
-        <p>Thời gian tạo: {{ $generated_at }}</p>
-        @if($registration->status === 'approved')
-        <p><strong>Tài liệu đã được ký số điện tử</strong></p>
-        @endif
+    <div style="margin-top: 15px; text-align: center; font-size: 8px; color: #666; border-top: 1px solid #ddd; padding-top: 8px;">
+        <p style="margin: 0;">Nhà máy A31</p>
     </div>
 </body>
 </html>
