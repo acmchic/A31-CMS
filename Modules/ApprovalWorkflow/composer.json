@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/approvalworkflow",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\ApprovalWorkflow\\": "app/",
+            "Modules\\ApprovalWorkflow\\Database\\Factories\\": "database/factories/",
+            "Modules\\ApprovalWorkflow\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\ApprovalWorkflow\\Tests\\": "tests/"
+        }
+    }
+}

@@ -3,5 +3,6 @@
     "UserManagement": true,
     "OrganizationStructure": true,
     "PersonnelReport": true,
-    "VehicleRegistration": true
+    "VehicleRegistration": true,
+    "ApprovalWorkflow": true
 }

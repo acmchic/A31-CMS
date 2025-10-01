@@ -1,0 +1,11 @@
+{
+    "name": "ApprovalWorkflow",
+    "alias": "approvalworkflow",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\ApprovalWorkflow\\Providers\\ApprovalWorkflowServiceProvider"
+    ],
+    "files": []
+}

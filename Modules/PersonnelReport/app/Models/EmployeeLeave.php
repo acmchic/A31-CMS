@@ -7,12 +7,21 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Backpack\CRUD\app\Models\Traits\CrudTrait;
 use Modules\OrganizationStructure\Models\Employee;
+use Modules\ApprovalWorkflow\Traits\HasApprovalWorkflow;
+use Modules\ApprovalWorkflow\Traits\HasDigitalSignature;
+use Modules\ApprovalWorkflow\Traits\ApprovalButtons;
 
 class EmployeeLeave extends Model
 {
     use HasFactory, SoftDeletes, CrudTrait;
+    use HasApprovalWorkflow, HasDigitalSignature, ApprovalButtons;
 
     protected $table = 'employee_leave';
+    
+    // ✅ Configure ApprovalWorkflow
+    protected $workflowType = 'two_level';
+    protected $pdfView = 'personnelreport::pdf.leave-request';
+    protected $pdfDirectory = 'leave_requests';
 
     protected $fillable = [
         'employee_id',
@@ -111,6 +120,169 @@ class EmployeeLeave extends Model
     {
         return $this->belongsTo(\App\Models\User::class, 'approved_by_director');
     }
+    
+    // ✅ Map old column names to ApprovalWorkflow convention
+    public function getWorkflowLevel1ByAttribute()
+    {
+        return $this->attributes['approved_by_approver'] ?? null;
+    }
+    
+    public function getWorkflowLevel1AtAttribute()
+    {
+        return isset($this->attributes['approved_at_approver']) ? $this->attributes['approved_at_approver'] : null;
+    }
+    
+    public function getWorkflowLevel2ByAttribute()
+    {
+        return $this->attributes['approved_by_director'] ?? null;
+    }
+    
+    public function getWorkflowLevel2AtAttribute()
+    {
+        return isset($this->attributes['approved_at_director']) ? $this->attributes['approved_at_director'] : null;
+    }
+    
+    // ✅ Override level1Approver relationship để dùng cột cũ
+    public function level1Approver()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'approved_by_approver');
+    }
+    
+    // ✅ Override level2Approver relationship để dùng cột cũ
+    public function level2Approver()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'approved_by_director');
+    }
+    
+    // ✅ Override module permission
+    protected function getModulePermission(): string
+    {
+        return 'leave';
+    }
+    
+    // ✅ Custom PDF title
+    public function getPdfTitle(): string
+    {
+        return 'Đơn xin nghỉ phép #' . $this->id;
+    }
+    
+    // ✅ Custom PDF filename for download
+    public function getPdfFilename(): string
+    {
+        return 'don_xin_nghi_phep_' . $this->id . '.pdf';
+    }
+    
+    // ✅ Custom PDF filename pattern for saving
+    public function getCustomPdfFilename(): string
+    {
+        return 'don_nghi_phep.pdf';
+    }
+    
+    // ✅ Override PDF owner username - use employee's username instead of approver
+    public function getCustomPdfOwnerUsername(): string
+    {
+        // Get employee's user account username
+        if ($this->employee && $this->employee->user) {
+            return $this->employee->user->username ?? 'user_' . $this->employee->user->id;
+        }
+        
+        // If employee doesn't have user account, use employee ID
+        if ($this->employee) {
+            return 'employee_' . $this->employee->id;
+        }
+        
+        // Fallback
+        return 'unknown';
+    }
+    
+    // ✅ Custom PDF data (override trait method)
+    public function getPdfData(): array
+    {
+        // Get base data from trait
+        $baseData = [
+            'model' => $this,
+            'approver' => $this->getCurrentLevelApprover(),
+            'generated_at' => \Carbon\Carbon::now()->format('d/m/Y H:i:s'),
+        ];
+        
+        // Add custom leave-specific data
+        return array_merge($baseData, [
+            'leave' => $this,
+            'employee' => $this->employee,
+            'department' => $this->employee ? $this->employee->department : null,
+        ]);
+    }
+    
+    // ✅ Override workflow status mapping to match old constants
+    public function getWorkflowStatusDisplayAttribute(): string
+    {
+        // Map old workflow status to display text
+        $statuses = [
+            'pending' => 'Chờ phê duyệt',
+            'approved_by_approver' => 'Đã phê duyệt cấp 1',  // old constant
+            'level1_approved' => 'Đã phê duyệt cấp 1',       // new ApprovalWorkflow
+            'approved_by_director' => 'Đã phê duyệt hoàn tất', // old constant  
+            'level2_approved' => 'Đã phê duyệt hoàn tất',     // new (not used)
+            'approved' => 'Đã phê duyệt hoàn tất',            // new ApprovalWorkflow
+            'rejected' => 'Đã từ chối'
+        ];
+        
+        return $statuses[$this->workflow_status] ?? $this->workflow_status;
+    }
+    
+    // ✅ Override getNextWorkflowStep to support old workflow status values
+    public function getNextWorkflowStep(): ?string
+    {
+        $currentStep = $this->getCurrentWorkflowStep();
+        
+        // Map old workflow status to new flow
+        $workflowMap = [
+            'pending' => 'approved_by_approver',              // Cấp 1 approve
+            'approved_by_approver' => 'approved_by_director',  // Cấp 2 approve (final)
+            'approved_by_director' => null,                    // Done - cannot approve anymore
+            'approved' => null,                                // Done
+            'rejected' => null,                                // Done
+        ];
+        
+        return $workflowMap[$currentStep] ?? null;
+    }
+    
+    // ✅ Override canBeApproved to prevent approving if already has PDF
+    public function canBeApproved(): bool
+    {
+        // Cannot approve if:
+        // 1. Already has signed PDF (final approval done)
+        // 2. Already rejected
+        // 3. Already at final status
+        if ($this->signed_pdf_path) {
+            return false;
+        }
+        
+        if ($this->workflow_status === 'approved_by_director') {
+            return false;
+        }
+        
+        // Can approve if: pending or approved_by_approver (for level 2)
+        return in_array($this->workflow_status, ['pending', 'approved_by_approver']);
+    }
+    
+    // ✅ Override canBeRejected to prevent rejecting if already has PDF
+    public function canBeRejected(): bool
+    {
+        // Cannot reject if:
+        // 1. Already has signed PDF (final approval done)
+        // 2. Already at final status
+        if ($this->signed_pdf_path) {
+            return false;
+        }
+        
+        if ($this->workflow_status === 'approved_by_director') {
+            return false;
+        }
+        
+        // Can reject if: pending or approved_by_approver (before final approval)
+        return in_array($this->workflow_status, ['pending', 'approved_by_approver']);
+    }
 
     // Scopes
     public function scopeInDepartment($query, $departmentId)
@@ -208,75 +380,51 @@ class EmployeeLeave extends Model
         return $this->note;
     }
 
-    public function getLocationAttribute()
-    {
-        return 'N/A'; // This field doesn't exist in employee_leave table
-    }
-
+    // ❌ REMOVED: approveButton(), rejectButton(), downloadPdfButton()
+    // ✅ These methods are now provided by ApprovalButtons trait!
+    
     /**
-     * Get approve button HTML
+     * ✅ Conditional Edit button - Only show for pending status
      */
-    public function approveButton()
+    public function editButtonConditional()
     {
         $user = backpack_user();
         
-        if (!$user) {
+        // Only show edit button if:
+        // 1. User has permission
+        // 2. Status is pending (not approved or rejected)
+        if (!\App\Helpers\PermissionHelper::can($user, 'leave.edit')) {
             return '';
         }
         
-        // Phê duyệt cấp 1 (Phê duyệt role)
-        if ($user->hasRole('Phê duyệt') && $this->workflow_status === self::WORKFLOW_PENDING) {
-            return '<a class="btn btn-sm btn-success" href="' . backpack_url('leave-request/' . $this->id . '/approve') . '" title="Phê duyệt cấp 1" onclick="return confirm(\'Bạn có chắc chắn muốn phê duyệt cấp 1?\')">
-                        <i class="la la-check"></i> Phê duyệt
-                    </a>';
-        }
-        
-        // Phê duyệt cấp 2 (Admin hoặc BAN GIÁM ĐỐC)
-        if (($user->hasRole('Admin') || $user->department_id == 1) && $this->workflow_status === self::WORKFLOW_APPROVED_BY_APPROVER) {
-            return '<a class="btn btn-sm btn-success" href="' . backpack_url('leave-request/' . $this->id . '/approve') . '" title="Phê duyệt cấp 2" onclick="return confirm(\'Bạn có chắc chắn muốn phê duyệt hoàn tất?\')">
-                        <i class="la la-check"></i> Phê duyệt cấp 2
-                    </a>';
+        if ($this->workflow_status === 'pending') {
+            return '<a class="btn btn-sm btn-link" href="' . backpack_url('leave-request/' . $this->id . '/edit') . '" title="Sửa">
+                <i class="la la-edit"></i> Sửa
+            </a>';
         }
         
         return '';
     }
-
+    
     /**
-     * Get reject button HTML
+     * ✅ Conditional Delete button - Only show for pending/rejected status
      */
-    public function rejectButton()
+    public function deleteButtonConditional()
     {
         $user = backpack_user();
         
-        if (!$user) {
+        // Only show delete button if:
+        // 1. User has permission
+        // 2. Status is pending or rejected (not approved)
+        if (!\App\Helpers\PermissionHelper::can($user, 'leave.delete')) {
             return '';
         }
         
-        // Chỉ có thể từ chối ở trạng thái pending
-        if ($user->hasRole('Phê duyệt') && $this->workflow_status === self::WORKFLOW_PENDING) {
-            return '<a class="btn btn-sm btn-danger" href="' . backpack_url('leave-request/' . $this->id . '/reject') . '" title="Từ chối" onclick="return confirm(\'Bạn có chắc chắn muốn từ chối đơn xin nghỉ phép này?\')">
-                        <i class="la la-times"></i> Từ chối
-                    </a>';
-        }
-        
-        return '';
-    }
-
-    /**
-     * Get download PDF button HTML
-     */
-    public function downloadPdfButton()
-    {
-        $user = backpack_user();
-        
-        if (!$user) {
-            return '';
-        }
-        
-        if ($this->workflow_status === self::WORKFLOW_APPROVED_BY_DIRECTOR && $this->signed_pdf_path) {
-            return '<a class="btn btn-sm btn-info" href="' . backpack_url('leave-request/' . $this->id . '/download-pdf') . '" title="Tải PDF đã ký số" target="_blank">
-                        <i class="la la-download"></i> Tải PDF
-                    </a>';
+        if (in_array($this->workflow_status, ['pending', 'rejected'])) {
+            return '<a class="btn btn-sm btn-link" href="' . backpack_url('leave-request/' . $this->id . '/delete') . '" 
+                onclick="return confirm(\'Bạn có chắc chắn muốn xóa?\');" title="Xóa">
+                <i class="la la-trash"></i> Xóa
+            </a>';
         }
         
         return '';
