@@ -78,8 +78,12 @@ $(document).ready(function() {
             permissions: ['dashboard.view', 'user.view', 'user.create', 'user.edit', 'user.delete', 'role.view', 'role.create', 'role.edit', 'role.delete', 'permission.view', 'permission.create', 'permission.edit', 'permission.delete']
         },
         'organization': {
-            title: '🏢 Cơ cấu tổ chức', 
+            title: '🏢 Cơ cấu tổ chức',
             permissions: ['department.view', 'department.create', 'department.edit', 'department.delete', 'department.approve', 'employee.view', 'employee.create', 'employee.edit', 'employee.delete', 'employee.approve']
+        },
+        'vehicle_registration': {
+            title: '🚗 Đăng ký xe',
+            permissions: ['vehicle_registration.view', 'vehicle_registration.create', 'vehicle_registration.edit', 'vehicle_registration.delete', 'vehicle_registration.assign', 'vehicle_registration.approve', 'vehicle_registration.reject', 'vehicle_registration.download_pdf', 'vehicle_registration.check_signature']
         },
         'personnel_report': {
             title: '📊 Báo cáo quân số',
@@ -96,7 +100,7 @@ $(document).ready(function() {
         'dashboard.view': 'Xem bảng điều khiển',
         'user.view': 'Xem người dùng',
         'user.create': 'Tạo người dùng',
-        'user.edit': 'Sửa người dùng', 
+        'user.edit': 'Sửa người dùng',
         'user.delete': 'Xóa người dùng',
         'role.view': 'Xem vai trò',
         'role.create': 'Tạo vai trò',
@@ -116,6 +120,15 @@ $(document).ready(function() {
         'employee.edit': 'Sửa nhân viên',
         'employee.delete': 'Xóa nhân viên',
         'employee.approve': 'Phê duyệt nhân viên',
+        'vehicle_registration.view': 'Xem danh sách đăng ký xe',
+        'vehicle_registration.create': 'Tạo đăng ký xe mới',
+        'vehicle_registration.edit': 'Sửa đăng ký xe',
+        'vehicle_registration.delete': 'Xóa đăng ký xe',
+        'vehicle_registration.assign': 'Phân công xe và lái xe',
+        'vehicle_registration.approve': 'Phê duyệt đăng ký xe',
+        'vehicle_registration.reject': 'Từ chối đăng ký xe',
+        'vehicle_registration.download_pdf': 'Tải PDF đã ký',
+        'vehicle_registration.check_signature': 'Kiểm tra chữ ký số',
         'report.view': 'Xem báo cáo quân số',
         'report.create': 'Tạo báo cáo quân số',
         'report.edit': 'Sửa báo cáo quân số',
@@ -159,7 +172,7 @@ $(document).ready(function() {
             module.permissions.forEach(function(permission) {
                 var permissionId = getPermissionId(permission);
                 var displayName = displayNames[permission] || permission;
-                
+
                 if (permissionId) {
                     groupHtml += '<div class="permission-item">';
                     groupHtml += '<input type="checkbox" name="permissions[]" value="' + permissionId + '" id="permission_' + permission.replace(/\./g, '_') + '" data-group="' + moduleKey + '">';
@@ -180,13 +193,13 @@ $(document).ready(function() {
     function loadCurrentValues() {
         var container = $('#permission-groups-container');
         var currentPermissions = JSON.parse(container.attr('data-current-permissions') || '[]');
-        
+
         console.log('Loading current permissions:', currentPermissions);
-        
+
         currentPermissions.forEach(function(permissionName) {
             var permissionId = getPermissionId(permissionName);
             console.log('Permission:', permissionName, '=> ID:', permissionId);
-            
+
             if (permissionId) {
                 var checkbox = $('input[name="permissions[]"][value="' + permissionId + '"]');
                 checkbox.prop('checked', true);
@@ -200,7 +213,7 @@ $(document).ready(function() {
             var groupCheckbox = $('.group-checkbox[data-group="' + moduleKey + '"]');
             var modulePermissions = $('input[data-group="' + moduleKey + '"]:not(.group-checkbox)');
             var checkedPermissions = modulePermissions.filter(':checked');
-            
+
             if (checkedPermissions.length === 0) {
                 groupCheckbox.prop('checked', false).prop('indeterminate', false);
             } else if (checkedPermissions.length === modulePermissions.length) {

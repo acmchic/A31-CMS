@@ -75,43 +75,43 @@ class RoleCrudController extends BaseRoleCrudController
     public function store()
     {
         $this->crud->setRequest($this->crud->validateRequest());
-        
+
         // Get the permissions from request
         $permissionIds = request()->get('permissions', []);
-        
+
         \Log::info('Role Store Request Data:', [
             'permissions' => $permissionIds,
             'permissions_count' => count($permissionIds)
         ]);
-        
+
         $this->crud->unsetValidation();
 
         // Create the role first
         $response = $this->crud->performSaveAction();
-        
+
         // After successful creation, sync permissions
         if ($response instanceof \Illuminate\Http\RedirectResponse && $response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
             $role = $this->crud->entry;
-            
+
             if ($role && is_array($permissionIds) && count($permissionIds) > 0) {
                 // Convert permission IDs to integers and filter out invalid ones
                 $validPermissionIds = array_filter(array_map('intval', $permissionIds), function($id) {
                     return $id > 0;
                 });
-                
+
                 // Sync permissions with the role
                 $role->permissions()->sync($validPermissionIds);
-                
+
                 // Clear permission cache
                 app()->make(PermissionRegistrar::class)->forgetCachedPermissions();
-                
+
                 \Log::info('Role permissions synced on create:', [
                     'role_id' => $role->id,
                     'permission_count' => count($validPermissionIds)
                 ]);
             }
         }
-        
+
         return $response;
     }
 
@@ -127,44 +127,44 @@ class RoleCrudController extends BaseRoleCrudController
     public function update()
     {
         $this->crud->setRequest($this->crud->validateRequest());
-        
+
         // Get the permissions from request
         $permissionIds = request()->get('permissions', []);
-        
+
         \Log::info('Role Update Request Data:', [
             'all' => request()->all(),
             'permissions' => $permissionIds,
             'permissions_count' => count($permissionIds)
         ]);
-        
+
         $this->crud->unsetValidation(); // validation has already been run
 
         // Update the role first
         $response = $this->traitUpdate();
-        
+
         // After successful update, sync permissions
         if ($response instanceof \Illuminate\Http\RedirectResponse && $response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
             $role = $this->crud->getCurrentEntry();
-            
+
             if ($role && is_array($permissionIds) && count($permissionIds) > 0) {
                 // Convert permission IDs to integers and filter out invalid ones
                 $validPermissionIds = array_filter(array_map('intval', $permissionIds), function($id) {
                     return $id > 0;
                 });
-                
+
                 // Sync permissions with the role
                 $role->permissions()->sync($validPermissionIds);
-                
+
                 // Clear permission cache
                 app()->make(PermissionRegistrar::class)->forgetCachedPermissions();
-                
+
                 \Log::info('Role permissions synced successfully:', [
                     'role_id' => $role->id,
                     'permission_count' => count($validPermissionIds)
                 ]);
             }
         }
-        
+
         return $response;
     }
 
@@ -224,7 +224,7 @@ class RoleCrudController extends BaseRoleCrudController
         $permissionModel = config('backpack.permissionmanager.models.permission');
         $permissions = $permissionModel::all();
         $options = [];
-        
+
         // Define permission groups
         $groups = [
             'dashboard' => '📊 Bảng Điều Khiển',
@@ -238,7 +238,7 @@ class RoleCrudController extends BaseRoleCrudController
             'system_settings' => '⚙️ Cài Đặt Hệ Thống',
             'pdf_signatures' => '📝 Ký Số PDF',
         ];
-        
+
         // Group permissions by category
         $groupedPermissions = [
             'dashboard' => ['view dashboard'],
@@ -252,12 +252,12 @@ class RoleCrudController extends BaseRoleCrudController
             'system_settings' => ['system settings'],
             'pdf_signatures' => ['sign-pdf'],
         ];
-        
+
         // Build options with groups
         foreach ($groups as $groupKey => $groupTitle) {
             $groupPermissions = $groupedPermissions[$groupKey] ?? [];
             $hasPermissions = false;
-            
+
             foreach ($permissions as $permission) {
                 if (in_array($permission->name, $groupPermissions)) {
                     $translatedName = $this->translatePermission($permission->name);
@@ -265,13 +265,13 @@ class RoleCrudController extends BaseRoleCrudController
                     $hasPermissions = true;
                 }
             }
-            
+
             // Add separator if group has permissions
             if ($hasPermissions) {
                 $options['separator_' . $groupKey] = '─────────────────────────';
             }
         }
-        
+
         return $options;
     }
 
@@ -309,7 +309,7 @@ class RoleCrudController extends BaseRoleCrudController
             'manage vehicles' => 'Quản lý phương tiện',
             'view reports' => 'Xem báo cáo',
         ];
-        
+
         return $translations[$permissionName] ?? $permissionName;
     }
 
