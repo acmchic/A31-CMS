@@ -57,9 +57,11 @@ class PermissionHelper
         if (!$user) return 'none';
         
         if ($user->hasRole('Admin')) return 'all';
-        if ($user->hasRole('Ban Giam Doc')) return 'company';
-        if ($user->hasRole('Truong Phong')) return 'department';
-        if ($user->hasRole('Nhan Vien')) return 'own';
+        
+        // ✅ Check multiple variations of role names
+        if ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc'])) return 'company';
+        if ($user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng'])) return 'department';
+        if ($user->hasRole(['Nhân viên', 'Nhan Vien', 'Nhân Viên'])) return 'own';
         
         return 'none';
     }

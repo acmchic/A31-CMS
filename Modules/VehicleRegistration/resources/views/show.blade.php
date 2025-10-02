@@ -125,7 +125,7 @@
                 @if($entry->signed_pdf_path && $entry->status === 'approved')
                 <hr>
                 <a href="{{ route('vehicle-registration.download-pdf', $entry->id) }}" class="btn btn-success btn-sm w-100">
-                    <i class="la la-download"></i> Tải PDF đã ký
+                    <i class="la la-download"></i> Tải về đã ký
                 </a>
                 @endif
             </div>

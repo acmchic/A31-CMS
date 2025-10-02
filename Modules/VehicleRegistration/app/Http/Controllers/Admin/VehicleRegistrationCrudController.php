@@ -93,7 +93,7 @@ class VehicleRegistrationCrudController extends CrudController
             CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
             CRUD::addButtonFromModelFunction('line', 'reject', 'rejectButton', 'beginning');
         }
-        
+
         // Download PDF (using ApprovalWorkflow button)
         if (PermissionHelper::can($user, 'vehicle_registration.view')) {
             CRUD::addButtonFromModelFunction('line', 'download_pdf', 'downloadPdfButton', 'beginning');
@@ -446,7 +446,7 @@ class VehicleRegistrationCrudController extends CrudController
         $registration = VehicleRegistration::findOrFail($id);
 
         if (!$registration->isApproved()) {
-            abort(403, 'Chỉ có thể tải PDF khi đã được phê duyệt.');
+            abort(403, 'Chỉ có thể Tải về khi đã được phê duyệt.');
         }
 
         try {

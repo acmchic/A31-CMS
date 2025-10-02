@@ -9,7 +9,7 @@ use App\Helpers\PermissionHelper;
 
 /**
  * ApprovalController
- * 
+ *
  * Generic controller for handling approval actions
  */
 class ApprovalController extends Controller
@@ -23,7 +23,7 @@ class ApprovalController extends Controller
 
     /**
      * Approve with PIN (generic endpoint)
-     * 
+     *
      * POST /approval/approve/{modelClass}/{id}
      */
     public function approveWithPin(Request $request, string $modelClass, int $id)
@@ -31,7 +31,7 @@ class ApprovalController extends Controller
         try {
             // Decode model class from base64
             $modelClass = base64_decode($modelClass);
-            
+
             if (!class_exists($modelClass)) {
                 return response()->json([
                     'success' => false,
@@ -41,11 +41,11 @@ class ApprovalController extends Controller
 
             // Find model
             $model = $modelClass::findOrFail($id);
-            
+
             // Check permission
             $user = backpack_user();
             $modulePermission = $this->getModulePermission($modelClass);
-            
+
             if (!PermissionHelper::can($user, "{$modulePermission}.approve")) {
                 return response()->json([
                     'success' => false,
@@ -87,7 +87,7 @@ class ApprovalController extends Controller
 
     /**
      * Reject (generic endpoint)
-     * 
+     *
      * POST /approval/reject/{modelClass}/{id}
      */
     public function reject(Request $request, string $modelClass, int $id)
@@ -95,7 +95,7 @@ class ApprovalController extends Controller
         try {
             // Decode model class
             $modelClass = base64_decode($modelClass);
-            
+
             if (!class_exists($modelClass)) {
                 return response()->json([
                     'success' => false,
@@ -105,11 +105,11 @@ class ApprovalController extends Controller
 
             // Find model
             $model = $modelClass::findOrFail($id);
-            
+
             // Check permission
             $user = backpack_user();
             $modulePermission = $this->getModulePermission($modelClass);
-            
+
             if (!PermissionHelper::can($user, "{$modulePermission}.reject")) {
                 return response()->json([
                     'success' => false,
@@ -154,17 +154,17 @@ class ApprovalController extends Controller
     {
         // Extract module name from namespace
         // Example: Modules\VehicleRegistration\Models\VehicleRegistration -> vehicle_registration
-        
+
         $parts = explode('\\', $modelClass);
         $moduleName = $parts[1] ?? 'unknown';
-        
+
         // Convert to snake_case
         return strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $moduleName));
     }
 
     /**
      * Download signed PDF
-     * 
+     *
      * GET /approval/download-pdf/{modelClass}/{id}
      */
     public function downloadPdf(string $modelClass, int $id)
@@ -172,14 +172,14 @@ class ApprovalController extends Controller
         try {
             // Decode model class
             $modelClass = base64_decode($modelClass);
-            
+
             if (!class_exists($modelClass)) {
                 abort(404, 'Invalid model class');
             }
 
             // Find model
             $model = $modelClass::findOrFail($id);
-            
+
             // Check if has signed PDF
             if (!$model->signed_pdf_path) {
                 abort(404, 'PDF chưa được tạo');
@@ -187,14 +187,14 @@ class ApprovalController extends Controller
 
             // Get PDF file path
             $filePath = \Storage::disk('public')->path($model->signed_pdf_path);
-            
+
             if (!file_exists($filePath)) {
                 abort(404, 'File PDF không tồn tại');
             }
 
             // Get filename from model (if method exists) or use default
-            $filename = method_exists($model, 'getPdfFilename') 
-                ? $model->getPdfFilename() 
+            $filename = method_exists($model, 'getPdfFilename')
+                ? $model->getPdfFilename()
                 : 'document_' . $model->id . '.pdf';
 
             return response()->download($filePath, $filename);
@@ -206,13 +206,13 @@ class ApprovalController extends Controller
                 'id' => $id
             ]);
 
-            abort(404, 'Không thể tải PDF: ' . $e->getMessage());
+            abort(404, 'Không thể Tải về: ' . $e->getMessage());
         }
     }
-    
+
     /**
      * Get approval history for a model
-     * 
+     *
      * GET /approval/history/{modelClass}/{id}
      */
     public function history(string $modelClass, int $id)
@@ -220,9 +220,9 @@ class ApprovalController extends Controller
         try {
             $modelClass = base64_decode($modelClass);
             $model = $modelClass::findOrFail($id);
-            
+
             $history = $this->approvalService->getHistory($model);
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $history

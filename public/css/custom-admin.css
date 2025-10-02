@@ -1,0 +1,61 @@
+/**
+ * Custom Admin Panel Styles
+ * A31 Factory CMS
+ */
+
+/* ✅ Custom Header Background - Màu xanh nhạt đậm hơn background 1 chút */
+.navbar-header,
+.app-header,
+header.navbar {
+    background-color: #2c5f7c !important; /* Xanh navy nhạt, đủ đậm để text trắng dễ đọc */
+    background: linear-gradient(135deg, #2c5f7c 0%, #1e4a63 100%) !important;
+}
+
+/* Alternative: Xanh lam nhạt nếu muốn sáng hơn */
+/* background-color: #4a90a4 !important; */
+
+/* Alternative: Xanh biển đậm nhẹ */
+/* background-color: #3b6d85 !important; */
+
+/* Đảm bảo text và icons màu trắng dễ đọc */
+.navbar-header *,
+.app-header *,
+header.navbar * {
+    color: #fff !important;
+}
+
+/* Dropdown menu vẫn giữ màu nền sáng */
+.navbar-header .dropdown-menu,
+.app-header .dropdown-menu,
+header.navbar .dropdown-menu {
+    background-color: #fff !important;
+}
+
+.navbar-header .dropdown-menu *,
+.app-header .dropdown-menu *,
+header.navbar .dropdown-menu * {
+    color: #333 !important;
+}
+
+/* Logo và brand */
+.navbar-header .navbar-brand,
+.app-header .navbar-brand {
+    color: #fff !important;
+}
+
+/* Nav links */
+.navbar-header .nav-link,
+.app-header .nav-link,
+header.navbar .nav-link {
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.navbar-header .nav-link:hover,
+.app-header .nav-link:hover,
+header.navbar .nav-link:hover {
+    color: #fff !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+
+

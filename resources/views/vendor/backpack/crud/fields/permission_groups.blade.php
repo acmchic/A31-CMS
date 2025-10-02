@@ -127,7 +127,7 @@ $(document).ready(function() {
         'vehicle_registration.assign': 'Phân công xe và lái xe',
         'vehicle_registration.approve': 'Phê duyệt đăng ký xe',
         'vehicle_registration.reject': 'Từ chối đăng ký xe',
-        'vehicle_registration.download_pdf': 'Tải PDF đã ký',
+        'vehicle_registration.download_pdf': 'Tải về đã ký',
         'report.view': 'Xem báo cáo quân số',
         'report.create': 'Tạo báo cáo quân số',
         'report.edit': 'Sửa báo cáo quân số',

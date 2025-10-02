@@ -27,7 +27,7 @@ class VehicleRegistrationPermissionSeeder extends Seeder
             'vehicle_registration.reject' => 'Từ chối đăng ký xe',
 
             // Additional permissions
-            'vehicle_registration.download_pdf' => 'Tải PDF đã ký',
+            'vehicle_registration.download_pdf' => 'Tải về đã ký',
         ];
 
         foreach ($permissions as $name => $description) {

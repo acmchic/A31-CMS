@@ -41,6 +41,16 @@ class LeaveRequestCrudController extends CrudController
         $user = backpack_user();
         $scope = PermissionHelper::getUserScope($user);
 
+        // ✅ Debug logging
+        \Log::info('LeaveRequest Filter Debug', [
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'user_roles' => $user->roles->pluck('name'),
+            'scope' => $scope,
+            'department_id' => $user->department_id,
+            'employee_department_id' => $user->employee ? $user->employee->department_id : null,
+        ]);
+
         switch ($scope) {
             case 'all':
             case 'company':
@@ -56,8 +66,13 @@ class LeaveRequestCrudController extends CrudController
 
                 if ($departmentId) {
                     $employeeIds = Employee::where('department_id', $departmentId)->pluck('id');
+                    \Log::info('Department Filter Applied', [
+                        'department_id' => $departmentId,
+                        'employee_ids' => $employeeIds->toArray(),
+                    ]);
                     CRUD::addClause('whereIn', 'employee_id', $employeeIds);
                 } else {
+                    \Log::warning('No department_id found for user', ['user_id' => $user->id]);
                     CRUD::addClause('where', 'id', 0);
                 }
                 break;
@@ -72,6 +87,7 @@ class LeaveRequestCrudController extends CrudController
                 break;
 
             default:
+                \Log::warning('Unknown scope, hiding all records', ['scope' => $scope, 'user_id' => $user->id]);
                 CRUD::addClause('where', 'id', 0);
                 break;
         }
