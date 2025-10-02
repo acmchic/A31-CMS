@@ -9,6 +9,7 @@ use Spatie\Permission\PermissionRegistrar;
 
 class RoleCrudController extends BaseRoleCrudController
 {
+    use \Backpack\CRUD\app\Http\Controllers\Operations\CreateOperation { store as traitStore; }
     use \Backpack\CRUD\app\Http\Controllers\Operations\UpdateOperation { update as traitUpdate; }
     public function setupListOperation()
     {
@@ -74,32 +75,43 @@ class RoleCrudController extends BaseRoleCrudController
 
     public function store()
     {
-        $this->crud->setRequest($this->crud->validateRequest());
+        try {
+            $this->crud->setRequest($this->crud->validateRequest());
 
-        // Get the permissions from request
-        $permissionIds = request()->get('permissions', []);
+            // Get the permissions from request
+            $permissionIds = request()->get('permissions', []);
 
-        \Log::info('Role Store Request Data:', [
-            'permissions' => $permissionIds,
-            'permissions_count' => count($permissionIds)
-        ]);
+            \Log::info('Role Store Request Data:', [
+                'all_request' => request()->all(),
+                'permissions' => $permissionIds,
+                'permissions_count' => count($permissionIds)
+            ]);
 
-        $this->crud->unsetValidation();
+            $this->crud->unsetValidation();
 
-        // Create the role first
-        $response = $this->crud->performSaveAction();
+            // Perform store action using trait
+            $response = $this->traitStore();
+            
+            \Log::info('Role traitStore response:', [
+                'response_type' => get_class($response),
+                'is_redirect' => $response instanceof \Illuminate\Http\RedirectResponse,
+            ]);
 
-        // After successful creation, sync permissions
-        if ($response instanceof \Illuminate\Http\RedirectResponse && $response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
+            // Get the created role
             $role = $this->crud->entry;
+            
+            \Log::info('Role entry after traitStore:', [
+                'role' => $role ? $role->toArray() : null,
+            ]);
 
-            if ($role && is_array($permissionIds) && count($permissionIds) > 0) {
+            // After successful creation, sync permissions
+            if ($role && is_array($permissionIds)) {
                 // Convert permission IDs to integers and filter out invalid ones
                 $validPermissionIds = array_filter(array_map('intval', $permissionIds), function($id) {
                     return $id > 0;
                 });
 
-                // Sync permissions with the role
+                // Sync permissions with the role (even if empty array)
                 $role->permissions()->sync($validPermissionIds);
 
                 // Clear permission cache
@@ -110,9 +122,17 @@ class RoleCrudController extends BaseRoleCrudController
                     'permission_count' => count($validPermissionIds)
                 ]);
             }
-        }
 
-        return $response;
+            return $response;
+            
+        } catch (\Exception $e) {
+            \Log::error('Role Store Error:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return redirect()->back()->withErrors(['error' => $e->getMessage()]);
+        }
     }
 
     public function setupUpdateOperation()
@@ -143,16 +163,17 @@ class RoleCrudController extends BaseRoleCrudController
         $response = $this->traitUpdate();
 
         // After successful update, sync permissions
-        if ($response instanceof \Illuminate\Http\RedirectResponse && $response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
+        // Accept both 2xx and 3xx (redirects) status codes
+        if ($response instanceof \Illuminate\Http\RedirectResponse && $response->getStatusCode() >= 200 && $response->getStatusCode() < 400) {
             $role = $this->crud->getCurrentEntry();
 
-            if ($role && is_array($permissionIds) && count($permissionIds) > 0) {
+            if ($role && is_array($permissionIds)) {
                 // Convert permission IDs to integers and filter out invalid ones
                 $validPermissionIds = array_filter(array_map('intval', $permissionIds), function($id) {
                     return $id > 0;
                 });
 
-                // Sync permissions with the role
+                // Sync permissions with the role (even if empty - để xóa tất cả)
                 $role->permissions()->sync($validPermissionIds);
 
                 // Clear permission cache
@@ -160,7 +181,8 @@ class RoleCrudController extends BaseRoleCrudController
 
                 \Log::info('Role permissions synced successfully:', [
                     'role_id' => $role->id,
-                    'permission_count' => count($validPermissionIds)
+                    'permission_count' => count($validPermissionIds),
+                    'permissions_synced' => $validPermissionIds
                 ]);
             }
         }

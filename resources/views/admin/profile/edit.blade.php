@@ -70,9 +70,82 @@
                                 </div>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Phòng ban</label>
-                                <input type="text" class="form-control" value="{{ $user->department ? $user->department->name : '--' }}" readonly>
+                            {{-- Debug info --}}
+                            @if(config('app.debug'))
+                            <div class="alert alert-warning">
+                                <strong>Debug Info:</strong><br>
+                                User ID: {{ $user->id }}<br>
+                                User Name: {{ $user->name }}<br>
+                                Has Employee: {{ $employee ? 'Yes (ID: '.$employee->id.')' : 'No' }}<br>
+                                @if($employee)
+                                    Employee Name: {{ $employee->name }}<br>
+                                    Position ID: {{ $employee->position_id ?? 'NULL' }}<br>
+                                    Position Name: {{ $employee->position ? $employee->position->name : 'NULL' }}<br>
+                                    Rank Code: {{ $employee->rank_code ?? 'NULL' }}<br>
+                                @endif
+                            </div>
+                            @endif
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Phòng ban</label>
+                                        <input type="text" class="form-control" value="{{ $user->department ? $user->department->name : ($employee && $employee->department ? $employee->department->name : '--') }}" readonly>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Chức vụ</label>
+                                        <input type="text" class="form-control" value="{{ $employee && $employee->position ? $employee->position->name : '--' }}" readonly>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Cấp bậc</label>
+                                        <input type="text" class="form-control" value="{{ $employee && $employee->rank_code ? $employee->rank_code : '--' }}" readonly>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Ngày sinh</label>
+                                        <input type="text" class="form-control" value="{{ $employee && $employee->date_of_birth ? \Carbon\Carbon::parse($employee->date_of_birth)->format('d/m/Y') : '--' }}" readonly>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Ngày nhập ngũ</label>
+                                        @php
+                                            $enlistDateDisplay = '--';
+                                            if ($employee && $employee->enlist_date && $employee->date_of_birth) {
+                                                $birthDate = \Carbon\Carbon::parse($employee->date_of_birth);
+                                                $enlistDate = \Carbon\Carbon::parse($employee->enlist_date);
+                                                $ageAtEnlistment = $birthDate->diffInYears($enlistDate);
+                                                
+                                                // Chỉ hiển thị nếu >= 18 tuổi khi nhập ngũ
+                                                if ($ageAtEnlistment >= 18) {
+                                                    $enlistDateDisplay = $enlistDate->format('d/m/Y');
+                                                } else {
+                                                    $enlistDateDisplay = '--';
+                                                }
+                                            } elseif ($employee && $employee->enlist_date) {
+                                                // Nếu có ngày nhập ngũ nhưng không có ngày sinh → hiển thị luôn
+                                                $enlistDateDisplay = \Carbon\Carbon::parse($employee->enlist_date)->format('d/m/Y');
+                                            }
+                                        @endphp
+                                        <input type="text" class="form-control {{ strpos($enlistDateDisplay, 'lỗi') !== false ? 'border-danger' : '' }}" value="{{ $enlistDateDisplay }}" readonly>
+                                        @if(strpos($enlistDateDisplay, 'lỗi') !== false)
+                                            <small class="text-danger">Dữ liệu ngày nhập ngũ không hợp lệ. Vui lòng kiểm tra lại.</small>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
 
                             <button type="submit" class="btn btn-primary">

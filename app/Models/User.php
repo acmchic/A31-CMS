@@ -68,6 +68,28 @@ class User extends Authenticatable
     {
         return $this->hasOne(\Modules\OrganizationStructure\Models\Employee::class, 'user_id');
     }
+    
+    // Get correct employee info by matching name
+    public function getCorrectEmployee()
+    {
+        // First try by user_id
+        $employee = \Modules\OrganizationStructure\Models\Employee::where('user_id', $this->id)->first();
+        
+        // If found and name matches, return it
+        if ($employee && $this->name === $employee->name) {
+            return $employee;
+        }
+        
+        // Otherwise, try to find by exact name matching
+        $employeeByName = \Modules\OrganizationStructure\Models\Employee::where('name', $this->name)->first();
+        
+        if ($employeeByName) {
+            return $employeeByName;
+        }
+        
+        // Fallback: partial name match
+        return \Modules\OrganizationStructure\Models\Employee::where('name', 'LIKE', '%' . $this->name . '%')->first();
+    }
 
     // Relationship with Department
     public function department()

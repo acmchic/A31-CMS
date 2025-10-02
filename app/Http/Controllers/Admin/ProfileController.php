@@ -16,8 +16,16 @@ class ProfileController extends Controller
      */
     public function edit()
     {
-        $user = backpack_user();
-        return view('admin.profile.edit', compact('user'));
+        $user = backpack_user()->load('department');
+        
+        // Get correct employee by name matching instead of user_id
+        $employee = $user->getCorrectEmployee();
+        
+        if ($employee) {
+            $employee->load('position', 'department');
+        }
+        
+        return view('admin.profile.edit', compact('user', 'employee'));
     }
 
     /**
