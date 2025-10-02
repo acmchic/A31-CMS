@@ -331,7 +331,7 @@ class VehicleRegistrationCrudController extends CrudController
         $registration = VehicleRegistration::findOrFail($id);
 
         if (!PermissionHelper::userCan('vehicle_registration.approve')) {
-            abort(403, 'Bạn không có quyền phê duyệt.');
+            abort(403, getUserTitle() . ' không có quyền phê duyệt.');
         }
 
         $registration->update([
@@ -352,7 +352,7 @@ class VehicleRegistrationCrudController extends CrudController
         $registration = VehicleRegistration::findOrFail($id);
 
         if (!PermissionHelper::userCan('vehicle_registration.approve')) {
-            abort(403, 'Bạn không có quyền phê duyệt.');
+            abort(403, getUserTitle() . ' không có quyền phê duyệt.');
         }
 
         $registration->update([
@@ -377,7 +377,7 @@ class VehicleRegistrationCrudController extends CrudController
         $registration = VehicleRegistration::findOrFail($id);
 
         if (!PermissionHelper::userCan('vehicle_registration.approve')) {
-            abort(403, 'Bạn không có quyền từ chối.');
+            abort(403, getUserTitle() . ' không có quyền từ chối.');
         }
 
         $request->validate([
@@ -402,7 +402,7 @@ class VehicleRegistrationCrudController extends CrudController
         $registration = VehicleRegistration::findOrFail($id);
 
         if (!PermissionHelper::userCan('vehicle_registration.approve')) {
-            abort(403, 'Bạn không có quyền phê duyệt.');
+            abort(403, getUserTitle() . ' không có quyền phê duyệt.');
         }
 
         // Update approval info

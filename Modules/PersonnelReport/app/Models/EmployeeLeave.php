@@ -422,7 +422,7 @@ class EmployeeLeave extends Model
         
         if (in_array($this->workflow_status, ['pending', 'rejected'])) {
             return '<a class="btn btn-sm btn-link" href="' . backpack_url('leave-request/' . $this->id . '/delete') . '" 
-                onclick="return confirm(\'Bạn có chắc chắn muốn xóa?\');" title="Xóa">
+                onclick="return confirm(\'' . getUserTitle() . ' có chắc chắn muốn xóa?\');" title="Xóa">
                 <i class="la la-trash"></i> Xóa
             </a>';
         }

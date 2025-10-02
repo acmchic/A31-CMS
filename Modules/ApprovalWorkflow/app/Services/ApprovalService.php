@@ -98,7 +98,7 @@ class ApprovalService
 
         // Validate user PIN first
         if (!$approver->certificate_pin) {
-            throw new \Exception('Bạn chưa thiết lập PIN chữ ký số. Vui lòng vào trang Thông tin cá nhân để thiết lập PIN.');
+            throw new \Exception(getUserTitle($approver) . ' chưa thiết lập PIN chữ ký số. Vui lòng vào trang Thông tin cá nhân để thiết lập PIN.');
         }
         
         if ($certificatePin !== $approver->certificate_pin) {

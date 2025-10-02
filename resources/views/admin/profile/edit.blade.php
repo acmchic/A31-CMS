@@ -225,7 +225,7 @@
                                     <div class="text-center mt-2">
                                         <a href="{{ route('admin.profile.delete-photo') }}"
                                            class="btn btn-danger btn-sm"
-                                           onclick="event.preventDefault(); if(confirm('Bạn có chắc chắn muốn xóa ảnh đại diện?')) { this.closest('form').nextElementSibling.submit(); }">
+                                           onclick="event.preventDefault(); if(confirm('{{ getUserTitle($user) }} có chắc chắn muốn xóa ảnh đại diện?')) { this.closest('form').nextElementSibling.submit(); }">
                                             <i class="la la-trash"></i> Xóa ảnh
                                         </a>
                                     </div>
@@ -290,7 +290,7 @@
                                     <div class="text-center mt-2">
                                         <a href="{{ route('admin.profile.delete-signature') }}"
                                            class="btn btn-danger btn-sm"
-                                           onclick="event.preventDefault(); if(confirm('Bạn có chắc chắn muốn xóa chữ ký?')) { document.getElementById('deleteSignatureForm').submit(); }">
+                                           onclick="event.preventDefault(); if(confirm('{{ getUserTitle($user) }} có chắc chắn muốn xóa chữ ký?')) { document.getElementById('deleteSignatureForm').submit(); }">
                                             <i class="la la-trash"></i> Xóa chữ ký
                                         </a>
                                     </div>
@@ -336,7 +336,7 @@
                                             @if($user->certificate_pin)
                                                 <i class="la la-check-circle text-success"></i> Để trống nếu không muốn thay đổi
                                             @else
-                                                <i class="la la-exclamation-triangle text-warning"></i> Bạn cần thiết lập PIN để sử dụng chữ ký số
+                                                <i class="la la-exclamation-triangle text-warning"></i> {{ getUserTitle($user) }} cần thiết lập PIN để sử dụng chữ ký số
                                             @endif
                                         </div>
                                         @if($errors->has('certificate_pin'))

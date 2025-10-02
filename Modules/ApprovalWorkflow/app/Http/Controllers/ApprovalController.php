@@ -49,7 +49,7 @@ class ApprovalController extends Controller
             if (!PermissionHelper::can($user, "{$modulePermission}.approve")) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Bạn không có quyền phê duyệt'
+                    'message' => getUserTitle($user) . ' không có quyền phê duyệt'
                 ], 403);
             }
 
@@ -113,7 +113,7 @@ class ApprovalController extends Controller
             if (!PermissionHelper::can($user, "{$modulePermission}.reject")) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Bạn không có quyền từ chối'
+                    'message' => getUserTitle($user) . ' không có quyền từ chối'
                 ], 403);
             }
 
