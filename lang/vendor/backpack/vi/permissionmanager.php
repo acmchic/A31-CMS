@@ -10,7 +10,7 @@ return [
     | Author: Sang Lu <connect.with.sang@gmail.com>
     |
     */
-    'name'                  => 'Tên',
+    'name'                  => 'Họ và tên',
     'role'                  => 'Vai trò',
     'roles'                 => 'Vai trò',
     'roles_have_permission' => 'Vai trò được cấp quyền này',
@@ -18,7 +18,7 @@ return [
     'permission_plural'     => 'Quyền',
     'user_singular'         => 'Người dùng',
     'user_plural'           => 'Người dùng',
-    'email'                 => 'Email',
+    'email'                 => 'Tài khoản',
     'extra_permissions'     => 'Quyền bổ sung',
     'password'              => 'Mật khẩu',
     'password_confirmation' => 'Xác nhận Mật khẩu',

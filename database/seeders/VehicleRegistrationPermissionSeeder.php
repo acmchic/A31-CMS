@@ -52,7 +52,6 @@ class VehicleRegistrationPermissionSeeder extends Seeder
             'vehicle_registration.approve',
             'vehicle_registration.reject',
             'vehicle_registration.download_pdf',
-            'vehicle_registration.check_signature',
         ]);
 
         // Gán quyền cho Đội trưởng xe
