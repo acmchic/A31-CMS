@@ -115,14 +115,14 @@ class UserCrudController extends CrudController
                 'model'     => config('permission.models.role'), // foreign key model
                 'pivot'     => true, // on create&update, do you need to add/delete pivot table entries?
             ],
-            [ // n-n relationship (with pivot table)
-                'label'     => trans('backpack::permissionmanager.extra_permissions'), // Table column heading
-                'type'      => 'checklist',
-                'name'      => 'permissions', // the method that defines the relationship in your Model
-                'entity'    => 'permissions', // the method that defines the relationship in your Model
-                'attribute' => 'name', // foreign key attribute that is shown to user
-                'model'     => config('permission.models.permission'), // foreign key model
-                'pivot'     => true, // on create&update, do you need to add/delete pivot table entries?
+            [ // n-n relationship (with pivot table) - Using custom permission_groups view
+                'label'     => trans('backpack::permissionmanager.extra_permissions'),
+                'type'      => 'permission_groups',
+                'name'      => 'permissions',
+                'entity'    => 'permissions',
+                'attribute' => 'name',
+                'model'     => config('permission.models.permission'),
+                'pivot'     => true,
             ],
         ]);
     }
@@ -130,9 +130,8 @@ class UserCrudController extends CrudController
     public function store()
     {
         $this->crud->setRequest($this->crud->validateRequest());
-        $this->crud->unsetValidation(); // We have already validated
-
-        $this->crud->setRequest($this->crud->handlePasswordInput($this->crud->getRequest()));
+        $this->crud->setRequest($this->handlePasswordInput($this->crud->getRequest()));
+        $this->crud->unsetValidation(); // validation has already been run
 
         return $this->traitStore();
     }
@@ -140,10 +139,30 @@ class UserCrudController extends CrudController
     public function update()
     {
         $this->crud->setRequest($this->crud->validateRequest());
-        $this->crud->unsetValidation(); // We have already validated
-
-        $this->crud->setRequest($this->crud->handlePasswordInput($this->crud->getRequest()));
+        $this->crud->setRequest($this->handlePasswordInput($this->crud->getRequest()));
+        $this->crud->unsetValidation(); // validation has already been run
 
         return $this->traitUpdate();
     }
+
+    /**
+     * Handle password input fields.
+     */
+    protected function handlePasswordInput($request)
+    {
+        // Remove fields not present on the user.
+        $request->request->remove('password_confirmation');
+        $request->request->remove('roles_show');
+        $request->request->remove('permissions_show');
+
+        // Encrypt password if specified.
+        if ($request->input('password')) {
+            $request->request->set('password', Hash::make($request->input('password')));
+        } else {
+            $request->request->remove('password');
+        }
+
+        return $request;
+    }
+
 }
