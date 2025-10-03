@@ -91,7 +91,7 @@ class RoleCrudController extends BaseRoleCrudController
 
             // Perform store action using trait
             $response = $this->traitStore();
-            
+
             \Log::info('Role traitStore response:', [
                 'response_type' => get_class($response),
                 'is_redirect' => $response instanceof \Illuminate\Http\RedirectResponse,
@@ -99,7 +99,7 @@ class RoleCrudController extends BaseRoleCrudController
 
             // Get the created role
             $role = $this->crud->entry;
-            
+
             \Log::info('Role entry after traitStore:', [
                 'role' => $role ? $role->toArray() : null,
             ]);
@@ -124,13 +124,13 @@ class RoleCrudController extends BaseRoleCrudController
             }
 
             return $response;
-            
+
         } catch (\Exception $e) {
             \Log::error('Role Store Error:', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             return redirect()->back()->withErrors(['error' => $e->getMessage()]);
         }
     }
@@ -235,7 +235,7 @@ class RoleCrudController extends BaseRoleCrudController
             'leave_management' => 'Quản Lý Nghỉ Phép',
             'vehicle_management' => 'Quản Lý Phương Tiện',
             'reports' => 'Báo Cáo',
-            'employee_management' => 'Quản Lý Nhân Viên',
+            'employee_management' => 'Quản Lý Nhân sự',
             'system_settings' => 'Cài Đặt Hệ Thống',
             'pdf_signatures' => 'Ký Số PDF',
         ];
@@ -256,7 +256,7 @@ class RoleCrudController extends BaseRoleCrudController
             'leave_management' => '🏖️ Quản Lý Nghỉ Phép',
             'vehicle_management' => '🚗 Quản Lý Phương Tiện',
             'reports' => '📈 Báo Cáo',
-            'employee_management' => '👤 Quản Lý Nhân Viên',
+            'employee_management' => '👤 Quản Lý Nhân sự',
             'system_settings' => '⚙️ Cài Đặt Hệ Thống',
             'pdf_signatures' => '📝 Ký Số PDF',
         ];
@@ -304,7 +304,7 @@ class RoleCrudController extends BaseRoleCrudController
             'view_department' => 'Xem phòng ban',
             'view_daily_report' => 'Xem báo cáo hàng ngày',
             'view_leave_request' => 'Xem đơn xin nghỉ phép',
-            'view_employee' => 'Xem nhân viên',
+            'view_employee' => 'Xem Nhân sự',
             'sign-pdf' => 'Ký số PDF',
             'view-leave-request' => 'Xem đơn xin nghỉ phép',
             'reject-leave-request' => 'Từ chối đơn xin nghỉ phép',

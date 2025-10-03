@@ -28,7 +28,7 @@ class EmployeeCrudController extends CrudController
 
         // Apply department filtering based on user permissions
         $this->applyDepartmentFilter();
-        
+
         // Setup buttons based on user role
         $this->setupButtonsForRole();
     }
@@ -70,9 +70,9 @@ class EmployeeCrudController extends CrudController
     private function setupButtonsForRole()
     {
         $user = backpack_user();
-        
-        // For Nhân viên role - only view, no create/edit/delete
-        if ($user->hasRole('Nhân viên')) {
+
+        // For Nhân sự role - only view, no create/edit/delete
+        if ($user->hasRole('Nhân sự')) {
             CRUD::removeButton('create');
             CRUD::removeButton('edit');
             CRUD::removeButton('delete');
@@ -112,7 +112,7 @@ class EmployeeCrudController extends CrudController
             'address' => 'nullable|string|max:500',
             'gender' => 'nullable|boolean',
             'date_of_birth' => 'nullable|date',
-            'enlist_date' => 'nullable|date',
+            'enlist_date' => 'nullable|string|max:20',
             'start_date' => 'nullable|date',
             'quit_date' => 'nullable|date',
             'max_leave_allowed' => 'nullable|integer|min:0',
@@ -161,7 +161,8 @@ class EmployeeCrudController extends CrudController
         // Chuyển Ngày nhập ngũ sang tab Thông tin cơ bản
         CRUD::field('enlist_date')
             ->label('Ngày nhập ngũ')
-            ->type('date')
+            ->type('text')
+            ->hint('Format: mm/yyyy (ví dụ: 09/1991)')
             ->tab('Thông tin cơ bản');
 
         // Thông tin cá nhân
@@ -266,7 +267,7 @@ class EmployeeCrudController extends CrudController
         CRUD::column('enlist_date')->label('Ngày nhập ngũ')
             ->type('closure')
             ->function(function($entry) {
-                return $entry->enlist_date ? $entry->enlist_date->format('d/m/Y') : '';
+                return $entry->enlist_date ?? '--';
             });
 
 

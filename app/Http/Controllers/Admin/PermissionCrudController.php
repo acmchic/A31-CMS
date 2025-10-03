@@ -28,7 +28,7 @@ class PermissionCrudController extends BasePermissionCrudController
                     'view_department' => 'Xem phòng ban',
                     'view_daily_report' => 'Xem báo cáo hàng ngày',
                     'view_leave_request' => 'Xem đơn xin nghỉ phép',
-                    'view_employee' => 'Xem nhân viên',
+                    'view_employee' => 'Xem Nhân sự',
                     'sign-pdf' => 'Ký số PDF',
                     'view-leave-request' => 'Xem đơn xin nghỉ phép',
                     'reject-leave-request' => 'Từ chối đơn xin nghỉ phép',
@@ -55,12 +55,12 @@ class PermissionCrudController extends BasePermissionCrudController
                     'manage vehicles' => 'Quản lý phương tiện',
                     'view reports' => 'Xem báo cáo',
                 ];
-                
+
                 // If translation exists, return it, otherwise return original name
                 if (isset($translations[$entry->name])) {
                     return $translations[$entry->name];
                 }
-                
+
                 return $entry->name;
             }
         ]);

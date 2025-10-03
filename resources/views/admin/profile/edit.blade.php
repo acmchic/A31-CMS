@@ -107,22 +107,10 @@
                                     <div class="mb-3">
                                         <label class="form-label">Ngày nhập ngũ</label>
                                         @php
-                                            $enlistDateDisplay = '--';
-                                            if ($employee && $employee->enlist_date && $employee->date_of_birth) {
-                                                $birthDate = \Carbon\Carbon::parse($employee->date_of_birth);
-                                                $enlistDate = \Carbon\Carbon::parse($employee->enlist_date);
-                                                $ageAtEnlistment = $birthDate->diffInYears($enlistDate);
-                                                
-                                                // Chỉ hiển thị nếu >= 18 tuổi khi nhập ngũ
-                                                if ($ageAtEnlistment >= 18) {
-                                                    $enlistDateDisplay = $enlistDate->format('d/m/Y');
-                                                } else {
-                                                    $enlistDateDisplay = '--';
-                                                }
-                                            } elseif ($employee && $employee->enlist_date) {
-                                                // Nếu có ngày nhập ngũ nhưng không có ngày sinh → hiển thị luôn
-                                                $enlistDateDisplay = \Carbon\Carbon::parse($employee->enlist_date)->format('d/m/Y');
-                                            }
+                                            // enlist_date giờ là string (mm/yyyy hoặc --)
+                                            $enlistDateDisplay = $employee && $employee->enlist_date 
+                                                ? $employee->enlist_date 
+                                                : '--';
                                         @endphp
                                         <input type="text" class="form-control {{ strpos($enlistDateDisplay, 'lỗi') !== false ? 'border-danger' : '' }}" value="{{ $enlistDateDisplay }}" readonly>
                                         @if(strpos($enlistDateDisplay, 'lỗi') !== false)

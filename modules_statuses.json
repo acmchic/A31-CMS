@@ -4,5 +4,7 @@
     "OrganizationStructure": true,
     "PersonnelReport": true,
     "VehicleRegistration": true,
-    "ApprovalWorkflow": true
+    "ApprovalWorkflow": true,
+    "RecordManagement": true,
+    "SalaryManagement": true
 }

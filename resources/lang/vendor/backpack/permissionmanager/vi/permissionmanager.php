@@ -71,7 +71,7 @@ return [
         'view_daily_report' => 'Xem báo cáo hàng ngày',
 
         // Employee Management
-        'view_employee' => 'Xem nhân viên',
+        'view_employee' => 'Xem Nhân sự',
         'view_department' => 'Xem phòng ban',
         'view_leave_request' => 'Xem đơn xin nghỉ phép',
         'view_user_profile' => 'Xem hồ sơ người dùng',

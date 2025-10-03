@@ -100,24 +100,24 @@ class LeaveRequestCrudController extends CrudController
     private function setupButtonsForRole()
     {
         $user = backpack_user();
-        
+
         // Remove buttons based on permissions
         if (!PermissionHelper::can($user, 'leave.create')) {
             CRUD::removeButton('create');
         }
-        
+
         // ✅ Hide Edit, Delete buttons for approved leaves (done via model method)
         CRUD::removeButton('update');
         CRUD::removeButton('delete');
         CRUD::addButtonFromModelFunction('line', 'edit_conditional', 'editButtonConditional', 'beginning');
         CRUD::addButtonFromModelFunction('line', 'delete_conditional', 'deleteButtonConditional', 'beginning');
-        
+
         // ✅ Add ApprovalWorkflow buttons - these come from ApprovalButtons trait in the model
         if (PermissionHelper::can($user, 'leave.approve')) {
             CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
             CRUD::addButtonFromModelFunction('line', 'reject', 'rejectButton', 'beginning');
         }
-        
+
         // Download PDF button for anyone who can view
         if (PermissionHelper::can($user, 'leave.view')) {
             CRUD::addButtonFromModelFunction('line', 'download_pdf', 'downloadPdfButton', 'beginning');
@@ -133,7 +133,7 @@ class LeaveRequestCrudController extends CrudController
         $this->setupButtonsForRole();
 
         CRUD::column('employee_name')
-            ->label('Nhân viên')
+            ->label('Nhân sự')
             ->type('closure')
             ->function(function($entry) {
                 return $entry->employee ? $entry->employee->name : 'N/A';
@@ -197,8 +197,8 @@ class LeaveRequestCrudController extends CrudController
             'location' => 'required|string|max:255',
             'note' => 'nullable|string|max:500'
         ], [
-            'employee_id.required' => 'Vui lòng chọn nhân viên',
-            'employee_id.exists' => 'Nhân viên không tồn tại',
+            'employee_id.required' => 'Vui lòng chọn Nhân sự',
+            'employee_id.exists' => 'Nhân sự không tồn tại',
             'leave_type.required' => 'Vui lòng chọn loại nghỉ',
             'leave_type.in' => 'Loại nghỉ không hợp lệ',
             'from_date.required' => 'Vui lòng chọn ngày bắt đầu',
@@ -247,7 +247,7 @@ class LeaveRequestCrudController extends CrudController
         ];
 
         CRUD::field('employee_id')
-            ->label('Nhân viên')
+            ->label('Nhân sự')
             ->type('select_from_array')
             ->options($employeeOptions)
             ->tab('Thông tin cơ bản');

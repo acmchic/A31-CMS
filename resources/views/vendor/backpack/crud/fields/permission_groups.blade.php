@@ -89,6 +89,10 @@ $(document).ready(function() {
             title: '📊 Báo cáo quân số',
             permissions: ['report.view', 'report.create', 'report.edit', 'report.delete', 'report.approve', 'leave.view', 'leave.create', 'leave.edit', 'leave.delete', 'leave.approve']
         },
+        'record_management': {
+            title: '📚 Quản lý sổ sách',
+            permissions: ['record_management.view', 'record_management.view.own', 'record_management.view.department', 'record_management.view.company', 'record_management.view.all', 'record_management.create', 'record_management.edit', 'record_management.delete', 'record_management.approve']
+        },
         'profile': {
             title: '👤 Quản lý cá nhân',
             permissions: ['profile.view', 'profile.edit']
@@ -115,11 +119,11 @@ $(document).ready(function() {
         'department.edit': 'Sửa phòng ban',
         'department.delete': 'Xóa phòng ban',
         'department.approve': 'Phê duyệt phòng ban',
-        'employee.view': 'Xem nhân viên',
-        'employee.create': 'Tạo nhân viên',
-        'employee.edit': 'Sửa nhân viên',
-        'employee.delete': 'Xóa nhân viên',
-        'employee.approve': 'Phê duyệt nhân viên',
+        'employee.view': 'Xem Nhân sự',
+        'employee.create': 'Tạo Nhân sự',
+        'employee.edit': 'Sửa Nhân sự',
+        'employee.delete': 'Xóa Nhân sự',
+        'employee.approve': 'Phê duyệt Nhân sự',
         'vehicle_registration.view': 'Xem danh sách đăng ký xe',
         'vehicle_registration.create': 'Tạo đăng ký xe mới',
         'vehicle_registration.edit': 'Sửa đăng ký xe',
@@ -138,6 +142,15 @@ $(document).ready(function() {
         'leave.edit': 'Sửa đơn nghỉ phép',
         'leave.delete': 'Xóa đơn nghỉ phép',
         'leave.approve': 'Phê duyệt đơn nghỉ phép',
+        'record_management.view': 'Xem quản lý sổ sách',
+        'record_management.view.own': 'Xem sổ sách cá nhân',
+        'record_management.view.department': 'Xem sổ sách phòng ban',
+        'record_management.view.company': 'Xem sổ sách công ty',
+        'record_management.view.all': 'Xem tất cả sổ sách',
+        'record_management.create': 'Tạo sổ sách',
+        'record_management.edit': 'Sửa sổ sách',
+        'record_management.delete': 'Xóa sổ sách',
+        'record_management.approve': 'Phê duyệt sổ sách',
         'profile.view': 'Xem thông tin cá nhân',
         'profile.edit': 'Sửa thông tin cá nhân'
     };

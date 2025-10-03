@@ -26,7 +26,7 @@ Examples:
 Admin (Quản trị viên): ALL permissions
 Ban Giam Doc (Ban Giám Đốc): company scope + approve
 Truong Phong (Trưởng Phòng): department scope + manage
-Nhan Vien (Nhân Viên): own scope + basic view
+Nhan Vien (Nhân sự): own scope + basic view
 ```
 
 ## 🛠️ Implementation Guide

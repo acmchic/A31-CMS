@@ -1,0 +1,11 @@
+{
+    "name": "RecordManagement",
+    "alias": "recordmanagement",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\RecordManagement\\Providers\\RecordManagementServiceProvider"
+    ],
+    "files": []
+}

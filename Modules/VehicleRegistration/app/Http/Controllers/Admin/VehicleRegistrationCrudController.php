@@ -198,17 +198,23 @@ class VehicleRegistrationCrudController extends CrudController
         $this->addBasicFields();
 
         // Vehicle assignment fields (only for Đội trưởng đội xe)
-        CRUD::field('vehicle_id')->label('Phân xe')->type('select2')->entity('vehicle')->attribute('name')
-            ->options(function($query) {
-                // Get available vehicles for the selected dates
-                return $query->where('status', 'available')->get();
-            });
+        CRUD::addField([
+            'name' => 'vehicle_id',
+            'label' => 'Phân xe',
+            'type' => 'select',
+            'entity' => 'vehicle',
+            'model' => \Modules\VehicleRegistration\Models\Vehicle::class,
+            'attribute' => 'name',
+        ]);
 
-        CRUD::field('driver_id')->label('Phân lái xe')->type('select2')->entity('driver')->attribute('name')
-            ->options(function($query) {
-                // Get available drivers for the selected dates
-                return $query->where('status', 'available')->get();
-            });
+        CRUD::addField([
+            'name' => 'driver_id',
+            'label' => 'Phân lái xe',
+            'type' => 'select',
+            'entity' => 'driver',
+            'model' => \Modules\OrganizationStructure\Models\Employee::class,
+            'attribute' => 'name',
+        ]);
 
         // Alternative: manual driver entry
         CRUD::field('driver_name')->label('Tên lái xe (thủ công)')->type('text');

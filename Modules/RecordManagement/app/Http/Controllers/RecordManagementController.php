@@ -1,0 +1,88 @@
+<?php
+
+namespace Modules\RecordManagement\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+
+class RecordManagementController extends Controller
+{
+    /**
+     * Display a listing of all record types (sổ sách)
+     */
+    public function index()
+    {
+        if (!(\App\Helpers\PermissionHelper::userCan('record_management.view'))) {
+            abort(403, 'Không có quyền truy cập');
+        }
+
+        // Danh sách các loại sổ
+        $recordTypes = [
+            [
+                'name' => 'Sổ nâng lương',
+                'description' => 'Quản lý nâng lương, nâng loại, chuyển nhóm',
+                'icon' => 'la la-money',
+                'color' => 'success',
+                'route' => 'salary-up-record',
+                'permission' => 'salary_up_record.view',
+                'count' => \Modules\RecordManagement\Models\SalaryUpRecord::count(),
+            ],
+            // TODO: Thêm các loại sổ khác
+            // [
+            //     'name' => 'Sổ quân nhân',
+            //     'description' => 'Danh sách quân nhân trong đơn vị',
+            //     'icon' => 'la la-users',
+            //     'color' => 'primary',
+            //     'route' => 'personnel-record',
+            //     'permission' => 'personnel_record.view',
+            //     'count' => 0,
+            // ],
+        ];
+
+        // Filter by permission
+        $recordTypes = array_filter($recordTypes, function($type) {
+            return \App\Helpers\PermissionHelper::userCan($type['permission']);
+        });
+
+        return view('recordmanagement::index', compact('recordTypes'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        return view('recordmanagement::create');
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request) {}
+
+    /**
+     * Show the specified resource.
+     */
+    public function show($id)
+    {
+        return view('recordmanagement::show');
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit($id)
+    {
+        return view('recordmanagement::edit');
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, $id) {}
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy($id) {}
+}

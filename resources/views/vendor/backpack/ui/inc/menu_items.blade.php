@@ -89,3 +89,12 @@
     </a>
 </li>
 @endif
+
+{{-- Record Management --}}
+@if(\App\Helpers\PermissionHelper::userCan('record_management.view'))
+<li class="nav-item">
+    <a class="nav-link" href="{{ backpack_url('record-management') }}">
+        <i class="la la-book nav-icon"></i> Quản lý sổ sách
+    </a>
+</li>
+@endif

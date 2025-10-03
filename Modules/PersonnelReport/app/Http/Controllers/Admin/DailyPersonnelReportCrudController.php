@@ -25,7 +25,7 @@ class DailyPersonnelReportCrudController extends CrudController
 
         // Apply department filtering based on user permissions
         $this->applyDepartmentFilter();
-        
+
         // Setup buttons based on user role
         $this->setupButtonsForRole();
     }
@@ -64,9 +64,9 @@ class DailyPersonnelReportCrudController extends CrudController
     private function setupButtonsForRole()
     {
         $user = backpack_user();
-        
-        // For Nhân viên role - only view, no create/edit/delete
-        if ($user->hasRole('Nhân viên')) {
+
+        // For Nhân sự role - only view, no create/edit/delete
+        if ($user->hasRole('Nhân sự')) {
             CRUD::removeButton('create');
             CRUD::removeButton('edit');
             CRUD::removeButton('delete');
@@ -150,7 +150,7 @@ class DailyPersonnelReportCrudController extends CrudController
 
         // Read-only fields that will be calculated
         CRUD::field('total_employees')
-            ->label('Tổng số nhân viên')
+            ->label('Tổng số Nhân sự')
             ->type('number')
             ->attributes(['readonly' => true])
             ->tab('Thống kê');

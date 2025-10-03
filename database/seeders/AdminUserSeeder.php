@@ -6,6 +6,7 @@ use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 class AdminUserSeeder extends Seeder
 {
@@ -14,20 +15,36 @@ class AdminUserSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create admin user
-        User::create([
-            'name' => 'Administrator',
-            'email' => 'admin@a31cms.com',
-            'username' => 'admin',
-            'password' => Hash::make('admin123'),
-        ]);
+        // Create or update admin user
+        $admin = User::updateOrCreate(
+            ['email' => 'admin@a31cms.com'],
+            [
+                'name' => 'Administrator',
+                'username' => 'admin',
+                'password' => Hash::make('admin123'),
+            ]
+        );
         
-        // Create test user
-        User::create([
-            'name' => 'Test User',
-            'email' => 'user@a31cms.com', 
-            'username' => 'testuser',
-            'password' => Hash::make('user123'),
-        ]);
+        // Assign Admin role to admin user if not already assigned
+        $adminRole = Role::where('name', 'Admin')->first();
+        if ($adminRole && !$admin->hasRole('Admin')) {
+            $admin->assignRole($adminRole);
+        }
+        
+        // Create or update test user
+        $user = User::updateOrCreate(
+            ['email' => 'user@a31cms.com'],
+            [
+                'name' => 'Test User',
+                'username' => 'testuser',
+                'password' => Hash::make('user123'),
+            ]
+        );
+        
+        // Assign Nhan Vien role to test user if not already assigned
+        $userRole = Role::where('name', 'Nhan Vien')->first();
+        if ($userRole && !$user->hasRole('Nhan Vien')) {
+            $user->assignRole($userRole);
+        }
     }
 }

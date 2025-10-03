@@ -122,7 +122,7 @@
 
     <h1>Đơn xin nghỉ phép</h1>
 
-    <h2>I. THÔNG TIN NHÂN VIÊN</h2>
+    <h2>I. THÔNG TIN Nhân sự</h2>
     <table border="1" cellpadding="6" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 6px 0 10px 0;">
         <tr>
             <td style="width: 30%; background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Họ và tên:</td>
@@ -192,7 +192,7 @@
         <table border="0" cellpadding="5" cellspacing="0" style="width: 100%; border: none;">
             <tr>
                 <td style="width: 50%; border: none; text-align: center; vertical-align: top;">
-                    <p style="font-weight: bold; font-size: 10px; margin: 0;">NHÂN VIÊN</p>
+                    <p style="font-weight: bold; font-size: 10px; margin: 0;">Nhân sự</p>
                     <p style="font-style: italic; font-size: 8px; color: #666; margin: 3px 0 35px 0;">(Ký và ghi rõ họ tên)</p>
                     <p style="font-weight: bold; font-size: 10px; margin: 0;">{{ $employee ? $employee->name : '' }}</p>
                 </td>

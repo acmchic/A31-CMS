@@ -10,6 +10,7 @@ use Modules\OrganizationStructure\Models\Employee;
 use Modules\PersonnelReport\Models\EmployeeLeave;
 use Modules\PersonnelReport\Models\DailyPersonnelReport;
 use Modules\VehicleRegistration\Models\VehicleRegistration;
+use Modules\RecordManagement\Models\RecordType;
 use App\Helpers\PermissionHelper;
 
 class DashboardController extends Controller
@@ -23,7 +24,7 @@ class DashboardController extends Controller
         if (!PermissionHelper::userCan('dashboard.view')) {
             abort(403, 'Bạn không có quyền truy cập dashboard.');
         }
-        
+
         // Get statistics
         $stats = [
             'departments' => Department::count(),
@@ -36,7 +37,7 @@ class DashboardController extends Controller
 
         // Base modules that all users can see
         $modules = [];
-        
+
         // System Management Module
         if (PermissionHelper::userCan('user.view') || PermissionHelper::userCan('role.view')) {
             $modules[] = [
@@ -62,12 +63,12 @@ class DashboardController extends Controller
                 'color' => 'success'
             ];
         }
-        
+
         // Employee Management
         if (PermissionHelper::userCan('employee.view')) {
             $modules[] = [
                 'name' => 'Quản lý nhân sự',
-                'description' => 'Quản lý thông tin cán bộ, nhân viên',
+                'description' => 'Quản lý thông tin cán bộ, Nhân sự',
                 'icon' => 'la la-users',
                 'url' => backpack_url('employee'),
                 'status' => 'active',
@@ -112,6 +113,28 @@ class DashboardController extends Controller
                 'status' => 'active',
                 'count' => $stats['vehicle_registrations'],
                 'color' => 'secondary'
+            ];
+        }
+
+        // Record Management
+        if (PermissionHelper::userCan('record_management.view')) {
+            $totalRecords = 0;
+            try {
+                $totalRecords = \Modules\RecordManagement\Models\SalaryUpRecord::count();
+                // TODO: Thêm count cho các loại sổ khác khi có
+                // $totalRecords += \Modules\RecordManagement\Models\PersonnelRecord::count();
+            } catch (\Exception $e) {
+                $totalRecords = 0;
+            }
+
+            $modules[] = [
+                'name' => 'Quản lý sổ sách',
+                'description' => 'Quản lý các loại sổ sách và bản ghi',
+                'icon' => 'la la-book',
+                'url' => backpack_url('record-management'),
+                'status' => 'active',
+                'count' => $totalRecords,
+                'color' => 'info'
             ];
         }
 

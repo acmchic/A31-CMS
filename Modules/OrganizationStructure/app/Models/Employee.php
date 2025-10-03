@@ -13,7 +13,6 @@ class Employee extends Model
     use HasFactory, SoftDeletes, CrudTrait;
 
     protected $fillable = [
-        'user_id',
         'name',
         'date_of_birth',
         'enlist_date', 
@@ -49,13 +48,13 @@ class Employee extends Model
         'hourly_counter' => 0,
     ];
 
-    protected $dates = ['deleted_at', 'date_of_birth', 'enlist_date', 'start_date', 'quit_date'];
+    protected $dates = ['deleted_at', 'date_of_birth', 'start_date', 'quit_date'];
     
     protected $casts = [
         'gender' => 'boolean',
         'is_active' => 'boolean',
         'date_of_birth' => 'date',
-        'enlist_date' => 'date',
+        // enlist_date giờ là string (mm/yyyy), không cast date
         'start_date' => 'date',
         'quit_date' => 'date'
     ];
@@ -68,7 +67,7 @@ class Employee extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->hasOne(\App\Models\User::class, 'employee_id');
     }
 
     public function position()

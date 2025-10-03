@@ -66,7 +66,7 @@ class User extends Authenticatable
     // Relationship with Employee
     public function employee()
     {
-        return $this->hasOne(\Modules\OrganizationStructure\Models\Employee::class, 'user_id');
+        return $this->belongsTo(\Modules\OrganizationStructure\Models\Employee::class, 'employee_id');
     }
     
     // Get correct employee info by matching name

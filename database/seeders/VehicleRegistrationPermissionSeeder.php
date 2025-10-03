@@ -61,7 +61,7 @@ class VehicleRegistrationPermissionSeeder extends Seeder
             'vehicle_registration.edit',
         ]);
 
-        // Gán quyền cho Nhân viên (tạo và xem đăng ký của mình)
+        // Gán quyền cho Nhân sự (tạo và xem đăng ký của mình)
         $nhanVien->givePermissionTo([
             'vehicle_registration.view',
             'vehicle_registration.create',
@@ -79,6 +79,6 @@ class VehicleRegistrationPermissionSeeder extends Seeder
         $this->command->info('  - Admin: Tất cả quyền');
         $this->command->info('  - Ban Giám Đốc: View, Approve, Reject, Download PDF, Check Signature');
         $this->command->info('  - Đội trưởng xe: View, Assign, Edit');
-        $this->command->info('  - Nhân viên: View, Create, Edit (own records)');
+        $this->command->info('  - Nhân sự: View, Create, Edit (own records)');
     }
 }
