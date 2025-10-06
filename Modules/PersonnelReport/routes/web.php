@@ -43,6 +43,10 @@ Route::group([
         // API endpoint - PHẢI ĐẶT TRƯỚC Route::crud() để tránh conflict
         Route::get('daily-personnel-report/api/department-stats/{departmentId}', [DailyPersonnelReportCrudController::class, 'getDepartmentStats']);
         
+        // New smart UI route
+        Route::get('daily-personnel-report/create-2', [DailyPersonnelReportCrudController::class, 'create2'])->name('daily-personnel-report.create-2');
+        Route::post('daily-personnel-report/store-2', [DailyPersonnelReportCrudController::class, 'store2'])->name('daily-personnel-report.store-2');
+        
         Route::crud('daily-personnel-report', DailyPersonnelReportCrudController::class);
     });
 });

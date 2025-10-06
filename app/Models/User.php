@@ -72,12 +72,12 @@ class User extends Authenticatable
     // Get correct employee info by matching name
     public function getCorrectEmployee()
     {
-        // First try by user_id
-        $employee = \Modules\OrganizationStructure\Models\Employee::where('user_id', $this->id)->first();
-        
-        // If found and name matches, return it
-        if ($employee && $this->name === $employee->name) {
-            return $employee;
+        // First try by employee_id relationship
+        if ($this->employee_id) {
+            $employee = \Modules\OrganizationStructure\Models\Employee::find($this->employee_id);
+            if ($employee) {
+                return $employee;
+            }
         }
         
         // Otherwise, try to find by exact name matching

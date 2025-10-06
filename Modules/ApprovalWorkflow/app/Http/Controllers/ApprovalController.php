@@ -152,9 +152,22 @@ class ApprovalController extends Controller
      */
     protected function getModulePermission(string $modelClass): string
     {
-        // Extract module name from namespace
+        // Special cases - map model to correct permission prefix
+        $modelName = class_basename($modelClass);
+        
+        // Map specific models to their permission prefixes
+        $permissionMap = [
+            'EmployeeLeave' => 'leave',
+            'VehicleRegistration' => 'vehicle_registration',
+            'RecordManagement' => 'record_management',
+        ];
+        
+        if (isset($permissionMap[$modelName])) {
+            return $permissionMap[$modelName];
+        }
+        
+        // Fallback: Extract module name from namespace
         // Example: Modules\VehicleRegistration\Models\VehicleRegistration -> vehicle_registration
-
         $parts = explode('\\', $modelClass);
         $moduleName = $parts[1] ?? 'unknown';
 

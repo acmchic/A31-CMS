@@ -2,53 +2,49 @@
 
 @section('content')
 <div class="container-fluid">
-    <!-- Header -->
-    <div class="row mb-3">
+    <!-- Modern Header -->
+    <div class="row mb-4">
         <div class="col-12">
-            <div class="card bg-primary text-white">
-                <div class="card-body text-center py-2">
-                    <h4 class="mb-0">
-                        PHẦN MỀM BÁO CÁO QUÂN SỐ HÀNG NGÀY
-                    </h4>
+            <div class="card shadow-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="card-body text-center text-white py-4">
+                    <h3 class="mb-2"><i class="la la-calendar-check"></i> BÁO CÁO QUÂN SỐ HÀNG NGÀY</h3>
+                    <h5 class="mb-0">Sổ Tổng Hợp Quân Số Toàn Nhà Máy A31</h5>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Title Section -->
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="card bg-warning">
-                <div class="card-body text-center py-2">
-                    <h5 class="mb-0">📊 SỔ TỔNG HỢP QUÂN SỐ TOÀN NHÀ MÁY</h5>
+    <!-- Date Selection Card -->
+    <div class="row mb-4">
+        <div class="col-md-6 offset-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form method="GET" action="{{ backpack_url('daily-personnel-report') }}">
+                        <div class="row align-items-end">
+                            <div class="col-md-8">
+                                <label class="form-label"><strong><i class="la la-calendar"></i> Chọn ngày xem:</strong></label>
+                                <input type="date" name="report_date" class="form-control" value="{{ $selectedDate }}" required>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="submit" class="btn btn-primary btn-block">
+                                    <i class="la la-search"></i> Xem báo cáo
+                                </button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Date Selection -->
+    <!-- Report Date Badge -->
     <div class="row mb-3">
-        <div class="col-md-4 offset-md-4">
-            <form method="GET" action="{{ backpack_url('daily-personnel-report') }}" class="form-inline">
-                <label class="mr-2"><strong>Chọn ngày xem:</strong></label>
-                <div class="input-group">
-                    <input type="date" name="report_date" class="form-control" value="{{ $selectedDate }}" required>
-                    <div class="input-group-append">
-                        <button type="submit" class="btn btn-info">
-                            <i class="la la-search"></i> Xem
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Report Title -->
-    <div class="row mb-2">
-        <div class="col-12">
-            <div class="alert alert-danger">
-                <strong>⭐ Bảng tổng hợp quân số Nhà máy A31 ngày {{ \Carbon\Carbon::parse($selectedDate)->format('d/m/Y') }}:</strong>
-            </div>
+        <div class="col-12 text-center">
+            <h4>
+                <span class="badge badge-danger badge-lg" style="font-size: 1.1rem; padding: 0.6rem 1.5rem;">
+                    <i class="la la-star"></i> Báo cáo ngày {{ \Carbon\Carbon::parse($selectedDate)->format('d/m/Y') }}
+                </span>
+            </h4>
         </div>
     </div>
 
@@ -84,14 +80,47 @@
                                 @foreach($departments as $dept)
                                     @php
                                         $report = $reports->where('department_id', $dept->id)->first();
-                                        $total = $report ? $report->total_employees : 0;
-                                        $present = $report ? $report->present_count : 0;
-                                        $absent = $report ? $report->absent_count : 0;
-                                        $congTac = $report ? $report->sick_count : 0;
-                                        $coDong = $report ? $report->annual_leave_count : 0;
-                                        $hoc = $report ? $report->personal_leave_count : 0;
-                                        $phep = $report ? $report->military_leave_count : 0;
-                                        $khac = $report ? $report->other_leave_count : 0;
+                                        
+                                        // Get approved leaves for this department on this date
+                                        $deptLeaves = $approvedLeaves->where('employee.department_id', $dept->id);
+                                        
+                                        // Map leave types to reason counts
+                                        $leaveTypeCounts = [
+                                            'cong_tac' => $deptLeaves->where('leave_type', 'business')->count(),
+                                            'co_dong' => $deptLeaves->where('leave_type', 'attendance')->count(),
+                                            'hoc' => $deptLeaves->where('leave_type', 'study')->count(),
+                                            'phep' => $deptLeaves->where('leave_type', 'leave')->count(),
+                                            'khac' => $deptLeaves->where('leave_type', 'other')->count(),
+                                        ];
+                                        
+                                        $totalLeaveAbsent = $deptLeaves->count();
+                                        
+                                        // If report exists, use its data and merge with leave data
+                                        if ($report) {
+                                            $total = $report->total_employees;
+                                            
+                                            // Merge counts: report data + approved leaves
+                                            $congTac = $report->sick_count + $leaveTypeCounts['cong_tac'];
+                                            $coDong = $report->annual_leave_count + $leaveTypeCounts['co_dong'];
+                                            $hoc = $report->personal_leave_count + $leaveTypeCounts['hoc'];
+                                            $phep = $report->military_leave_count + $leaveTypeCounts['phep'];
+                                            $khac = $report->other_leave_count + $leaveTypeCounts['khac'];
+                                            
+                                            $absent = $report->absent_count + $totalLeaveAbsent;
+                                            $present = $total - $absent;
+                                        } else {
+                                            // No report means all employees present EXCEPT those on approved leave
+                                            $activeEmployeeCount = $dept->employees()->active()->count();
+                                            $total = $activeEmployeeCount;
+                                            $absent = $totalLeaveAbsent;
+                                            $present = $activeEmployeeCount - $absent;
+                                            
+                                            $congTac = $leaveTypeCounts['cong_tac'];
+                                            $coDong = $leaveTypeCounts['co_dong'];
+                                            $hoc = $leaveTypeCounts['hoc'];
+                                            $phep = $leaveTypeCounts['phep'];
+                                            $khac = $leaveTypeCounts['khac'];
+                                        }
                                         
                                         // Add to grand total
                                         $grandTotal['total'] += $total;
@@ -147,38 +176,129 @@
                     <h5 class="mb-0"><strong>TỔNG HỢP CÁC LÝ DO VẮNG:</strong></h5>
                 </div>
                 <div class="card-body">
-                    <ol class="mb-0">
-                        @foreach($departments as $dept)
-                            @php
-                                $report = $reports->where('department_id', $dept->id)->first();
-                            @endphp
-                            @if($report && $report->note)
-                                <li><strong>{{ $dept->name }}:</strong> {{ $report->note }}</li>
-                            @endif
-                        @endforeach
-                    </ol>
+                    @php
+                        $hasAbsentEmployees = false;
+                        $reasonMap = [
+                            'cong_tac' => 'Công tác',
+                            'co_dong' => 'Cơ động',
+                            'hoc' => 'Học',
+                            'phep' => 'Phép',
+                            'khac' => 'Khác'
+                        ];
+                    @endphp
                     
-                    @if($reports->where('note', '!=', null)->count() == 0)
-                        <p class="text-muted mb-0"><em>Không có ghi chú nào.</em></p>
+                    <table class="table table-bordered">
+                        <thead class="thead-light">
+                            <tr>
+                                <th width="20%">Phòng ban</th>
+                                <th width="25%">Họ tên</th>
+                                <th width="15%">Lý do</th>
+                                <th width="40%">Ghi chú</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    @foreach($departments as $dept)
+                        @php
+                            $report = $reports->where('department_id', $dept->id)->first();
+                            $allAbsentEmployees = [];
+                            
+                            // 1. Get absent from report
+                            if ($report && $report->note) {
+                                $decoded = json_decode($report->note, true);
+                                if (is_array($decoded)) {
+                                    $allAbsentEmployees = $decoded;
+                                }
+                            }
+                            
+                            // 2. Add approved leaves for this department
+                            $deptLeaves = $approvedLeaves->filter(function($leave) use ($dept) {
+                                return $leave->employee && $leave->employee->department_id == $dept->id;
+                            });
+                            
+                            // Map leave type to reason
+                            $leaveTypeMap = [
+                                'business' => 'cong_tac',
+                                'attendance' => 'co_dong',
+                                'study' => 'hoc',
+                                'leave' => 'phep',
+                                'other' => 'khac'
+                            ];
+                            
+                            foreach ($deptLeaves as $leave) {
+                                // Check if not already in list (avoid duplicate)
+                                $alreadyAdded = false;
+                                foreach ($allAbsentEmployees as $absent) {
+                                    if ($absent['employee_id'] == $leave->employee_id) {
+                                        $alreadyAdded = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if (!$alreadyAdded) {
+                                    $reason = $leaveTypeMap[$leave->leave_type] ?? 'khac';
+                                    $allAbsentEmployees[] = [
+                                        'employee_id' => $leave->employee_id,
+                                        'reason' => $reason,
+                                        'note' => $leave->note ?: '-' // Use note from leave request directly
+                                    ];
+                                }
+                            }
+                            
+                            // Skip if no absent employees
+                            if (count($allAbsentEmployees) == 0) continue;
+                            
+                            $hasAbsentEmployees = true;
+                            $rowspan = count($allAbsentEmployees);
+                        @endphp
+                        
+                        @foreach($allAbsentEmployees as $index => $absent)
+                            @php
+                                $employee = \Modules\OrganizationStructure\Models\Employee::find($absent['employee_id']);
+                                if (!$employee) continue;
+                                
+                                $reasonText = $reasonMap[$absent['reason']] ?? 'Không rõ';
+                                $note = $absent['note'] ?? '-';
+                                
+                                // Color coding for reasons
+                                $reasonColors = [
+                                    'cong_tac' => 'primary',
+                                    'co_dong' => 'success',
+                                    'hoc' => 'info',
+                                    'phep' => 'warning',
+                                    'khac' => 'secondary'
+                                ];
+                                $colorClass = $reasonColors[$absent['reason']] ?? 'secondary';
+                            @endphp
+                            <tr>
+                                @if($index == 0)
+                                    <td rowspan="{{ $rowspan }}" class="align-middle bg-light">
+                                        <strong>{{ $dept->name }}</strong>
+                                    </td>
+                                @endif
+                                <td>{{ $employee->name }}</td>
+                                <td>
+                                    <span class="badge badge-{{ $colorClass }}">{{ $reasonText }}</span>
+                                </td>
+                                <td>{{ $note }}</td>
+                            </tr>
+                        @endforeach
+                    @endforeach
+                        </tbody>
+                    </table>
+                    
+                    @if(!$hasAbsentEmployees)
+                        <p class="text-muted mb-0"><em>Không có nhân viên vắng mặt.</em></p>
                     @endif
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Action Buttons -->
-    <div class="row mt-3">
-        <div class="col-12 text-center">
-            <button class="btn btn-primary" onclick="window.print()">
-                <i class="la la-print"></i> In báo cáo
-            </button>
-        </div>
-    </div>
 </div>
 
 <style>
 @media print {
-    .btn, .navbar, .sidebar, form {
+    .navbar, .sidebar, form {
         display: none !important;
     }
     
