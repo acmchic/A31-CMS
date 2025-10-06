@@ -16,6 +16,9 @@ return [
         '500' => 'Đã xảy ra lỗi nội bộ của máy chủ.',
         'button' => 'Quay lại trang trước',
     ],
+    
+    // Footer customization
+    'handcrafted_by' => 'Phát triển bởi',
 ];
 
 
