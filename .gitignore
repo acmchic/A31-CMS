@@ -21,3 +21,11 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Error pages (to avoid auto-format changes)
+resources/views/errors/403.blade.php
+resources/views/errors/404.blade.php
+resources/views/errors/500.blade.php
+resources/views/vendor/backpack/crud/errors/
+resources/views/vendor/backpack/theme-tabler/errors/
+resources/views/vendor/backpack/ui/errors/

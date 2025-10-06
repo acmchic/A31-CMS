@@ -79,11 +79,17 @@ class DashboardController extends Controller
 
         // Reports
         if (PermissionHelper::userCan('report.view')) {
+            // Ưu tiên: Nếu có quyền xem tổng hợp → link đến summary
+            // Nếu không → link đến create-2 (phòng ban)
+            $reportUrl = backpack_user()->hasPermissionTo('tong_hop_bao_cao_quan_so') 
+                ? backpack_url('daily-personnel-report')
+                : backpack_url('daily-personnel-report/create-2');
+            
             $modules[] = [
                 'name' => 'Báo cáo quân số',
                 'description' => 'Báo cáo và thống kê nhân sự',
                 'icon' => 'la la-chart-bar',
-                'url' => backpack_url('daily-personnel-report'),
+                'url' => $reportUrl,
                 'status' => 'active',
                 'count' => $stats['reports'],
                 'color' => 'primary'

@@ -41,6 +41,7 @@ return [
     'styles' => [
         base_path('vendor/backpack/theme-tabler/resources/assets/css/color-adjustments.css'),
         base_path('vendor/backpack/theme-tabler/resources/assets/css/colors.css'),
+        'css/custom-admin.css', // Custom navbar color - Xanh da trời
     ],
 
     /**

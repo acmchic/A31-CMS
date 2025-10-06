@@ -73,7 +73,13 @@
         @endif
         
         @if(backpack_user()->hasPermissionTo('report.view'))
-        <a class="dropdown-item" href="{{ backpack_url('daily-personnel-report/create') }}">
+        @php
+            // Ưu tiên: Nếu có quyền tổng hợp → link summary, nếu không → create-2
+            $reportUrl = backpack_user()->hasPermissionTo('tong_hop_bao_cao_quan_so')
+                ? backpack_url('daily-personnel-report')
+                : backpack_url('daily-personnel-report/create-2');
+        @endphp
+        <a class="dropdown-item" href="{{ $reportUrl }}">
             <i class="la la-chart-line"></i> Báo cáo quân số
         </a>
         @endif
