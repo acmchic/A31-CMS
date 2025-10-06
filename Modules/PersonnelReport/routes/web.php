@@ -40,6 +40,9 @@ Route::group([
     
     // Daily Report routes - require report.view permission
     Route::group(['middleware' => 'permission:report.view'], function () {
+        // API endpoint - PHẢI ĐẶT TRƯỚC Route::crud() để tránh conflict
+        Route::get('daily-personnel-report/api/department-stats/{departmentId}', [DailyPersonnelReportCrudController::class, 'getDepartmentStats']);
+        
         Route::crud('daily-personnel-report', DailyPersonnelReportCrudController::class);
     });
 });

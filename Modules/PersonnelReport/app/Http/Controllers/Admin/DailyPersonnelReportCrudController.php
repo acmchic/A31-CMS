@@ -46,8 +46,11 @@ class DailyPersonnelReportCrudController extends CrudController
         $departmentId = $user->department_id;
 
         // Fallback to employee's department if user doesn't have direct department
-        if (!$departmentId && $user->employee) {
-            $departmentId = $user->employee->department_id;
+        if (!$departmentId && $user->employee_id) {
+            $employee = \Modules\OrganizationStructure\Models\Employee::find($user->employee_id);
+            if ($employee) {
+                $departmentId = $employee->department_id;
+            }
         }
 
         if ($departmentId) {
@@ -75,36 +78,31 @@ class DailyPersonnelReportCrudController extends CrudController
 
     protected function setupListOperation()
     {
-        CRUD::column('report_date')
-            ->label('Ngày báo cáo')
-            ->type('date');
-
-        CRUD::column('department_name')
-            ->label('Phòng ban')
-            ->type('closure')
-            ->function(function($entry) {
-                return $entry->department ? $entry->department->name : 'N/A';
-            });
-
-        CRUD::column('total_employees')
-            ->label('Tổng số')
-            ->type('number');
-
-        CRUD::column('present_count')
-            ->label('Có mặt')
-            ->type('number');
-
-        CRUD::column('on_leave_count')
-            ->label('Nghỉ phép')
-            ->type('number');
-
-        CRUD::column('absent_count')
-            ->label('Vắng mặt')
-            ->type('number');
-
-
-        // Note: Filters removed to avoid Backpack PRO requirement
-        // You can add custom filtering logic in the controller if needed
+        // Check permission - only users with "tong_hop_bao_cao_quan_so" can access summary
+        if (!backpack_user()->hasPermissionTo('tong_hop_bao_cao_quan_so')) {
+            abort(403, 'Không có quyền xem tổng hợp báo cáo quân số');
+        }
+    }
+    
+    /**
+     * Override index to show custom summary view
+     */
+    public function index()
+    {
+        // Check permission
+        if (!backpack_user()->hasPermissionTo('tong_hop_bao_cao_quan_so')) {
+            abort(403, 'Không có quyền xem tổng hợp báo cáo quân số');
+        }
+        
+        $selectedDate = request('report_date', now()->format('Y-m-d'));
+        
+        // Get all departments
+        $departments = \Modules\OrganizationStructure\Models\Department::orderBy('id')->get();
+        
+        // Get reports for selected date
+        $reports = DailyPersonnelReport::whereDate('report_date', $selectedDate)->get();
+        
+        return view('personnelreport::daily_report_summary', compact('departments', 'reports', 'selectedDate'));
     }
 
     protected function setupCreateOperation()
@@ -113,6 +111,9 @@ class DailyPersonnelReportCrudController extends CrudController
             'department_id' => 'required|exists:departments,id',
             'report_date' => 'required|date',
         ]);
+
+        // Use custom create view
+        $this->crud->setCreateView('personnelreport::daily_report_create');
 
         // Filter departments based on user's department
         $departmentOptions = [];
@@ -124,8 +125,11 @@ class DailyPersonnelReportCrudController extends CrudController
             $departmentId = $user->department_id;
 
             // Fallback to employee's department if user doesn't have direct department
-            if (!$departmentId && $user->employee) {
-                $departmentId = $user->employee->department_id;
+            if (!$departmentId && $user->employee_id) {
+                $employee = \Modules\OrganizationStructure\Models\Employee::find($user->employee_id);
+                if ($employee) {
+                    $departmentId = $employee->department_id;
+                }
             }
 
             if ($departmentId) {
@@ -135,6 +139,9 @@ class DailyPersonnelReportCrudController extends CrudController
                 }
             }
         }
+        
+        // Pass to view
+        $this->data['departmentOptions'] = $departmentOptions;
 
         CRUD::field('department_id')
             ->label('Phòng ban')
@@ -213,6 +220,98 @@ class DailyPersonnelReportCrudController extends CrudController
         CRUD::column('created_by')->label('Người tạo');
         CRUD::column('updated_by')->label('Người cập nhật');
     }
+    
+    /**
+     * API: Lấy thống kê quân số theo phòng ban
+     */
+    public function getDepartmentStats($departmentId)
+    {
+        try {
+            \Log::info("API getDepartmentStats called", ['department_id' => $departmentId]);
+            
+            $department = Department::find($departmentId);
+            
+            if (!$department) {
+                \Log::warning("Department not found", ['department_id' => $departmentId]);
+                return response()->json(['error' => 'Phòng ban không tồn tại'], 404);
+            }
+            
+            // Đếm tổng nhân viên active
+            $totalEmployees = $department->employees()->active()->count();
+            
+            // Tạm thời: Đếm theo rank_code để phân loại
+            // SQ: Sĩ quan (có chữ "úy" hoặc "tá" hoặc "tướng")
+            // QNCN: Quân nhân chuyên nghiệp (có chữ "sĩ")
+            // CNQP: Còn lại (null hoặc không match)
+            
+            $employees = $department->employees()->active()->get();
+            
+            $sqCount = 0; // Sĩ quan
+            $qncnCount = 0; // Quân nhân CN
+            $cnqpCount = 0; // Công nhân QP
+            
+            foreach ($employees as $emp) {
+                $rankCode = strtolower($emp->rank_code ?? '');
+                
+                if (strpos($rankCode, 'úy') !== false || 
+                    strpos($rankCode, 'tá') !== false || 
+                    strpos($rankCode, 'tướng') !== false ||
+                    strpos($rankCode, 'đại') !== false) {
+                    $sqCount++;
+                } elseif (strpos($rankCode, 'sĩ') !== false) {
+                    $qncnCount++;
+                } else {
+                    $cnqpCount++;
+                }
+            }
+            
+            $result = [
+                'total' => $totalEmployees,
+                'sq' => $sqCount,
+                'qncn' => $qncnCount,
+                'cnqp' => $cnqpCount
+            ];
+            
+            \Log::info("Department stats calculated", $result);
+            
+            return response()->json($result);
+        } catch (\Exception $e) {
+            \Log::error("Error in getDepartmentStats", [
+                'department_id' => $departmentId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json(['error' => 'Có lỗi xảy ra: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    /**
+     * Hiển thị báo cáo quân số format đẹp
+     */
+    public function showReport($id)
+    {
+        $report = $this->crud->getEntry($id);
+        
+        if (!$report) {
+            abort(404, 'Báo cáo không tồn tại');
+        }
+        
+        // Calculate statistics
+        $stats = [
+            'total_sq' => $report->total_strength ?? 0,
+            'total_qncn' => $report->present_count ?? 0,
+            'total_cnqp' => $report->absent_count ?? 0,
+            'present_sq' => $report->present_count ?? 0,
+            'present_qncn' => $report->present_count ?? 0,
+            'present_cnqp' => 0,
+            'absent_sq' => $report->absent_count ?? 0,
+            'absent_qncn' => $report->absent_count ?? 0,
+            'absent_cnqp' => 0,
+        ];
+        
+        return view('personnelreport::daily_report_view', compact('report', 'stats'));
+    }
 
     public function store()
     {
@@ -225,22 +324,36 @@ class DailyPersonnelReportCrudController extends CrudController
         $departmentId = $request->input('department_id');
         $reportDate = $request->input('report_date');
 
-        // Generate the report data automatically
-        $reportData = DailyPersonnelReport::generateReport($departmentId, $reportDate);
+        // ✅ Check if report already exists
+        $existingReport = DailyPersonnelReport::where('department_id', $departmentId)
+            ->where('report_date', $reportDate)
+            ->first();
 
-        if ($reportData) {
-            $request->merge($reportData->toArray());
+        if ($existingReport) {
+            \Alert::error('Báo cáo cho phòng ban này vào ngày ' . date('d/m/Y', strtotime($reportDate)) . ' đã tồn tại!')->flash();
+            return redirect()->back()->withInput();
         }
 
-        $request->merge([
+        // ✅ Create report with custom data from form
+        $reportData = DailyPersonnelReport::create([
+            'department_id' => $departmentId,
+            'report_date' => $reportDate,
+            'total_employees' => $request->input('total_sq', 0) + $request->input('total_qncn', 0) + $request->input('total_cnqp', 0),
+            'present_count' => $request->input('present_sq', 0) + $request->input('present_qncn', 0) + $request->input('present_cnqp', 0),
+            'absent_count' => $request->input('absent_sq', 0) + $request->input('absent_qncn', 0) + $request->input('absent_cnqp', 0),
+            'on_leave_count' => 0,
+            'sick_count' => $request->input('cong_tac_sq', 0) + $request->input('cong_tac_qncn', 0) + $request->input('cong_tac_cnqp', 0),
+            'annual_leave_count' => $request->input('co_dong_sq', 0) + $request->input('co_dong_qncn', 0) + $request->input('co_dong_cnqp', 0),
+            'personal_leave_count' => $request->input('di_hoc_sq', 0) + $request->input('di_hoc_qncn', 0) + $request->input('di_hoc_cnqp', 0),
+            'military_leave_count' => $request->input('di_phep_sq', 0) + $request->input('di_phep_qncn', 0) + $request->input('di_phep_cnqp', 0),
+            'other_leave_count' => $request->input('ly_do_khac_sq', 0) + $request->input('ly_do_khac_qncn', 0) + $request->input('ly_do_khac_cnqp', 0),
+            'note' => $request->input('note'),
             'created_by' => $user->name ?: $user->username,
             'updated_by' => $user->name ?: $user->username
         ]);
 
-        $this->crud->setRequest($request);
-        $this->crud->unsetValidation(); // validation has already been run
-
-        return $this->traitStore();
+        \Alert::success('Tạo báo cáo thành công!')->flash();
+        return redirect(backpack_url('daily-personnel-report'));
     }
 
     public function update()

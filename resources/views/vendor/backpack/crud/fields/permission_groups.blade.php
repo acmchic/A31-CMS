@@ -87,7 +87,7 @@ $(document).ready(function() {
         },
         'personnel_report': {
             title: '📊 Báo cáo quân số',
-            permissions: ['report.view', 'report.create', 'report.edit', 'report.delete', 'report.approve', 'leave.view', 'leave.create', 'leave.edit', 'leave.delete', 'leave.approve']
+            permissions: ['tong_hop_bao_cao_quan_so', 'report.view', 'report.create', 'report.edit', 'report.delete', 'report.approve', 'leave.view', 'leave.create', 'leave.edit', 'leave.delete', 'leave.approve']
         },
         'record_management': {
             title: '📚 Quản lý sổ sách',
@@ -132,6 +132,7 @@ $(document).ready(function() {
         'vehicle_registration.approve': 'Phê duyệt đăng ký xe',
         'vehicle_registration.reject': 'Từ chối đăng ký xe',
         'vehicle_registration.download_pdf': 'Tải về đã ký',
+        'tong_hop_bao_cao_quan_so': 'Tổng hợp báo cáo quân số',
         'report.view': 'Xem báo cáo quân số',
         'report.create': 'Tạo báo cáo quân số',
         'report.edit': 'Sửa báo cáo quân số',

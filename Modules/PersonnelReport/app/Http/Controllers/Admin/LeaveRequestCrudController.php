@@ -42,13 +42,19 @@ class LeaveRequestCrudController extends CrudController
         $scope = PermissionHelper::getUserScope($user);
 
         // ✅ Debug logging
+        $employeeDeptId = null;
+        if ($user->employee_id) {
+            $emp = \Modules\OrganizationStructure\Models\Employee::find($user->employee_id);
+            $employeeDeptId = $emp ? $emp->department_id : null;
+        }
+        
         \Log::info('LeaveRequest Filter Debug', [
             'user_id' => $user->id,
             'user_name' => $user->name,
             'user_roles' => $user->roles->pluck('name'),
             'scope' => $scope,
             'department_id' => $user->department_id,
-            'employee_department_id' => $user->employee ? $user->employee->department_id : null,
+            'employee_department_id' => $employeeDeptId,
         ]);
 
         switch ($scope) {
@@ -60,8 +66,9 @@ class LeaveRequestCrudController extends CrudController
             case 'department':
                 // Can see department's leave requests
                 $departmentId = $user->department_id;
-                if (!$departmentId && $user->employee) {
-                    $departmentId = $user->employee->department_id;
+                if (!$departmentId && $user->employee_id) {
+                    $emp = \Modules\OrganizationStructure\Models\Employee::find($user->employee_id);
+                    $departmentId = $emp ? $emp->department_id : null;
                 }
 
                 if ($departmentId) {
@@ -79,8 +86,8 @@ class LeaveRequestCrudController extends CrudController
 
             case 'own':
                 // Can see only own leave requests
-                if ($user->employee) {
-                    CRUD::addClause('where', 'employee_id', $user->employee->id);
+                if ($user->employee_id) {
+                    CRUD::addClause('where', 'employee_id', $user->employee_id);
                 } else {
                     CRUD::addClause('where', 'id', 0);
                 }
@@ -224,8 +231,9 @@ class LeaveRequestCrudController extends CrudController
             $departmentId = $user->department_id;
 
             // Fallback to employee's department if user doesn't have direct department
-            if (!$departmentId && $user->employee) {
-                $departmentId = $user->employee->department_id;
+            if (!$departmentId && $user->employee_id) {
+                $emp = \Modules\OrganizationStructure\Models\Employee::find($user->employee_id);
+                $departmentId = $emp ? $emp->department_id : null;
             }
 
             if ($departmentId) {

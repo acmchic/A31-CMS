@@ -269,7 +269,7 @@ class RoleCrudController extends BaseRoleCrudController
             'department_management' => ['manage departments', 'view all departments', 'edit all departments', 'manage department users', 'view_department'],
             'leave_management' => ['approve leaves', 'approve-leave-request', 'reject-leave-request', 'view-leave-request', 'view_leave_request'],
             'vehicle_management' => ['manage vehicles', 'assign vehicles', 'view vehicle requests', 'approve vehicle step2'],
-            'reports' => ['view reports', 'view_daily_report'],
+            'reports' => ['tong_hop_bao_cao_quan_so', 'view reports', 'view_daily_report'],
             'employee_management' => ['view_employee'],
             'system_settings' => ['system settings'],
             'pdf_signatures' => ['sign-pdf'],
@@ -300,6 +300,7 @@ class RoleCrudController extends BaseRoleCrudController
     private function translatePermission($permissionName)
     {
         $translations = [
+            'tong_hop_bao_cao_quan_so' => 'Tổng hợp báo cáo quân số',
             'view_user_profile' => 'Xem hồ sơ người dùng',
             'view_department' => 'Xem phòng ban',
             'view_daily_report' => 'Xem báo cáo hàng ngày',

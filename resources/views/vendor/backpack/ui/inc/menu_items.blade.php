@@ -60,21 +60,27 @@
 @endif
 
 {{-- Personnel Reports --}}
-@if(\App\Helpers\PermissionHelper::userCan('report.view') || \App\Helpers\PermissionHelper::userCan('leave.view'))
+@if(backpack_user()->hasPermissionTo('tong_hop_bao_cao_quan_so') || backpack_user()->hasPermissionTo('report.view') || \App\Helpers\PermissionHelper::userCan('leave.view'))
 <li class="nav-item dropdown">
     <a class="nav-link dropdown-toggle" href="#navbar-reports" data-bs-toggle="dropdown" role="button">
         <i class="la la-chart-bar nav-icon"></i> Báo cáo quân số
     </a>
     <div class="dropdown-menu">
-        @if(\App\Helpers\PermissionHelper::userCan('leave.view'))
-        <a class="dropdown-item" href="{{ backpack_url('leave-request') }}">
-            <i class="la la-calendar-check"></i> Đăng ký nghỉ phép
+        @if(backpack_user()->hasPermissionTo('tong_hop_bao_cao_quan_so'))
+        <a class="dropdown-item" href="{{ backpack_url('daily-personnel-report') }}">
+            <i class="la la-file-text"></i> Tổng hợp báo cáo quân số
         </a>
         @endif
         
-        @if(\App\Helpers\PermissionHelper::userCan('report.view'))
-        <a class="dropdown-item" href="{{ backpack_url('daily-personnel-report') }}">
+        @if(backpack_user()->hasPermissionTo('report.view'))
+        <a class="dropdown-item" href="{{ backpack_url('daily-personnel-report/create') }}">
             <i class="la la-chart-line"></i> Báo cáo quân số
+        </a>
+        @endif
+        
+        @if(\App\Helpers\PermissionHelper::userCan('leave.view'))
+        <a class="dropdown-item" href="{{ backpack_url('leave-request') }}">
+            <i class="la la-calendar-check"></i> Đăng ký nghỉ phép
         </a>
         @endif
     </div>

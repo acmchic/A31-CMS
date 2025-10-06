@@ -24,6 +24,7 @@ class DailyPersonnelReport extends Model
         'personal_leave_count',
         'military_leave_count',
         'other_leave_count',
+        'note',
         'created_by',
         'updated_by'
     ];
