@@ -24,6 +24,9 @@ Route::group([
     Route::group(['namespace' => 'Modules\RecordManagement\Http\Controllers\Admin'], function () {
         Route::get('salary-up-record/api/employees-by-department/{departmentId}', 'SalaryUpRecordCrudController@getEmployeesByDepartment');
         Route::get('salary-up-record/api/employee-info/{employeeId}', 'SalaryUpRecordCrudController@getEmployeeInfo');
+        
+        Route::get('quan-nhan-record/api/employees-by-department/{departmentId}', 'QuanNhanRecordCrudController@getEmployeesByDepartment');
+        Route::get('quan-nhan-record/api/employee-info/{employeeId}', 'QuanNhanRecordCrudController@getEmployeeInfo');
     });
     
     // CRUD cho từng loại sổ
@@ -31,8 +34,10 @@ Route::group([
         // Sổ nâng lương
         Route::crud('salary-up-record', 'SalaryUpRecordCrudController');
         
+        // Sổ danh sách quân nhân
+        Route::crud('quan-nhan-record', 'QuanNhanRecordCrudController');
+        
         // TODO: Thêm các loại sổ khác ở đây
-        // Route::crud('personnel-record', 'PersonnelRecordCrudController');
         // Route::crud('discipline-record', 'DisciplineRecordCrudController');
     });
 });

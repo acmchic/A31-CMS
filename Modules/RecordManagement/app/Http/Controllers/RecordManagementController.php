@@ -19,24 +19,24 @@ class RecordManagementController extends Controller
         // Danh sách các loại sổ
         $recordTypes = [
             [
+                'name' => 'Sổ Danh sách Quân nhân',
+                'description' => 'Danh sách chi tiết thông tin quân nhân trong đơn vị',
+                'icon' => 'la la-id-card',
+                'color' => 'primary',
+                'route' => 'quan-nhan-record',
+                'permission' => 'record_management.view',
+                'count' => \Modules\RecordManagement\Models\QuanNhanRecord::count(),
+            ],
+            [
                 'name' => 'Sổ nâng lương',
                 'description' => 'Quản lý nâng lương, nâng loại, chuyển nhóm',
-                'icon' => 'la la-money',
+                'icon' => 'la la-money-bill-wave',
                 'color' => 'success',
                 'route' => 'salary-up-record',
-                'permission' => 'salary_up_record.view',
+                'permission' => 'record_management.view',
                 'count' => \Modules\RecordManagement\Models\SalaryUpRecord::count(),
             ],
-            // TODO: Thêm các loại sổ khác
-            // [
-            //     'name' => 'Sổ quân nhân',
-            //     'description' => 'Danh sách quân nhân trong đơn vị',
-            //     'icon' => 'la la-users',
-            //     'color' => 'primary',
-            //     'route' => 'personnel-record',
-            //     'permission' => 'personnel_record.view',
-            //     'count' => 0,
-            // ],
+            // TODO: Thêm các loại sổ khác ở đây
         ];
 
         // Filter by permission

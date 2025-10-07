@@ -29,6 +29,10 @@ class UserCrudController extends CrudController
                 'name'  => 'name',
                 'label' => trans('backpack::permissionmanager.name'),
                 'type'  => 'text',
+                'searchLogic' => function ($query, $column, $searchTerm) {
+                    $query->orWhere('name', 'like', '%'.$searchTerm.'%')
+                          ->orWhere('username', 'like', '%'.$searchTerm.'%');
+                },
             ],
             [ // n-n relationship (with pivot table)
                 'label'     => trans('backpack::permissionmanager.roles'), // Table column heading
@@ -37,6 +41,11 @@ class UserCrudController extends CrudController
                 'entity'    => 'roles', // the method that defines the relationship in your Model
                 'attribute' => 'name', // foreign key attribute that is shown to user
                 'model'     => config('permission.models.role'), // foreign key model
+                'searchLogic' => function ($query, $column, $searchTerm) {
+                    $query->orWhereHas('roles', function ($q) use ($searchTerm) {
+                        $q->where('name', 'like', '%'.$searchTerm.'%');
+                    });
+                },
             ],
             [ // n-n relationship (with pivot table)
                 'label'     => trans('backpack::permissionmanager.extra_permissions'), // Table column heading
@@ -45,6 +54,11 @@ class UserCrudController extends CrudController
                 'entity'    => 'permissions', // the method that defines the relationship in your Model
                 'attribute' => 'name', // foreign key attribute that is shown to user
                 'model'     => config('permission.models.permission'), // foreign key model
+                'searchLogic' => function ($query, $column, $searchTerm) {
+                    $query->orWhereHas('permissions', function ($q) use ($searchTerm) {
+                        $q->where('name', 'like', '%'.$searchTerm.'%');
+                    });
+                },
             ],
         ]);
 

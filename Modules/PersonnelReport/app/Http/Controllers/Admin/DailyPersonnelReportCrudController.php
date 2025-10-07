@@ -78,8 +78,8 @@ class DailyPersonnelReportCrudController extends CrudController
 
     protected function setupListOperation()
     {
-        // Check permission - only users with "tong_hop_bao_cao_quan_so" can access summary
-        if (!backpack_user()->hasPermissionTo('tong_hop_bao_cao_quan_so')) {
+        // Check permission - only users with "report.view.company" can access summary
+        if (!backpack_user()->hasPermissionTo('report.view.company')) {
             abort(403, 'Không có quyền xem tổng hợp báo cáo quân số');
         }
     }
@@ -90,7 +90,7 @@ class DailyPersonnelReportCrudController extends CrudController
     public function index()
     {
         // Check permission
-        if (!backpack_user()->hasPermissionTo('tong_hop_bao_cao_quan_so')) {
+        if (!backpack_user()->hasPermissionTo('report.view.company')) {
             abort(403, 'Không có quyền xem tổng hợp báo cáo quân số');
         }
         

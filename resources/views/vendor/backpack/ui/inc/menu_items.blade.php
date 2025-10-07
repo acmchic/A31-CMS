@@ -60,13 +60,13 @@
 @endif
 
 {{-- Personnel Reports --}}
-@if(backpack_user()->hasPermissionTo('tong_hop_bao_cao_quan_so') || backpack_user()->hasPermissionTo('report.view') || \App\Helpers\PermissionHelper::userCan('leave.view'))
+@if(backpack_user()->hasPermissionTo('report.view.company') || backpack_user()->hasPermissionTo('report.view') || \App\Helpers\PermissionHelper::userCan('leave.view'))
 <li class="nav-item dropdown">
     <a class="nav-link dropdown-toggle" href="#navbar-reports" data-bs-toggle="dropdown" role="button">
         <i class="la la-chart-bar nav-icon"></i> Báo cáo quân số
     </a>
     <div class="dropdown-menu">
-        @if(backpack_user()->hasPermissionTo('tong_hop_bao_cao_quan_so'))
+        @if(backpack_user()->hasPermissionTo('report.view.company'))
         <a class="dropdown-item" href="{{ backpack_url('daily-personnel-report') }}">
             <i class="la la-file-text"></i> Tổng hợp báo cáo quân số
         </a>
@@ -75,7 +75,7 @@
         @if(backpack_user()->hasPermissionTo('report.view'))
         @php
             // Ưu tiên: Nếu có quyền tổng hợp → link summary, nếu không → create-2
-            $reportUrl = backpack_user()->hasPermissionTo('tong_hop_bao_cao_quan_so')
+            $reportUrl = backpack_user()->hasPermissionTo('report.view.company')
                 ? backpack_url('daily-personnel-report')
                 : backpack_url('daily-personnel-report/create-2');
         @endphp
