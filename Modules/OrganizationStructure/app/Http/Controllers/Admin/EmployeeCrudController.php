@@ -11,7 +11,7 @@ use App\Models\User;
 
 class EmployeeCrudController extends CrudController
 {
-    use \Backpack\CRUD\app\Http\Controllers\Operations\ListOperation;
+    use \Backpack\CRUD\app\Http\Controllers\Operations\ListOperation { index as traitIndex; }
     use \Backpack\CRUD\app\Http\Controllers\Operations\CreateOperation { store as traitStore; }
     use \Backpack\CRUD\app\Http\Controllers\Operations\UpdateOperation { update as traitUpdate; }
     use \Backpack\CRUD\app\Http\Controllers\Operations\DeleteOperation;
@@ -117,14 +117,14 @@ class EmployeeCrudController extends CrudController
         $departments = Department::orderBy('id', 'ASC')->get();
         $currentDepartment = request()->get('department', 'all');
         
-        // Pass data to view
+        // Pass data to default view
         $this->data['departments'] = $departments;
         $this->data['currentDepartment'] = $currentDepartment;
         $this->data['crud'] = $this->crud;
         $this->data['title'] = $this->crud->getTitle() ?? 'Nhân sự';
 
-        // Load the view
-        return view('vendor.backpack.crud.list_with_filter', $this->data);
+        // Use default Backpack list view but with custom data
+        return $this->traitIndex();
     }
 
     protected function setupListOperation()
@@ -132,23 +132,66 @@ class EmployeeCrudController extends CrudController
         // Set default ordering by ID ascending
         $this->crud->orderBy('id', 'ASC');
 
-        CRUD::column('name')->label('Họ tên');
+        // Add STT column (sequential number)
+        CRUD::column('stt')
+            ->label('STT')
+            ->type('text')
+            ->orderable(false)
+            ->priority(1)
+            ->value(''); // Empty value, will be filled by JavaScript
 
-        CRUD::column('department_name')
-            ->label('Phòng ban')
-            ->type('closure')
-            ->function(function($entry) {
-                return $entry->department ? $entry->department->name : 'Chưa có';
+        CRUD::column('name')
+            ->label('Họ và tên')
+            ->orderable(false)
+            ->searchLogic(function ($query, $column, $searchTerm) {
+                $query->orWhere('name', 'like', '%'.$searchTerm.'%');
             });
 
-        CRUD::column('position_name')
+        CRUD::column('rank_code')
+            ->label('Cấp bậc')
+            ->orderable(false)
+            ->searchLogic(function ($query, $column, $searchTerm) {
+                $query->orWhere('rank_code', 'like', '%'.$searchTerm.'%');
+            });
+
+        CRUD::column('position')
             ->label('Chức vụ')
-            ->type('closure')
-            ->function(function($entry) {
-                return $entry->position ? $entry->position->name : 'Chưa có';
+            ->type('select')
+            ->entity('position')
+            ->attribute('name')
+            ->model('Modules\OrganizationStructure\Models\Position')
+            ->searchLogic(function ($query, $column, $searchTerm) {
+                $query->orWhereHas('position', function ($q) use ($searchTerm) {
+                    $q->where('name', 'like', '%'.$searchTerm.'%');
+                });
             });
 
-        CRUD::column('rank_code')->label('Cấp bậc');
+        CRUD::column('department')
+            ->label('Đơn vị')
+            ->type('select')
+            ->entity('department')
+            ->attribute('name')
+            ->model('Modules\OrganizationStructure\Models\Department')
+            ->searchLogic(function ($query, $column, $searchTerm) {
+                $query->orWhereHas('department', function ($q) use ($searchTerm) {
+                    $q->where('name', 'like', '%'.$searchTerm.'%');
+                });
+            });
+
+        CRUD::column('date_of_birth')
+            ->label('Ngày sinh')
+            ->type('date')
+            ->orderable(false)
+            ->searchLogic(function ($query, $column, $searchTerm) {
+                $query->orWhere('date_of_birth', 'like', '%'.$searchTerm.'%');
+            });
+
+        CRUD::column('address')
+            ->label('Quê quán')
+            ->orderable(false)
+            ->searchLogic(function ($query, $column, $searchTerm) {
+                $query->orWhere('address', 'like', '%'.$searchTerm.'%');
+            });
     }
 
     protected function setupCreateOperation()

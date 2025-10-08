@@ -60,7 +60,7 @@ class DashboardController extends Controller
         // 2. Department Management
         if (PermissionHelper::userCan('department.view')) {
             $modules[] = [
-                'name' => 'Quản lý phòng ban',
+                'name' => 'Cơ cấu tổ chức',
                 'description' => 'Quản lý cơ cấu phòng ban, phân xưởng',
                 'icon' => 'la la-building',
                 'url' => backpack_url('department'),
@@ -83,18 +83,7 @@ class DashboardController extends Controller
             ];
         }
 
-        // 4. Vehicle Registration
-        if (PermissionHelper::userCan('vehicle_registration.view')) {
-            $modules[] = [
-                'name' => 'Đăng ký xe',
-                'description' => 'Quản lý đăng ký sử dụng xe công vụ',
-                'icon' => 'la la-car',
-                'url' => backpack_url('vehicle-registration'),
-                'status' => 'active',
-                'count' => $stats['vehicle_registrations'],
-                'color' => 'secondary'
-            ];
-        }
+        
 
         // 5. Record Management
         if (PermissionHelper::userCan('record_management.view')) {
@@ -109,7 +98,7 @@ class DashboardController extends Controller
 
             $modules[] = [
                 'name' => 'Quản lý sổ sách',
-                'description' => 'Quản lý các loại sổ sách và bản ghi',
+                'description' => 'Quản lý các loại sổ sách',
                 'icon' => 'la la-book',
                 'url' => backpack_url('record-management'),
                 'status' => 'active',
@@ -131,7 +120,19 @@ class DashboardController extends Controller
             ];
         }
 
-        // 7. System Management Module - Cuối cùng (ưu tiên thấp nhất)
+        // 4. Vehicle Registration
+        if (PermissionHelper::userCan('vehicle_registration.view')) {
+            $modules[] = [
+                'name' => 'Đăng ký xe',
+                'description' => 'Quản lý đăng ký sử dụng xe công vụ',
+                'icon' => 'la la-car',
+                'url' => backpack_url('vehicle-registration'),
+                'status' => 'active',
+                'count' => $stats['vehicle_registrations'],
+                'color' => 'secondary'
+            ];
+        }
+
         if (PermissionHelper::userCan('user.view') || PermissionHelper::userCan('role.view')) {
             $modules[] = [
                 'name' => 'Quản lý hệ thống',

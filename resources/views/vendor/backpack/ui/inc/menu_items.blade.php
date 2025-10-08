@@ -16,20 +16,21 @@
         <i class="la la-chart-bar nav-icon"></i> Báo cáo quân số
     </a>
     <div class="dropdown-menu">
-        @if(backpack_user()->hasPermissionTo('report.view.company'))
+        @php
+            // Logic: Ưu tiên "Tổng hợp báo cáo quân số" nếu có quyền report.view.company
+            // Nếu không có quyền đó nhưng có report.view thì hiển thị "Báo cáo quân số"
+            $hasCompanyReport = backpack_user()->hasPermissionTo('report.view.company');
+            $hasDepartmentReport = backpack_user()->hasPermissionTo('report.view');
+        @endphp
+        
+        @if($hasCompanyReport)
+        {{-- Hiển thị "Tổng hợp báo cáo quân số" --}}
         <a class="dropdown-item" href="{{ backpack_url('daily-personnel-report') }}">
             <i class="la la-file-text"></i> Tổng hợp báo cáo quân số
         </a>
-        @endif
-        
-        @if(backpack_user()->hasPermissionTo('report.view'))
-        @php
-            // Ưu tiên: Nếu có quyền tổng hợp → link summary, nếu không → create-2
-            $reportUrl = backpack_user()->hasPermissionTo('report.view.company')
-                ? backpack_url('daily-personnel-report')
-                : backpack_url('daily-personnel-report/create-2');
-        @endphp
-        <a class="dropdown-item" href="{{ $reportUrl }}">
+        @elseif($hasDepartmentReport)
+        {{-- Hiển thị "Báo cáo quân số" --}}
+        <a class="dropdown-item" href="{{ backpack_url('daily-personnel-report/create-2') }}">
             <i class="la la-chart-line"></i> Báo cáo quân số
         </a>
         @endif
