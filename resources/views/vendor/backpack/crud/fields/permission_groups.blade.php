@@ -83,7 +83,7 @@ $(document).ready(function() {
         },
         'vehicle_registration': {
             title: '🚗 Đăng ký xe',
-            permissions: ['vehicle_registration.view', 'vehicle_registration.create', 'vehicle_registration.edit', 'vehicle_registration.delete', 'vehicle_registration.assign', 'vehicle_registration.approve', 'vehicle_registration.reject', 'vehicle_registration.download_pdf', 'vehicle_registration.check_signature']
+            permissions: ['vehicle_registration.view', 'vehicle_registration.create', 'vehicle_registration.edit', 'vehicle_registration.delete', 'vehicle_registration.assign', 'vehicle_registration.approve', 'vehicle_registration.reject', 'vehicle_registration.download_pdf']
         },
         'personnel_report': {
             title: '📊 Báo cáo quân số',
