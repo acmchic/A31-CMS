@@ -8,6 +8,7 @@ use Modules\OrganizationStructure\Models\Employee;
 use Modules\OrganizationStructure\Models\Department;
 use Modules\OrganizationStructure\Models\Position;
 use App\Models\User;
+use App\Helpers\DateHelper;
 
 class EmployeeCrudController extends CrudController
 {
@@ -180,7 +181,10 @@ class EmployeeCrudController extends CrudController
 
         CRUD::column('date_of_birth')
             ->label('Ngày sinh')
-            ->type('date')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->date_of_birth);
+            })
             ->orderable(false)
             ->searchLogic(function ($query, $column, $searchTerm) {
                 $query->orWhere('date_of_birth', 'like', '%'.$searchTerm.'%');
@@ -354,7 +358,11 @@ class EmployeeCrudController extends CrudController
         CRUD::column('date_of_birth')->label('Ngày sinh')
             ->type('closure')
             ->function(function($entry) {
-                return $entry->date_of_birth ? $entry->date_of_birth->format('d/m/Y') : '';
+                return \App\Helpers\DateHelper::formatDate($entry->date_of_birth);
+            })
+            ->orderable(false)
+            ->searchLogic(function ($query, $column, $searchTerm) {
+                $query->orWhere('date_of_birth', 'like', '%'.$searchTerm.'%');
             });
 
         CRUD::column('enlist_date')->label('Ngày nhập ngũ')

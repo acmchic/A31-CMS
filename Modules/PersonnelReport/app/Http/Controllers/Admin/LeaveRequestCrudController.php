@@ -9,6 +9,7 @@ use Modules\OrganizationStructure\Models\Employee;
 use Modules\OrganizationStructure\Models\Department;
 use Modules\OrganizationStructure\Models\Leave;
 use App\Helpers\PermissionHelper;
+use App\Helpers\DateHelper;
 
 class LeaveRequestCrudController extends CrudController
 {
@@ -164,11 +165,17 @@ class LeaveRequestCrudController extends CrudController
 
         CRUD::column('from_date')
             ->label('Từ ngày')
-            ->type('date');
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->from_date);
+            });
 
         CRUD::column('to_date')
             ->label('Đến ngày')
-            ->type('date');
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->to_date);
+            });
 
         CRUD::column('location')
             ->label('Địa điểm')

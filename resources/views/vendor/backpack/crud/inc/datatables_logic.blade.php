@@ -264,7 +264,7 @@
               "loadingRecords": "{{ trans('backpack::crud.loadingRecords') }}",
               "processing":     "<img src='{{ Basset::getUrl('vendor/backpack/crud/src/resources/assets/img/spinner.svg') }}' alt='{{ trans('backpack::crud.processing') }}'>",
               "search": "_INPUT_",
-              "searchPlaceholder": "{{ trans('backpack::crud.search') }}...",
+              "searchPlaceholder": "Tìm kiếm theo Họ tên, Cấp bậc, Chức vụ...",
               "zeroRecords":    "{{ trans('backpack::crud.zeroRecords') }}",
               "paginate": {
                   "first":      "{{ trans('backpack::crud.paginate.first') }}",

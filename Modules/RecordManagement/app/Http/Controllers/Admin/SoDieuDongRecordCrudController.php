@@ -6,6 +6,7 @@ use Backpack\CRUD\app\Http\Controllers\CrudController;
 use Backpack\CRUD\app\Library\CrudPanel\CrudPanelFacade as CRUD;
 use Modules\RecordManagement\Models\SoDieuDongRecord;
 use Modules\RecordManagement\Traits\EmployeeSelectionTrait;
+use App\Helpers\DateHelper;
 use App\Helpers\PermissionHelper;
 
 class SoDieuDongRecordCrudController extends CrudController
@@ -55,7 +56,13 @@ class SoDieuDongRecordCrudController extends CrudController
             $query->orWhere('so_quyet_dinh', 'like', '%'.$searchTerm.'%');
         });
 
-        CRUD::column('ngay_quyet_dinh')->label('Ngày quyết định')->type('date')->priority(4);
+        CRUD::column('ngay_quyet_dinh')
+            ->label('Ngày quyết định')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->ngay_quyet_dinh);
+            })
+            ->priority(4);
 
         CRUD::column('tu_don_vi')->label('Từ đơn vị')->priority(5)->searchLogic(function ($query, $column, $searchTerm) {
             $query->orWhere('tu_don_vi', 'like', '%'.$searchTerm.'%');
@@ -69,7 +76,12 @@ class SoDieuDongRecordCrudController extends CrudController
             $query->orWhere('chuc_vu_moi', 'like', '%'.$searchTerm.'%');
         });
 
-        CRUD::column('ngay_hieu_luc')->label('Ngày hiệu lực')->type('date');
+        CRUD::column('ngay_hieu_luc')
+            ->label('Ngày hiệu lực')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->ngay_hieu_luc);
+            });
     }
 
     protected function setupCreateOperation()
@@ -125,7 +137,12 @@ class SoDieuDongRecordCrudController extends CrudController
 
         // Thông tin điều động
         CRUD::column('so_quyet_dinh')->label('Số quyết định')->type('text');
-        CRUD::column('ngay_quyet_dinh')->label('Ngày quyết định')->type('date');
+        CRUD::column('ngay_quyet_dinh')
+            ->label('Ngày quyết định')
+            ->type('closure')
+            ->function(function($entry) {
+                return $entry->ngay_quyet_dinh ? $entry->ngay_quyet_dinh->format('d/m/Y') : '';
+            });
         // CRUD::column('nguoi_ky')->label('Người ký')->type('text'); // Ẩn trường này
         // CRUD::column('chuc_vu_nguoi_ky')->label('Chức vụ người ký')->type('text'); // Ẩn trường này
         // CRUD::column('ly_do_dieu_dong')->label('Lý do điều động')->type('text'); // Ẩn trường này
@@ -133,7 +150,12 @@ class SoDieuDongRecordCrudController extends CrudController
         CRUD::column('den_don_vi')->label('Đến đơn vị')->type('text');
         // CRUD::column('chuc_vu_cu')->label('Chức vụ cũ')->type('text'); // Ẩn trường này
         // CRUD::column('chuc_vu_moi')->label('Chức vụ mới')->type('text'); // Ẩn trường này
-        CRUD::column('ngay_hieu_luc')->label('Ngày hiệu lực')->type('date');
+        CRUD::column('ngay_hieu_luc')
+            ->label('Ngày hiệu lực')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->ngay_hieu_luc);
+            });
         CRUD::column('ghi_chu')->label('Ghi chú')->type('textarea');
     }
 

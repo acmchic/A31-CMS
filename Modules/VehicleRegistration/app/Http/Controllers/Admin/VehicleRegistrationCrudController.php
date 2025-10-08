@@ -6,6 +6,7 @@ use Backpack\CRUD\app\Http\Controllers\CrudController;
 use Backpack\CRUD\app\Library\CrudPanel\CrudPanelFacade as CRUD;
 use Modules\VehicleRegistration\Models\VehicleRegistration;
 use App\Helpers\PermissionHelper;
+use App\Helpers\DateHelper;
 use Illuminate\Http\Request;
 use App\Services\VehicleRegistrationPdfService;
 use Illuminate\Support\Facades\Storage;
@@ -104,8 +105,18 @@ class VehicleRegistrationCrudController extends CrudController
     {
         CRUD::column('id')->label('ID');
         CRUD::column('user_id')->label('Người đăng ký')->type('select')->entity('user')->attribute('name');
-        CRUD::column('departure_datetime')->label('Ngày đi')->type('date');
-        CRUD::column('return_datetime')->label('Ngày về')->type('date');
+        CRUD::column('departure_datetime')
+            ->label('Ngày đi')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->departure_datetime);
+            });
+        CRUD::column('return_datetime')
+            ->label('Ngày về')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->return_datetime);
+            });
         CRUD::column('route')->label('Tuyến đường')->limit(50);
         CRUD::column('purpose')->label('Mục đích')->limit(50);
         CRUD::column('passenger_count')->label('Số người');

@@ -6,6 +6,7 @@ use Backpack\CRUD\app\Http\Controllers\CrudController;
 use Backpack\CRUD\app\Library\CrudPanel\CrudPanelFacade as CRUD;
 use Modules\RecordManagement\Models\QuanNhanRecord;
 use Modules\RecordManagement\Traits\EmployeeSelectionTrait;
+use App\Helpers\DateHelper;
 use App\Helpers\PermissionHelper;
 
 class QuanNhanRecordCrudController extends CrudController
@@ -307,7 +308,12 @@ class QuanNhanRecordCrudController extends CrudController
         // THÔNG TIN CÁ NHÂN (từ employees)
         if ($employee) {
             CRUD::column('emp_ho_ten')->label('Họ tên đệm khai sinh')->type('text')->value($employee->name);
-            CRUD::column('emp_ngay_sinh')->label('Ngày sinh')->type('date')->value($employee->date_of_birth);
+            CRUD::column('emp_ngay_sinh')
+                ->label('Ngày sinh')
+                ->type('closure')
+                ->function(function($entry) use ($employee) {
+                    return DateHelper::formatDate($employee->date_of_birth);
+                });
             CRUD::column('emp_gioi_tinh')->label('Giới tính')->type('text')->value($employee->gender == 1 ? 'Nam' : ($employee->gender == 0 ? 'Nữ' : ''));
             CRUD::column('emp_quan_ham')->label('Quân hàm')->type('text')->value($employee->rank_code);
             CRUD::column('emp_chuc_vu')->label('Chức vụ')->type('text')->value($employee->position ? $employee->position->name : '');
@@ -324,19 +330,54 @@ class QuanNhanRecordCrudController extends CrudController
 
         // THÔNG TIN QUÂN ĐỘI
         CRUD::column('cap_bac')->label('Cấp bậc');
-        CRUD::column('ngay_nhan_cap')->label('Ngày cấp')->type('date');
-        CRUD::column('ngay_cap_cc')->label('Ngày cấp CM, thẻ, CC')->type('date');
+        CRUD::column('ngay_nhan_cap')
+            ->label('Ngày cấp')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->ngay_nhan_cap);
+            });
+        CRUD::column('ngay_cap_cc')
+            ->label('Ngày cấp CM, thẻ, CC')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->ngay_cap_cc);
+            });
         CRUD::column('cnqs')->label('Chứng minh quân sự');
         CRUD::column('bac_ky_thuat')->label('Bậc kỹ thuật');
         CRUD::column('tai_ngu')->label('Tái ngũ');
-        CRUD::column('ngay_chuyen_qncn')->label('Ngày chuyển QNCN')->type('date');
-        CRUD::column('ngay_chuyen_cnv')->label('Ngày chuyển CNV')->type('date');
+        CRUD::column('ngay_chuyen_qncn')
+            ->label('Ngày chuyển QNCN')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->ngay_chuyen_qncn);
+            });
+        CRUD::column('ngay_chuyen_cnv')
+            ->label('Ngày chuyển CNV')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->ngay_chuyen_cnv);
+            });
         CRUD::column('luong_nhom_ngach_bac')->label('Lương: nhóm ngạch bậc');
 
         // THÔNG TIN CHÍNH TRỊ
-        CRUD::column('ngay_vao_doan')->label('Ngày vào Đoàn')->type('date');
-        CRUD::column('ngay_vao_dang')->label('Ngày vào Đảng')->type('date');
-        CRUD::column('ngay_chinh_thuc')->label('Ngày chính thức Đảng')->type('date');
+        CRUD::column('ngay_vao_doan')
+            ->label('Ngày vào Đoàn')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->ngay_vao_doan);
+            });
+        CRUD::column('ngay_vao_dang')
+            ->label('Ngày vào Đảng')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->ngay_vao_dang);
+            });
+        CRUD::column('ngay_chinh_thuc')
+            ->label('Ngày chính thức Đảng')
+            ->type('closure')
+            ->function(function($entry) {
+                return DateHelper::formatDate($entry->ngay_chinh_thuc);
+            });
 
         // THÀNH PHẦN
         CRUD::column('tp_gia_dinh')->label('Thành phần gia đình');
