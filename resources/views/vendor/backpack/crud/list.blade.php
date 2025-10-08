@@ -82,7 +82,7 @@
                   $forceExport = $column['forceExport'] ?? (isset($column['exportOnlyColumn']) ? true : false);
                   @endphp
                   <th
-                    data-orderable="{{ var_export($column['orderable'], true) }}"
+                    data-orderable="false"
                     data-priority="{{ $column['priority'] }}"
                     data-visible-in-table="{{ var_export($visibleInTable, true) }}"
                     data-visible="{{ var_export($visibleInTable, true) }}"
