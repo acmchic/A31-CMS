@@ -51,7 +51,7 @@
     </a>
     <div class="dropdown-menu">
         @if(\App\Helpers\PermissionHelper::userCan('employee.view'))
-        <a class="dropdown-item" href="{{ backpack_url('employee') }}">
+        <a class="dropdown-item" href="{{ backpack_url('employee?department=all') }}">
             <i class="la la-users"></i> Nhân sự
         </a>
         @endif

@@ -34,6 +34,7 @@ class Department extends Model
     // Accessors
     public function getEmployeeCountAttribute()
     {
-        return $this->employees()->count();
+        // Use employees_count if available (from withCount), otherwise count manually
+        return $this->employees_count ?? $this->employees()->count();
     }
 }

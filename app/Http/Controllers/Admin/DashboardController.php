@@ -76,7 +76,7 @@ class DashboardController extends Controller
                 'name' => 'Quản lý nhân sự',
                 'description' => 'Quản lý thông tin cán bộ, Nhân sự',
                 'icon' => 'la la-users',
-                'url' => backpack_url('employee'),
+                'url' => backpack_url('employee?department=all'),
                 'status' => 'active',
                 'count' => $stats['employees'],
                 'color' => 'info'

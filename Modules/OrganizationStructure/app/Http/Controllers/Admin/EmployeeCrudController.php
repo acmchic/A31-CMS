@@ -26,11 +26,37 @@ class EmployeeCrudController extends CrudController
         // Order by id ASC
         CRUD::orderBy('id', 'ASC');
 
-        // Apply department filtering based on user permissions
-        $this->applyDepartmentFilter();
-
         // Setup buttons based on user role
         $this->setupButtonsForRole();
+
+        // Apply department filtering logic
+        $this->applyDepartmentFiltering();
+    }
+
+    /**
+     * Apply department filtering logic
+     */
+    private function applyDepartmentFiltering()
+    {
+        // Xử lý filter department từ URL parameter
+        if (request()->has('department') && request()->get('department')) {
+            $departmentParam = request()->get('department');
+            
+            if ($departmentParam === 'all') {
+                // Hiển thị tất cả nhân sự - không filter gì
+                return;
+            } else {
+                // Filter theo department ID cụ thể
+                $departmentId = $departmentParam;
+                $this->crud->addClause('where', 'department_id', $departmentId);
+            }
+        } else {
+            // Nếu không có parameter department, redirect đến ?department=all
+            $currentUrl = request()->fullUrl();
+            if (strpos($currentUrl, '?department=') === false) {
+                return redirect()->to($currentUrl . (strpos($currentUrl, '?') !== false ? '&' : '?') . 'department=all');
+            }
+        }
     }
 
     /**
@@ -79,8 +105,33 @@ class EmployeeCrudController extends CrudController
         }
     }
 
+
+    /**
+     * Override index to add department filter
+     */
+    public function index()
+    {
+        $this->crud->hasAccessOrFail('list');
+
+        // Get all departments for filter
+        $departments = Department::orderBy('id', 'ASC')->get();
+        $currentDepartment = request()->get('department', 'all');
+        
+        // Pass data to view
+        $this->data['departments'] = $departments;
+        $this->data['currentDepartment'] = $currentDepartment;
+        $this->data['crud'] = $this->crud;
+        $this->data['title'] = $this->crud->getTitle() ?? 'Nhân sự';
+
+        // Load the view
+        return view('vendor.backpack.crud.list_with_filter', $this->data);
+    }
+
     protected function setupListOperation()
     {
+        // Set default ordering by ID ascending
+        $this->crud->orderBy('id', 'ASC');
+
         CRUD::column('name')->label('Họ tên');
 
         CRUD::column('department_name')
@@ -98,7 +149,6 @@ class EmployeeCrudController extends CrudController
             });
 
         CRUD::column('rank_code')->label('Cấp bậc');
-
     }
 
     protected function setupCreateOperation()
