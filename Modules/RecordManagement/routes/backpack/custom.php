@@ -27,6 +27,14 @@ Route::group([
         
         Route::get('quan-nhan-record/api/employees-by-department/{departmentId}', 'QuanNhanRecordCrudController@getEmployeesByDepartment');
         Route::get('quan-nhan-record/api/employee-info/{employeeId}', 'QuanNhanRecordCrudController@getEmployeeInfo');
+        
+        Route::get('so-dieu-dong-record/api/employees-by-department/{departmentId}', 'SoDieuDongRecordCrudController@getEmployeesByDepartment');
+        Route::get('so-dieu-dong-record/api/employee-info/{employeeId}', 'SoDieuDongRecordCrudController@getEmployeeInfo');
+        
+        // Test route
+        Route::get('so-dieu-dong-record/api/test', function() {
+            return response()->json(['message' => 'API working']);
+        });
     });
     
     // CRUD cho từng loại sổ
@@ -36,6 +44,9 @@ Route::group([
         
         // Sổ danh sách quân nhân
         Route::crud('quan-nhan-record', 'QuanNhanRecordCrudController');
+        
+        // Sổ đăng ký điều động nội bộ
+        Route::crud('so-dieu-dong-record', 'SoDieuDongRecordCrudController');
         
         // TODO: Thêm các loại sổ khác ở đây
         // Route::crud('discipline-record', 'DisciplineRecordCrudController');

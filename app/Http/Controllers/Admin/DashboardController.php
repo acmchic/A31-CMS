@@ -35,49 +35,10 @@ class DashboardController extends Controller
             'users' => User::count(),
         ];
 
-        // Base modules that all users can see
+        // Base modules that all users can see - Sắp xếp theo thứ tự ưu tiên
         $modules = [];
 
-        // System Management Module
-        if (PermissionHelper::userCan('user.view') || PermissionHelper::userCan('role.view')) {
-            $modules[] = [
-                'name' => 'Quản lý hệ thống',
-                'description' => 'Quản lý người dùng, vai trò và quyền hạn',
-                'icon' => 'la la-cogs',
-                'url' => PermissionHelper::userCan('user.view') ? backpack_url('user') : backpack_url('role'),
-                'status' => 'active',
-                'count' => $stats['users'],
-                'color' => 'danger'
-            ];
-        }
-
-        // Department Management
-        if (PermissionHelper::userCan('department.view')) {
-            $modules[] = [
-                'name' => 'Quản lý phòng ban',
-                'description' => 'Quản lý cơ cấu phòng ban, phân xưởng',
-                'icon' => 'la la-building',
-                'url' => backpack_url('department'),
-                'status' => 'active',
-                'count' => $stats['departments'],
-                'color' => 'success'
-            ];
-        }
-
-        // Employee Management
-        if (PermissionHelper::userCan('employee.view')) {
-            $modules[] = [
-                'name' => 'Quản lý nhân sự',
-                'description' => 'Quản lý thông tin cán bộ, Nhân sự',
-                'icon' => 'la la-users',
-                'url' => backpack_url('employee'),
-                'status' => 'active',
-                'count' => $stats['employees'],
-                'color' => 'info'
-            ];
-        }
-
-        // Reports
+        // 1. Reports - Báo cáo quân số (ưu tiên cao nhất)
         if (PermissionHelper::userCan('report.view')) {
             // Ưu tiên: Nếu có quyền xem tổng hợp → link đến summary
             // Nếu không → link đến create-2 (phòng ban)
@@ -96,20 +57,33 @@ class DashboardController extends Controller
             ];
         }
 
-        // Leave Requests
-        if (PermissionHelper::userCan('leave.view')) {
+        // 2. Department Management
+        if (PermissionHelper::userCan('department.view')) {
             $modules[] = [
-                'name' => 'Đăng ký nghỉ phép',
-                'description' => 'Quản lý đơn xin nghỉ phép',
-                'icon' => 'la la-calendar-check',
-                'url' => backpack_url('leave-request'),
+                'name' => 'Quản lý phòng ban',
+                'description' => 'Quản lý cơ cấu phòng ban, phân xưởng',
+                'icon' => 'la la-building',
+                'url' => backpack_url('department'),
                 'status' => 'active',
-                'count' => $stats['leave_requests'],
-                'color' => 'warning'
+                'count' => $stats['departments'],
+                'color' => 'success'
             ];
         }
 
-        // Vehicle Registration
+        // 3. Employee Management
+        if (PermissionHelper::userCan('employee.view')) {
+            $modules[] = [
+                'name' => 'Quản lý nhân sự',
+                'description' => 'Quản lý thông tin cán bộ, Nhân sự',
+                'icon' => 'la la-users',
+                'url' => backpack_url('employee'),
+                'status' => 'active',
+                'count' => $stats['employees'],
+                'color' => 'info'
+            ];
+        }
+
+        // 4. Vehicle Registration
         if (PermissionHelper::userCan('vehicle_registration.view')) {
             $modules[] = [
                 'name' => 'Đăng ký xe',
@@ -122,7 +96,7 @@ class DashboardController extends Controller
             ];
         }
 
-        // Record Management
+        // 5. Record Management
         if (PermissionHelper::userCan('record_management.view')) {
             $totalRecords = 0;
             try {
@@ -141,6 +115,32 @@ class DashboardController extends Controller
                 'status' => 'active',
                 'count' => $totalRecords,
                 'color' => 'info'
+            ];
+        }
+
+        // 6. Leave Requests
+        if (PermissionHelper::userCan('leave.view')) {
+            $modules[] = [
+                'name' => 'Đăng ký nghỉ phép',
+                'description' => 'Quản lý đơn xin nghỉ phép',
+                'icon' => 'la la-calendar-check',
+                'url' => backpack_url('leave-request'),
+                'status' => 'active',
+                'count' => $stats['leave_requests'],
+                'color' => 'warning'
+            ];
+        }
+
+        // 7. System Management Module - Cuối cùng (ưu tiên thấp nhất)
+        if (PermissionHelper::userCan('user.view') || PermissionHelper::userCan('role.view')) {
+            $modules[] = [
+                'name' => 'Quản lý hệ thống',
+                'description' => 'Quản lý người dùng, vai trò và quyền hạn',
+                'icon' => 'la la-cogs',
+                'url' => PermissionHelper::userCan('user.view') ? backpack_url('user') : backpack_url('role'),
+                'status' => 'active',
+                'count' => $stats['users'],
+                'color' => 'danger'
             ];
         }
 

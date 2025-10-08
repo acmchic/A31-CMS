@@ -20,10 +20,10 @@ class DepartmentCrudController extends CrudController
         CRUD::setModel(Department::class);
         CRUD::setRoute(config('backpack.base.route_prefix') . '/department');
         CRUD::setEntityNameStrings('phòng ban', 'phòng ban');
-        
+
         // Order by id ASC
         CRUD::orderBy('id', 'ASC');
-        
+
         // Apply department filtering based on user permissions
         $this->applyDepartmentFilter();
     }
@@ -35,13 +35,13 @@ class DepartmentCrudController extends CrudController
     {
         $user = backpack_user();
         $scope = PermissionHelper::getUserScope($user);
-        
+
         switch ($scope) {
             case 'all':
             case 'company':
                 // No filtering - can see all departments
                 break;
-                
+
             case 'department':
                 // Can see own department only
                 if ($user->department_id) {
@@ -50,7 +50,7 @@ class DepartmentCrudController extends CrudController
                     CRUD::addClause('where', 'id', 0);
                 }
                 break;
-                
+
             case 'own':
             default:
                 // Can see own department only
@@ -67,9 +67,9 @@ class DepartmentCrudController extends CrudController
     {
         CRUD::column('id')->label('ID');
         CRUD::column('name')->label('Tên phòng ban');
-        CRUD::column('created_at')->label('Ngày tạo')->type('datetime');
-        CRUD::column('created_by')->label('Người tạo');
-        
+        // CRUD::column('created_at')->label('Ngày tạo')->type('datetime'); // Ẩn cột này
+        // CRUD::column('created_by')->label('Người tạo'); // Ẩn cột này
+
     }
 
     protected function setupCreateOperation()
@@ -81,13 +81,13 @@ class DepartmentCrudController extends CrudController
         CRUD::field('name')
             ->label('Tên phòng ban')
             ->type('text')
-            ->hint('Ví dụ: Phòng Kế hoạch, Phân xưởng 1, Tổ sản xuất A...');
+            ->hint('');
     }
 
     protected function setupUpdateOperation()
     {
         $this->setupCreateOperation();
-        
+
         CRUD::setValidation([
             'name' => 'required|string|max:255|unique:departments,name,' . CRUD::getCurrentEntryId(),
         ]);
@@ -96,7 +96,7 @@ class DepartmentCrudController extends CrudController
     protected function setupShowOperation()
     {
         $this->setupListOperation();
-        
+
         CRUD::column('updated_by')->label('Người cập nhật');
     }
 
@@ -104,7 +104,7 @@ class DepartmentCrudController extends CrudController
     {
         // Add created_by before saving
         request()->merge(['created_by' => backpack_user()->name]);
-        
+
         return $this->backpackStore();
     }
 
@@ -112,7 +112,7 @@ class DepartmentCrudController extends CrudController
     {
         // Add updated_by before saving
         request()->merge(['updated_by' => backpack_user()->name]);
-        
+
         return $this->backpackUpdate();
     }
 }

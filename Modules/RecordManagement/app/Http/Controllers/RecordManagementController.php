@@ -28,6 +28,15 @@ class RecordManagementController extends Controller
                 'count' => \Modules\RecordManagement\Models\QuanNhanRecord::count(),
             ],
             [
+                'name' => 'Sổ Đăng ký Điều động nội bộ',
+                'description' => 'Quản lý điều động nội bộ (Sĩ quan, QNCN, CN & VCQP)',
+                'icon' => 'la la-exchange-alt',
+                'color' => 'info',
+                'route' => 'so-dieu-dong-record',
+                'permission' => 'record_management.view',
+                'count' => \Modules\RecordManagement\Models\SoDieuDongRecord::count(),
+            ],
+            [
                 'name' => 'Sổ nâng lương',
                 'description' => 'Quản lý nâng lương, nâng loại, chuyển nhóm',
                 'icon' => 'la la-money-bill-wave',

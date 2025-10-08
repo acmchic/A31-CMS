@@ -4,58 +4,8 @@
 @if(\App\Helpers\PermissionHelper::userCan('dashboard.view'))
 <li class="nav-item">
     <a class="nav-link" href="{{ backpack_url('dashboard') }}">
-        <i class="la la-home nav-icon"></i> Dashboard
+        <i class="la la-home nav-icon"></i> Trang chủ
     </a>
-</li>
-@endif
-
-{{-- System Management --}}
-@if(\App\Helpers\PermissionHelper::userCan('user.view') || \App\Helpers\PermissionHelper::userCan('role.view') || \App\Helpers\PermissionHelper::userCan('permission.view'))
-<li class="nav-item dropdown">
-    <a class="nav-link dropdown-toggle" href="#navbar-system" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
-        <i class="la la-cogs nav-icon"></i> Quản lý hệ thống
-    </a>
-    <div class="dropdown-menu">
-        @if(\App\Helpers\PermissionHelper::userCan('user.view'))
-        <a class="dropdown-item" href="{{ backpack_url('user') }}">
-            <i class="la la-user"></i> Người dùng
-        </a>
-        @endif
-        
-        @if(\App\Helpers\PermissionHelper::userCan('role.view'))
-        <a class="dropdown-item" href="{{ backpack_url('role') }}">
-            <i class="la la-user-shield"></i> Vai trò
-        </a>
-        @endif
-        
-        @if(\App\Helpers\PermissionHelper::userCan('permission.view'))
-        <a class="dropdown-item" href="{{ backpack_url('permission') }}">
-            <i class="la la-key"></i> Quyền hạn
-        </a>
-        @endif
-    </div>
-</li>
-@endif
-
-{{-- Organization Structure --}}
-@if(\App\Helpers\PermissionHelper::userCan('department.view') || \App\Helpers\PermissionHelper::userCan('employee.view'))
-<li class="nav-item dropdown">
-    <a class="nav-link dropdown-toggle" href="#navbar-org" data-bs-toggle="dropdown" role="button">
-        <i class="la la-building nav-icon"></i> Cơ cấu tổ chức
-    </a>
-    <div class="dropdown-menu">
-        @if(\App\Helpers\PermissionHelper::userCan('department.view'))
-        <a class="dropdown-item" href="{{ backpack_url('department') }}">
-            <i class="la la-building"></i> Phòng ban
-        </a>
-        @endif
-        
-        @if(\App\Helpers\PermissionHelper::userCan('employee.view'))
-        <a class="dropdown-item" href="{{ backpack_url('employee') }}">
-            <i class="la la-users"></i> Nhân sự
-        </a>
-        @endif
-    </div>
 </li>
 @endif
 
@@ -93,6 +43,28 @@
 </li>
 @endif
 
+{{-- Organization Structure --}}
+@if(\App\Helpers\PermissionHelper::userCan('department.view') || \App\Helpers\PermissionHelper::userCan('employee.view'))
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#navbar-org" data-bs-toggle="dropdown" role="button">
+        <i class="la la-building nav-icon"></i> Cơ cấu tổ chức
+    </a>
+    <div class="dropdown-menu">
+        @if(\App\Helpers\PermissionHelper::userCan('employee.view'))
+        <a class="dropdown-item" href="{{ backpack_url('employee') }}">
+            <i class="la la-users"></i> Nhân sự
+        </a>
+        @endif
+        
+        @if(\App\Helpers\PermissionHelper::userCan('department.view'))
+        <a class="dropdown-item" href="{{ backpack_url('department') }}">
+            <i class="la la-building"></i> Phòng ban
+        </a>
+        @endif
+    </div>
+</li>
+@endif
+
 {{-- Vehicle Registration --}}
 @if(\App\Helpers\PermissionHelper::userCan('vehicle_registration.view'))
 <li class="nav-item">
@@ -108,5 +80,33 @@
     <a class="nav-link" href="{{ backpack_url('record-management') }}">
         <i class="la la-book nav-icon"></i> Quản lý sổ sách
     </a>
+</li>
+@endif
+
+{{-- System Management --}}
+@if(\App\Helpers\PermissionHelper::userCan('user.view') || \App\Helpers\PermissionHelper::userCan('role.view') || \App\Helpers\PermissionHelper::userCan('permission.view'))
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#navbar-system" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+        <i class="la la-cogs nav-icon"></i> Quản lý hệ thống
+    </a>
+    <div class="dropdown-menu">
+        @if(\App\Helpers\PermissionHelper::userCan('user.view'))
+        <a class="dropdown-item" href="{{ backpack_url('user') }}">
+            <i class="la la-user"></i> Người dùng
+        </a>
+        @endif
+        
+        @if(\App\Helpers\PermissionHelper::userCan('role.view'))
+        <a class="dropdown-item" href="{{ backpack_url('role') }}">
+            <i class="la la-user-shield"></i> Vai trò
+        </a>
+        @endif
+        
+        @if(\App\Helpers\PermissionHelper::userCan('permission.view'))
+        <a class="dropdown-item" href="{{ backpack_url('permission') }}">
+            <i class="la la-key"></i> Quyền hạn
+        </a>
+        @endif
+    </div>
 </li>
 @endif

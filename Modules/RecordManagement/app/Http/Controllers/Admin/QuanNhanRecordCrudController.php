@@ -5,6 +5,7 @@ namespace Modules\RecordManagement\Http\Controllers\Admin;
 use Backpack\CRUD\app\Http\Controllers\CrudController;
 use Backpack\CRUD\app\Library\CrudPanel\CrudPanelFacade as CRUD;
 use Modules\RecordManagement\Models\QuanNhanRecord;
+use Modules\RecordManagement\Traits\EmployeeSelectionTrait;
 use App\Helpers\PermissionHelper;
 
 class QuanNhanRecordCrudController extends CrudController
@@ -14,6 +15,7 @@ class QuanNhanRecordCrudController extends CrudController
     use \Backpack\CRUD\app\Http\Controllers\Operations\UpdateOperation;
     use \Backpack\CRUD\app\Http\Controllers\Operations\DeleteOperation;
     use \Backpack\CRUD\app\Http\Controllers\Operations\ShowOperation;
+    use EmployeeSelectionTrait;
 
     public function setup()
     {
@@ -73,28 +75,43 @@ class QuanNhanRecordCrudController extends CrudController
         //     });
         // });
 
-        CRUD::column('id')->label('STT')->priority(1);
-        CRUD::column('employee.name')->label('Họ và tên')->priority(2)->searchLogic(function ($query, $column, $searchTerm) {
+        CRUD::column('employee.name')->label('Họ tên')->priority(1)->searchLogic(function ($query, $column, $searchTerm) {
             $query->orWhereHas('employee', function ($q) use ($searchTerm) {
                 $q->where('name', 'like', '%'.$searchTerm.'%');
             });
         });
-        CRUD::column('employee.date_of_birth')->label('Ngày sinh')->type('date')->priority(3);
-        CRUD::column('employee.rank_code')->label('Quân hàm')->priority(4)->searchLogic(function ($query, $column, $searchTerm) {
+
+        CRUD::column('department_name')
+            ->label('Phòng ban')
+            ->type('closure')
+            ->function(function($entry) {
+                return $entry->department ? $entry->department->name : 'Chưa có';
+            })
+            ->searchLogic(function ($query, $column, $searchTerm) {
+                $query->orWhereHas('department', function ($q) use ($searchTerm) {
+                    $q->where('name', 'like', '%'.$searchTerm.'%');
+                });
+            })
+            ->priority(2);
+
+        CRUD::column('position_name')
+            ->label('Chức vụ')
+            ->type('closure')
+            ->function(function($entry) {
+                return $entry->employee && $entry->employee->position ? $entry->employee->position->name : 'Chưa có';
+            })
+            ->searchLogic(function ($query, $column, $searchTerm) {
+                $query->orWhereHas('employee.position', function ($q) use ($searchTerm) {
+                    $q->where('name', 'like', '%'.$searchTerm.'%');
+                });
+            })
+            ->priority(3);
+
+        CRUD::column('employee.rank_code')->label('Cấp bậc')->priority(4)->searchLogic(function ($query, $column, $searchTerm) {
             $query->orWhereHas('employee', function ($q) use ($searchTerm) {
                 $q->where('rank_code', 'like', '%'.$searchTerm.'%');
             });
         });
-        CRUD::column('department.name')->label('Phòng ban')->priority(5)->searchLogic(function ($query, $column, $searchTerm) {
-            $query->orWhereHas('department', function ($q) use ($searchTerm) {
-                $q->where('name', 'like', '%'.$searchTerm.'%');
-            });
-        });
-        CRUD::column('cap_bac')->label('Cấp bậc')->searchLogic(function ($query, $column, $searchTerm) {
-            $query->orWhere('cap_bac', 'like', '%'.$searchTerm.'%');
-        });
-        CRUD::column('ngay_vao_dang')->label('Ngày vào Đảng')->type('date');
-        CRUD::column('created_at')->label('Ngày tạo')->type('datetime')->format('DD/MM/YYYY HH:mm');
     }
 
 
@@ -119,142 +136,12 @@ class QuanNhanRecordCrudController extends CrudController
         // ========== THÔNG TIN CÁ NHÂN ==========
         $this->addSectionHeader('Thông tin cá nhân');
 
+        // Hiển thị tất cả thông tin từ employees
+        $this->addEmployeeInfoFields();
 
 
-        CRUD::addField([
-            'name' => 'display_ho_ten',
-            'label' => 'Họ đệm tên khai sinh',
-            'type' => 'text',
-            'wrapper' => ['class' => 'form-group col-md-4'],
-            'attributes' => [
-                'readonly' => 'readonly',
-                'id' => 'ho-ten-field',
-                'class' => 'form-control bg-light',
-                'tabindex' => '-1',
-            ],
-            'fake' => true,
-            'store_in' => false,
-        ]);
 
-        CRUD::addField([
-            'name' => 'display_ngay_sinh',
-            'label' => 'Ngày tháng năm sinh',
-            'type' => 'date',
-            'wrapper' => ['class' => 'form-group col-md-4'],
-            'attributes' => [
-                'readonly' => 'readonly',
-                'id' => 'ngay-sinh-field',
-                'class' => 'form-control bg-light',
-                'tabindex' => '-1',
-            ],
-            'fake' => true,
-            'store_in' => false,
-        ]);
 
-        CRUD::addField([
-            'name' => 'display_gioi_tinh',
-            'label' => 'Giới tính',
-            'type' => 'text',
-            'wrapper' => ['class' => 'form-group col-md-4'],
-            'attributes' => [
-                'readonly' => 'readonly',
-                'id' => 'gioi-tinh-field',
-                'class' => 'form-control bg-light',
-                'tabindex' => '-1',
-            ],
-            'fake' => true,
-            'store_in' => false,
-        ]);
-
-        CRUD::addField([
-            'name' => 'display_quan_ham',
-            'label' => 'Quân hàm',
-            'type' => 'text',
-            'wrapper' => ['class' => 'form-group col-md-3'],
-            'attributes' => [
-                'readonly' => 'readonly',
-                'id' => 'quan-ham-field',
-                'class' => 'form-control bg-light',
-                'tabindex' => '-1',
-            ],
-            'fake' => true,
-            'store_in' => false,
-        ]);
-
-        CRUD::addField([
-            'name' => 'display_chuc_vu',
-            'label' => 'Chức vụ',
-            'type' => 'text',
-            'wrapper' => ['class' => 'form-group col-md-3'],
-            'attributes' => [
-                'readonly' => 'readonly',
-                'id' => 'chuc-vu-field',
-                'class' => 'form-control bg-light',
-                'tabindex' => '-1',
-            ],
-            'fake' => true,
-            'store_in' => false,
-        ]);
-
-        CRUD::addField([
-            'name' => 'display_nhap_ngu',
-            'label' => 'Nhập ngũ',
-            'type' => 'text',
-            'wrapper' => ['class' => 'form-group col-md-3'],
-            'attributes' => [
-                'readonly' => 'readonly',
-                'id' => 'nhap-ngu-field',
-                'class' => 'form-control bg-light',
-                'tabindex' => '-1',
-            ],
-            'fake' => true,
-            'store_in' => false,
-        ]);
-
-        CRUD::addField([
-            'name' => 'display_cccd',
-            'label' => 'Số CCCD',
-            'type' => 'text',
-            'wrapper' => ['class' => 'form-group col-md-3'],
-            'attributes' => [
-                'readonly' => 'readonly',
-                'id' => 'cccd-field',
-                'class' => 'form-control bg-light',
-                'tabindex' => '-1',
-            ],
-            'fake' => true,
-            'store_in' => false,
-        ]);
-
-        CRUD::addField([
-            'name' => 'display_dia_chi',
-            'label' => 'Địa chỉ',
-            'type' => 'text',
-            'wrapper' => ['class' => 'form-group col-md-8'],
-            'attributes' => [
-                'readonly' => 'readonly',
-                'id' => 'dia-chi-field',
-                'class' => 'form-control bg-light',
-                'tabindex' => '-1',
-            ],
-            'fake' => true,
-            'store_in' => false,
-        ]);
-
-        CRUD::addField([
-            'name' => 'display_dien_thoai',
-            'label' => 'Điện thoại',
-            'type' => 'text',
-            'wrapper' => ['class' => 'form-group col-md-4'],
-            'attributes' => [
-                'readonly' => 'readonly',
-                'id' => 'dien-thoai-field',
-                'class' => 'form-control bg-light',
-                'tabindex' => '-1',
-            ],
-            'fake' => true,
-            'store_in' => false,
-        ]);
 
         // Separator
         CRUD::field('separator_personal')->type('custom_html')->value('<hr class="my-3">');
@@ -351,7 +238,17 @@ class QuanNhanRecordCrudController extends CrudController
         CRUD::addField([
             'name' => 'auto_fill_script',
             'type' => 'custom_html',
-            'value' => $this->getAutoFillScript(),
+            'value' => $this->getEmployeeSelectionScript() . $this->getEmployeeInfoScript([
+                'ho-ten-field' => 'name',
+                'ngay-sinh-field' => 'date_of_birth',
+                'gioi-tinh-field' => 'gender_text',
+                'quan-ham-field' => 'rank_code',
+                'chuc-vu-field' => 'position_name',
+                'nhap-ngu-field' => 'enlist_date',
+                'cccd-field' => 'CCCD',
+                'dia-chi-field' => 'address',
+                'dien-thoai-field' => 'phone'
+            ]),
         ]);
     }
 
@@ -364,155 +261,8 @@ class QuanNhanRecordCrudController extends CrudController
         ]);
     }
 
-    private function addDepartmentField()
-    {
-        $departments = \Modules\OrganizationStructure\Models\Department::orderBy('id', 'asc')
-            ->pluck('name', 'id')
-            ->toArray();
-
-        // Add empty option at the beginning
-        $departments = ['' => '- Chọn phòng ban -'] + $departments;
-
-        CRUD::addField([
-            'name' => 'department_id',
-            'label' => 'Phòng ban',
-            'type' => 'select_from_array',
-            'options' => $departments,
-            'wrapper' => ['class' => 'form-group col-md-6'],
-            'allows_null' => false,
-            'attributes' => [
-                'required' => 'required',
-                'id' => 'department-select',
-            ],
-        ]);
-    }
-
-    private function addEmployeeField()
-    {
-        CRUD::addField([
-            'name' => 'employee_id',
-            'label' => 'Nhân sự',
-            'type' => 'select_from_array',
-            'options' => [],
-            'wrapper' => ['class' => 'form-group col-md-6'],
-            'allows_null' => false,
-            'attributes' => [
-                'required' => 'required',
-                'id' => 'employee-select',
-                'disabled' => 'disabled',
-            ],
-        ]);
-    }
 
 
-    private function getAutoFillScript()
-    {
-        return <<<'HTML'
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const departmentSelect = document.getElementById('department-select');
-    const employeeSelect = document.getElementById('employee-select');
-
-    // Load employees by department
-    function loadEmployeesByDepartment(departmentId, selectedEmployeeId = null) {
-        if (!departmentId) {
-            employeeSelect.disabled = true;
-            employeeSelect.innerHTML = '<option value="">- Chọn phòng ban trước -</option>';
-            return;
-        }
-
-        fetch(`/quan-nhan-record/api/employees-by-department/${departmentId}`)
-            .then(response => response.json())
-            .then(data => {
-                employeeSelect.innerHTML = '<option value="">- Chọn nhân sự -</option>';
-
-                if (data && data.length > 0) {
-                    data.forEach(emp => {
-                        const option = document.createElement('option');
-                        option.value = emp.id;
-                        option.textContent = emp.name;
-                        if (selectedEmployeeId && emp.id == selectedEmployeeId) {
-                            option.selected = true;
-                        }
-                        employeeSelect.appendChild(option);
-                    });
-                }
-
-                employeeSelect.disabled = false;
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Lỗi khi tải danh sách nhân viên');
-            });
-    }
-
-    // When department changes
-    if (departmentSelect) {
-        departmentSelect.addEventListener('change', function() {
-            loadEmployeesByDepartment(this.value);
-        });
-
-        const currentDepartmentId = departmentSelect.value;
-        const currentEmployeeId = employeeSelect.value;
-
-        if (currentDepartmentId && currentEmployeeId) {
-            loadEmployeesByDepartment(currentDepartmentId, currentEmployeeId);
-            // Trigger employee change to load info after loading department employees
-            setTimeout(function() {
-                if (employeeSelect.value) {
-                    employeeSelect.dispatchEvent(new Event('change'));
-                }
-            }, 500);
-        }
-    }
-
-    // When employee changes - auto-fill readonly fields from employees table
-    if (employeeSelect) {
-        employeeSelect.addEventListener('change', function() {
-            const employeeId = this.value;
-
-            if (!employeeId) {
-                clearEmployeeFields();
-                return;
-            }
-
-            fetch(`/quan-nhan-record/api/employee-info/${employeeId}`)
-                .then(response => response.json())
-                .then(emp => {
-                    // Auto-fill thông tin vào các input fields
-                    document.getElementById('ho-ten-field').value = emp.name || '';
-                    document.getElementById('ngay-sinh-field').value = emp.date_of_birth || '';
-                    document.getElementById('gioi-tinh-field').value = emp.gender_text || '';
-                    document.getElementById('quan-ham-field').value = emp.rank_code || '';
-                    document.getElementById('chuc-vu-field').value = emp.position_name || '';
-                    document.getElementById('nhap-ngu-field').value = emp.enlist_date || '';
-                    document.getElementById('cccd-field').value = emp.CCCD || '';
-                    document.getElementById('dia-chi-field').value = emp.address || '';
-                    document.getElementById('dien-thoai-field').value = emp.phone || '';
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Lỗi khi tải thông tin nhân viên');
-                });
-        });
-    }
-
-    function clearEmployeeFields() {
-        // Clear all display fields
-        document.getElementById('ho-ten-field').value = '';
-        document.getElementById('ngay-sinh-field').value = '';
-        document.getElementById('gioi-tinh-field').value = '';
-        document.getElementById('quan-ham-field').value = '';
-        document.getElementById('chuc-vu-field').value = '';
-        document.getElementById('nhap-ngu-field').value = '';
-        document.getElementById('cccd-field').value = '';
-        document.getElementById('dia-chi-field').value = '';
-        document.getElementById('dien-thoai-field').value = '';
-    }
-});
-</script>
-HTML;
-    }
 
 
     protected function setupUpdateOperation()
@@ -556,7 +306,7 @@ HTML;
 
         // THÔNG TIN CÁ NHÂN (từ employees)
         if ($employee) {
-            CRUD::column('emp_ho_ten')->label('Họ đệm tên khai sinh')->type('text')->value($employee->name);
+            CRUD::column('emp_ho_ten')->label('Họ tên đệm khai sinh')->type('text')->value($employee->name);
             CRUD::column('emp_ngay_sinh')->label('Ngày sinh')->type('date')->value($employee->date_of_birth);
             CRUD::column('emp_gioi_tinh')->label('Giới tính')->type('text')->value($employee->gender == 1 ? 'Nam' : ($employee->gender == 0 ? 'Nữ' : ''));
             CRUD::column('emp_quan_ham')->label('Quân hàm')->type('text')->value($employee->rank_code);
