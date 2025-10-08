@@ -147,4 +147,63 @@ class User extends Authenticatable
         }
         return null;
     }
+
+    /**
+     * Get approver title for PDF display
+     */
+    public function getApproverTitle()
+    {
+        // Check roles first - get the first role name
+        $roles = $this->roles;
+        if ($roles->count() > 0) {
+            $roleName = $roles->first()->name;
+            
+            // Map role names to display titles
+            $roleMap = [
+                'Admin' => 'GIÁM ĐỐC',
+                'Ban Giám đốc' => 'BAN GIÁM ĐỐC',
+                'Ban Giam Doc' => 'BAN GIÁM ĐỐC', 
+                'Ban Giám Đốc' => 'BAN GIÁM ĐỐC',
+                'Trưởng phòng' => 'TRƯỞNG PHÒNG',
+                'Truong Phong' => 'TRƯỞNG PHÒNG',
+                'Trưởng Phòng' => 'TRƯỞNG PHÒNG',
+                'Nhân sự' => 'NHÂN SỰ',
+                'Nhan Vien' => 'NHÂN SỰ',
+                'Nhân Viên' => 'NHÂN SỰ',
+            ];
+            
+            if (isset($roleMap[$roleName])) {
+                return $roleMap[$roleName];
+            }
+            
+            // If role not in map, use role name directly
+            return strtoupper($roleName);
+        }
+        
+        // Check by department name as fallback
+        $department = $this->getDepartment();
+        if ($department) {
+            $deptName = strtoupper($department->name);
+            
+            // Map specific department names to titles
+            $titleMap = [
+                'PHÒNG KẾ HOẠCH' => 'TRƯỞNG PHÒNG KẾ HOẠCH',
+                'PHÒNG TỔ CHỨC' => 'TRƯỞNG PHÒNG TỔ CHỨC',
+                'PHÒNG TÀI CHÍNH' => 'TRƯỞNG PHÒNG TÀI CHÍNH',
+                'PHÒNG KỸ THUẬT' => 'TRƯỞNG PHÒNG KỸ THUẬT',
+                'PHÒNG HÀNH CHÍNH' => 'TRƯỞNG PHÒNG HÀNH CHÍNH',
+                'PHÒNG NHÂN SỰ' => 'TRƯỞNG PHÒNG NHÂN SỰ',
+            ];
+            
+            if (isset($titleMap[$deptName])) {
+                return $titleMap[$deptName];
+            }
+            
+            // Default pattern: TRƯỞNG + department name
+            return 'TRƯỞNG ' . $deptName;
+        }
+        
+        // Final fallback
+        return 'THỦ TRƯỞNG ĐƠN VỊ';
+    }
 }

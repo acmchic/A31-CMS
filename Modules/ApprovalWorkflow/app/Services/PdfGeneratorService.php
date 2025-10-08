@@ -82,7 +82,7 @@ class PdfGeneratorService
         // Write HTML content
         $pdf->writeHTML($html, true, false, true, false, '');
 
-        // Set digital signature
+        // Set digital signature BEFORE finalizing the document
         $certificateInfo = openssl_x509_parse($certificate);
 
         $signatureInfo = [
@@ -92,13 +92,16 @@ class PdfGeneratorService
             'ContactInfo' => $approver->email ?? 'admin@a31factory.com',
         ];
 
+        // Set signature with visible type but positioned correctly
         $pdf->setSignature($certificate, $privateKey, $certificatePassword, '', 2, $signatureInfo);
 
-        // Add signature image if available
+        // Add signature image if available - position it near the signature area
         if ($approver->signature_path) {
             $signatureImagePath = Storage::disk('public')->path($approver->signature_path);
             if (file_exists($signatureImagePath)) {
-                $pdf->Image($signatureImagePath, 140, 250, 50, 20, '', '', '', false, 300, '', false, false, 1);
+                // Position signature image at fixed coordinates (right side, near approver area)
+                // Coordinates: x, y, width, height - use fixed Y position to ensure visibility
+                $pdf->Image($signatureImagePath, 130, 220, 50, 20, '', '', '', false, 300, '', false, false, 1);
             }
         }
 

@@ -127,7 +127,7 @@ http://localhost:8000/admin/vehicle-registration
 # 1. Tạo đăng ký mới hoặc dùng ID có sẵn
 # 2. Click "Phê duyệt với PIN"
 # 3. Nhập PIN: A31Factory2025
-# 4. Kết quả: "Phê duyệt thành công! PDF đã được ký số."
+# 4. Kết quả: "Phê duyệt thành công! Tài liệu đã được ký số."
 ```
 
 ### Test 2: Kiểm tra trong Adobe Reader

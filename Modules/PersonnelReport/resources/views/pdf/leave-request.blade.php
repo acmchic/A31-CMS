@@ -112,7 +112,7 @@
     </style>
 </head>
 <body>
-    <div class="header-container">
+    <div class="header-container" style="margin-top: -10px;">
         <div class="header-center">
             <img src="{{ public_path('assets/logo/logo.png') }}" class="logo" alt="Logo"><br>
             QUÂN CHỦNG PHÒNG KHÔNG - KHÔNG QUÂN<br>
@@ -193,17 +193,20 @@
             <tr>
                 <td style="width: 50%; border: none; text-align: center; vertical-align: top;">
                     <p style="font-weight: bold; font-size: 10px; margin: 0;">Nhân sự</p>
-                    <p style="font-style: italic; font-size: 8px; color: #666; margin: 3px 0 35px 0;">(Ký và ghi rõ họ tên)</p>
+                    <p style="font-style: italic; font-size: 8px; color: #666; margin: 3px 0 35px 0;">&nbsp;</p>
                     <p style="font-weight: bold; font-size: 10px; margin: 0;">{{ $employee ? $employee->name : '' }}</p>
                 </td>
                 <td style="width: 50%; border: none; text-align: center; vertical-align: top;">
-                    <p style="font-weight: bold; font-size: 10px; margin: 0;">{{ $approver && $approver->department ? strtoupper($approver->department->name) : 'THỦ TRƯỞNG ĐƠN VỊ' }}</p>
+                    <p style="font-weight: bold; font-size: 10px; margin: 0;">{{ $approver ? $approver->getApproverTitle() : 'THỦ TRƯỞNG ĐƠN VỊ' }}</p>
                     <p style="font-style: italic; font-size: 8px; color: #666; margin: 3px 0;">
-                        (Đã ký số)
                         @if($leave->workflow_level2_at)
-                        <br>Ngày {{ \Carbon\Carbon::parse($leave->workflow_level2_at)->format('d/m/Y') }}
+                        Ngày {{ \Carbon\Carbon::parse($leave->workflow_level2_at)->format('d/m/Y') }}
                         @elseif($leave->approved_at_director)
-                        <br>Ngày {{ \Carbon\Carbon::parse($leave->approved_at_director)->format('d/m/Y') }}
+                        Ngày {{ \Carbon\Carbon::parse($leave->approved_at_director)->format('d/m/Y') }}
+                        @elseif($leave->workflow_level1_at)
+                        Ngày {{ \Carbon\Carbon::parse($leave->workflow_level1_at)->format('d/m/Y') }}
+                        @elseif($leave->approved_at_approver)
+                        Ngày {{ \Carbon\Carbon::parse($leave->approved_at_approver)->format('d/m/Y') }}
                         @endif
                     </p>
                     <p style="font-weight: bold; font-size: 10px; margin: 35px 0 0 0;">{{ $approver ? $approver->name : '' }}</p>
@@ -220,7 +223,7 @@
     </div>
     @endif
 
-    <div style="margin-top: 15px; text-align: center; font-size: 8px; color: #666; border-top: 1px solid #ddd; padding-top: 8px;">
+    <div style="margin-top: 15px; margin-bottom: 60px; text-align: center; font-size: 8px; color: #666; border-top: 1px solid #ddd; padding-top: 8px;">
         <p style="margin: 0;">Nhà máy A31</p>
     </div>
 </body>

@@ -40,7 +40,7 @@ class LeaveRequestCrudController extends CrudController
     private function applyDepartmentFilter()
     {
         $user = backpack_user();
-        $scope = PermissionHelper::getUserScope($user);
+        $scope = PermissionHelper::getUserScope($user, 'leave'); // Pass module name
 
         // ✅ Debug logging
         $employeeDeptId = null;
@@ -48,11 +48,12 @@ class LeaveRequestCrudController extends CrudController
             $emp = \Modules\OrganizationStructure\Models\Employee::find($user->employee_id);
             $employeeDeptId = $emp ? $emp->department_id : null;
         }
-        
+
         \Log::info('LeaveRequest Filter Debug', [
             'user_id' => $user->id,
             'user_name' => $user->name,
             'user_roles' => $user->roles->pluck('name'),
+            'user_permissions' => $user->getAllPermissions()->pluck('name'),
             'scope' => $scope,
             'department_id' => $user->department_id,
             'employee_department_id' => $employeeDeptId,
@@ -181,15 +182,8 @@ class LeaveRequestCrudController extends CrudController
             ->label('Địa điểm')
             ->type('text');
 
-        CRUD::column('status')
-            ->label('Trạng thái')
-            ->type('closure')
-            ->function(function($entry) {
-                return $entry->status_text;
-            });
-
         CRUD::column('workflow_status')
-            ->label('Trạng thái quy trình')
+            ->label('Trạng thái')
             ->type('closure')
             ->function(function($entry) {
                 return $entry->workflow_status_text;
@@ -311,12 +305,12 @@ class LeaveRequestCrudController extends CrudController
             ->tab('Thông tin cơ bản');
 
         CRUD::field('workflow_status')
-            ->label('Trạng thái quy trình')
+            ->label('Trạng thái')
             ->type('select_from_array')
             ->options([
                 EmployeeLeave::WORKFLOW_PENDING => 'Chờ xử lý',
-                EmployeeLeave::WORKFLOW_IN_REVIEW => 'Đang xem xét',
-                EmployeeLeave::WORKFLOW_APPROVED => 'Đã phê duyệt',
+                EmployeeLeave::WORKFLOW_APPROVED_BY_APPROVER => 'Đã phê duyệt',
+                EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR => 'Đã phê duyệt hoàn tất',
                 EmployeeLeave::WORKFLOW_REJECTED => 'Đã từ chối'
             ])
             ->tab('Thông tin cơ bản');
@@ -324,16 +318,6 @@ class LeaveRequestCrudController extends CrudController
         CRUD::field('rejection_reason')
             ->label('Lý do từ chối')
             ->type('textarea')
-            ->tab('Thông tin cơ bản');
-
-        CRUD::field('is_authorized')
-            ->label('Đã ủy quyền')
-            ->type('boolean')
-            ->tab('Thông tin cơ bản');
-
-        CRUD::field('is_checked')
-            ->label('Đã kiểm tra')
-            ->type('boolean')
             ->tab('Thông tin cơ bản');
     }
 
@@ -365,14 +349,6 @@ class LeaveRequestCrudController extends CrudController
 
         CRUD::column('rejection_reason')
             ->label('Lý do từ chối');
-
-        CRUD::column('is_authorized')
-            ->label('Đã ủy quyền')
-            ->type('boolean');
-
-        CRUD::column('is_checked')
-            ->label('Đã kiểm tra')
-            ->type('boolean');
 
         CRUD::column('created_by')
             ->label('Người tạo');

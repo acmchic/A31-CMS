@@ -67,7 +67,7 @@
     </div>
 
     <h1>Phiếu đăng ký sử dụng xe</h1>
-    
+
     <h2>I. THÔNG TIN ĐĂNG KÝ</h2>
     <table border="1" cellpadding="6" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 6px 0 10px 0;">
         <tr>
@@ -103,7 +103,7 @@
     <h2>II. THÔNG TIN XE VÀ LÁI XE</h2>
     <table border="1" cellpadding="6" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 6px 0 10px 0;">
         <tr>
-            <td style="width: 30%; background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Xe được phân:</td>
+            <td style="width: 30%; background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Xe được giao:</td>
             <td style="width: 70%; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $vehicle ? $vehicle->full_name : 'Chưa phân' }}</td>
         </tr>
         <tr>
@@ -153,13 +153,16 @@
                     <p style="font-weight: bold; font-size: 10px; margin: 0;">{{ $requester ? $requester->name : '' }}</p>
                 </td>
                 <td style="width: 50%; border: none; text-align: center; vertical-align: top;">
-                    <p style="font-weight: bold; font-size: 10px; margin: 0;">{{ $approver && $approver->department ? strtoupper($approver->department->name) : 'BAN GIÁM ĐỐC' }}</p>
+                    <p style="font-weight: bold; font-size: 10px; margin: 0;">{{ $approver ? $approver->getApproverTitle() : 'BAN GIÁM ĐỐC' }}</p>
                     <p style="font-style: italic; font-size: 8px; color: #666; margin: 3px 0;">
-                        (Đã ký số)
                         @if($registration->workflow_level2_at)
-                        <br>Ngày {{ \Carbon\Carbon::parse($registration->workflow_level2_at)->format('d/m/Y') }}
+                        Ngày {{ \Carbon\Carbon::parse($registration->workflow_level2_at)->format('d/m/Y') }}
                         @elseif($registration->director_approved_at)
-                        <br>Ngày {{ \Carbon\Carbon::parse($registration->director_approved_at)->format('d/m/Y') }}
+                        Ngày {{ \Carbon\Carbon::parse($registration->director_approved_at)->format('d/m/Y') }}
+                        @elseif($registration->workflow_level1_at)
+                        Ngày {{ \Carbon\Carbon::parse($registration->workflow_level1_at)->format('d/m/Y') }}
+                        @elseif($registration->department_approved_at)
+                        Ngày {{ \Carbon\Carbon::parse($registration->department_approved_at)->format('d/m/Y') }}
                         @endif
                     </p>
                     <p style="font-weight: bold; font-size: 10px; margin: 35px 0 0 0;">{{ $approver ? $approver->name : '' }}</p>
@@ -176,7 +179,7 @@
     </div>
     @endif
 
-    <div style="margin-top: 15px; text-align: center; font-size: 8px; color: #666; border-top: 1px solid #ddd; padding-top: 8px;">
+    <div style="margin-top: 15px; margin-bottom: 60px; text-align: center; font-size: 8px; color: #666; border-top: 1px solid #ddd; padding-top: 8px;">
         <p style="margin: 0;">Nhà máy A31</p>
     </div>
 </body>

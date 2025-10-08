@@ -59,7 +59,7 @@
                 <div class="row">
                     @if($entry->vehicle)
                     <div class="col-md-6">
-                        <p><strong>Xe được phân:</strong> {{ $entry->vehicle->full_name ?? 'N/A' }}</p>
+                        <p><strong>Xe được giao:</strong> {{ $entry->vehicle->full_name ?? 'N/A' }}</p>
                     </div>
                     @endif
                     @if($entry->driver_name || $entry->driver_id)

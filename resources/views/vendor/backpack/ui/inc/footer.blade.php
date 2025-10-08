@@ -26,23 +26,23 @@
                         <strong>Chữ ký số A31 Factory</strong><br>
                         Để phê duyệt, bạn cần nhập PIN của chứng thư số để ký PDF.
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="registration_id" class="form-label">ID Đăng ký:</label>
                         <input type="text" class="form-control" id="registration_id" name="registration_id" readonly>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="certificate_pin" class="form-label">
                             <i class="la la-key"></i> PIN Chứng thư số <span class="text-danger">*</span>
                         </label>
-                        <input type="password" class="form-control" id="certificate_pin" name="certificate_pin" 
+                        <input type="password" class="form-control" id="certificate_pin" name="certificate_pin"
                                placeholder="Nhập PIN của chứng thư số A1" required>
                         <div class="form-text">
                             PIN này sẽ được sử dụng để giải mã chứng thư số và ký PDF
                         </div>
                     </div>
-                    
+
                     <div class="mb-3">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="confirm_approve" required>
@@ -71,15 +71,15 @@ window.showApproveModal = function(registrationId, approveUrl) {
     const modal = new bootstrap.Modal(document.getElementById('approveModal'));
     const form = document.getElementById('approveForm');
     const registrationInput = document.getElementById('registration_id');
-    
+
     // Set form data
     registrationInput.value = registrationId;
     form.action = approveUrl;
-    
+
     // Reset form
     form.reset();
     registrationInput.value = registrationId;
-    
+
     // Show modal
     modal.show();
 };
@@ -88,32 +88,32 @@ window.showApproveModal = function(registrationId, approveUrl) {
 document.addEventListener('DOMContentLoaded', function() {
     const approveForm = document.getElementById('approveForm');
     const approveBtn = document.getElementById('approveBtn');
-    
+
     if (!approveForm) return;
-    
+
     approveForm.addEventListener('submit', function(e) {
         e.preventDefault();
-        
+
         const pin = document.getElementById('certificate_pin').value;
         const confirmed = document.getElementById('confirm_approve').checked;
-        
+
         if (!pin) {
             alert('Vui lòng nhập PIN chứng thư số');
             return;
         }
-        
+
         if (!confirmed) {
             alert('Vui lòng xác nhận phê duyệt');
             return;
         }
-        
+
         // Show loading
         approveBtn.disabled = true;
         approveBtn.innerHTML = '<i class="la la-spinner la-spin"></i> Đang ký số...';
-        
+
         // Submit form
         const formData = new FormData(approveForm);
-        
+
         fetch(approveForm.action, {
             method: 'POST',
             body: formData,
@@ -126,17 +126,17 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 // Success
-                alert('✅ Phê duyệt thành công! PDF đã được ký số.');
-                
+                alert('✅ Phê duyệt thành công! Tài liệu đã được ký số.');
+
                 // Close modal
                 bootstrap.Modal.getInstance(document.getElementById('approveModal')).hide();
-                
+
                 // Reload page
                 window.location.reload();
             } else {
                 // Error
                 alert('❌ Lỗi: ' + (data.message || 'Không thể phê duyệt'));
-                
+
                 // Reset button
                 approveBtn.disabled = false;
                 approveBtn.innerHTML = '<i class="la la-check"></i> Phê duyệt & Ký số';
@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Error:', error);
             alert('❌ Có lỗi xảy ra khi phê duyệt');
-            
+
             // Reset button
             approveBtn.disabled = false;
             approveBtn.innerHTML = '<i class="la la-check"></i> Phê duyệt & Ký số';

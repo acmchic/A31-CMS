@@ -68,7 +68,7 @@ class ApprovalController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Phê duyệt thành công! PDF đã được ký số.',
+                'message' => 'Phê duyệt thành công! Tài liệu đã được ký số.',
                 'data' => $result
             ]);
 
@@ -154,18 +154,18 @@ class ApprovalController extends Controller
     {
         // Special cases - map model to correct permission prefix
         $modelName = class_basename($modelClass);
-        
+
         // Map specific models to their permission prefixes
         $permissionMap = [
             'EmployeeLeave' => 'leave',
             'VehicleRegistration' => 'vehicle_registration',
             'RecordManagement' => 'record_management',
         ];
-        
+
         if (isset($permissionMap[$modelName])) {
             return $permissionMap[$modelName];
         }
-        
+
         // Fallback: Extract module name from namespace
         // Example: Modules\VehicleRegistration\Models\VehicleRegistration -> vehicle_registration
         $parts = explode('\\', $modelClass);

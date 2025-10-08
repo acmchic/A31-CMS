@@ -123,7 +123,7 @@ class VehicleRegistrationCrudController extends CrudController
 
         // Show vehicle and driver info if assigned
         CRUD::column('vehicle_id')
-            ->label('Xe được phân')
+            ->label('Xe được giao')
             ->type('select')
             ->entity('vehicle')
             ->attribute('full_name')
