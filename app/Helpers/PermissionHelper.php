@@ -17,11 +17,7 @@ class PermissionHelper
     {
         if (!$user) return false;
 
-        // Admin has everything
-        if ($user->hasRole('Admin')) {
-            return true;
-        }
-
+        // Check actual permissions instead of hardcoding Admin role
         return $user->hasPermissionTo($permission);
     }
 
@@ -57,7 +53,7 @@ class PermissionHelper
     {
         if (!$user) return 'none';
 
-        if ($user->hasRole('Admin')) return 'all';
+        // Check actual permissions instead of hardcoding Admin role
 
         // ✅ Check multiple variations of role names
         if ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc'])) return 'company';
