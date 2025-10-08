@@ -51,17 +51,18 @@ class RoleCrudController extends BaseRoleCrudController
 
         /**
          * Show the exact permissions that role has.
+         * Removed to simplify the interface
          */
-        $this->crud->addColumn([
-            // n-n relationship (with pivot table)
-            'label'     => mb_ucfirst(trans('backpack::permissionmanager.permission_plural')),
-            'type'      => 'select_multiple',
-            'name'      => 'permissions', // the method that defines the relationship in your Model
-            'entity'    => 'permissions', // the method that defines the relationship in your Model
-            'attribute' => 'name', // foreign key attribute that is shown to user
-            'model'     => $this->permission_model, // foreign key model
-            'pivot'     => true, // on create&update, do you need to add/delete pivot table entries?
-        ]);
+        // $this->crud->addColumn([
+        //     // n-n relationship (with pivot table)
+        //     'label'     => mb_ucfirst(trans('backpack::permissionmanager.permission_plural')),
+        //     'type'      => 'select_multiple',
+        //     'name'      => 'permissions', // the method that defines the relationship in your Model
+        //     'entity'    => 'permissions', // the method that defines the relationship in your Model
+        //     'attribute' => 'name', // foreign key attribute that is shown to user
+        //     'model'     => $this->permission_model, // foreign key model
+        //     'pivot'     => true, // on create&update, do you need to add/delete pivot table entries?
+        // ]);
     }
 
     public function setupCreateOperation()
