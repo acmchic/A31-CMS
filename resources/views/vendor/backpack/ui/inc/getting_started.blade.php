@@ -147,10 +147,10 @@
 </div>
 
 @push('after_styles')
-  @basset('https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.6.0/styles/base16/dracula.min.css')
+  @basset(asset('vendor/highlight.js/dracula.min.css'))
 @endpush
 
 @push('after_scripts')
-  @basset('https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.6.0/highlight.min.js')
+  @basset(asset('vendor/highlight.js/highlight.min.js'))
   <script>hljs.highlightAll();</script>
 @endpush

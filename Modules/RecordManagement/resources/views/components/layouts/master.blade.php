@@ -14,8 +14,7 @@
         <meta name="author" content="{{ $author ?? '' }}">
 
         <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+        {{-- Google Fonts removed for offline deployment --}}
 
         {{-- Vite CSS --}}
         {{-- {{ module_vite('build-recordmanagement', 'resources/assets/sass/app.scss') }} --}}

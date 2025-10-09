@@ -26,7 +26,7 @@
   </nav>
 
 @push('crud_list_scripts')
-    @basset('https://cdn.jsdelivr.net/npm/urijs@1.19.11/src/URI.min.js')
+    @basset(asset('vendor/urijs/URI.min.js'))
     <script>
       function addOrUpdateUriParameter(uri, parameter, value) {
             var new_url = normalizeAmpersand(uri);
