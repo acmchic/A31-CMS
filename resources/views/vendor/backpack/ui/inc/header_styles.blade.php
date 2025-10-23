@@ -1,5 +1,11 @@
 {{-- Custom header color styles - loaded globally --}}
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+/* Apply Inter font to all elements, but exclude icon fonts */
+*:not([class*="la-"]):not([class*="fa-"]):not([class*="icon-"]):not(.icon):not(i) {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif !important;
+}
 /* ✅ Custom Header Background - Màu xanh nhạt đậm hơn background */
 header.navbar {
     background-color: #2c5f7c !important;
@@ -38,6 +44,10 @@ header.navbar .dropdown-menu .dropdown-item:hover {
     background-color: #f5f5f5 !important;
 }
 </style>
+
+
+
+
 
 
 

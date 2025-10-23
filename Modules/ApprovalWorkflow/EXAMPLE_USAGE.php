@@ -230,7 +230,7 @@ foreach ($history as $record) {
     <meta charset="utf-8">
     <title>{{ $model->getPdfTitle() }}</title>
     <style>
-        body { font-family: 'DejaVu Sans', sans-serif; }
+        body { font-family: 'Inter', 'DejaVu Sans', sans-serif; }
         h1 { text-align: center; color: #2c3e50; }
         table { width: 100%; border-collapse: collapse; }
         th, td { border: 1px solid #ddd; padding: 8px; }

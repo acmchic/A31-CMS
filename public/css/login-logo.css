@@ -1,0 +1,27 @@
+/* Custom styles for login page logo */
+.auth-logo-container img {
+    height: 200px !important; /* Tăng từ 40px lên 200px (gấp 5 lần) */
+    width: auto !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+}
+
+/* Đảm bảo container có đủ không gian cho logo lớn */
+.auth-logo-container {
+    margin-bottom: 2rem !important;
+}
+
+/* Responsive cho mobile */
+@media (max-width: 768px) {
+    .auth-logo-container img {
+        height: 150px !important; /* Nhỏ hơn một chút trên mobile */
+    }
+}
+
+@media (max-width: 480px) {
+    .auth-logo-container img {
+        height: 120px !important; /* Nhỏ hơn nữa trên mobile nhỏ */
+    }
+}
+
+

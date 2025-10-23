@@ -5,7 +5,7 @@
     <title>Đơn xin nghỉ phép #{{ $leave->id }}</title>
     <style>
         body {
-            font-family: 'DejaVu Sans', sans-serif;
+            font-family: 'Inter', 'DejaVu Sans', sans-serif;
             font-size: 10px;
             line-height: 1.3;
             color: #000;
