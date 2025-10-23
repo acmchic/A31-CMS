@@ -42,7 +42,7 @@ return [
         base_path('vendor/backpack/theme-tabler/resources/assets/css/color-adjustments.css'),
         base_path('vendor/backpack/theme-tabler/resources/assets/css/colors.css'),
         'css/custom-admin.css', // Custom navbar color - Xanh da trời
-        'css/inter-font.css', // Inter font global styles
+        'css/dynamic-font.css', // Dynamic font based on settings
         'css/login-logo.css', // Custom login logo size
     ],
 

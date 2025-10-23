@@ -108,6 +108,12 @@
             <i class="la la-key"></i> Quyền hạn
         </a>
         @endif
+        
+        @if(\App\Helpers\PermissionHelper::userCan('user.view'))
+        <a class="dropdown-item" href="{{ backpack_url('system-settings') }}">
+            <i class="la la-cog"></i> Cài đặt
+        </a>
+        @endif
     </div>
 </li>
 @endif

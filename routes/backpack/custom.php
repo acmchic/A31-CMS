@@ -29,6 +29,11 @@ Route::group([
     Route::put('profile/update-pin', 'ProfileController@updatePin')->name('admin.profile.update-pin');
     Route::delete('profile/delete-photo', 'ProfileController@deleteProfilePhoto')->name('admin.profile.delete-photo');
     Route::delete('profile/delete-signature', 'ProfileController@deleteSignature')->name('admin.profile.delete-signature');
+    
+    // System Settings routes
+    Route::get('system-settings', 'SystemSettingsController@index')->name('admin.system-settings.index');
+    Route::put('system-settings', 'SystemSettingsController@update')->name('admin.system-settings.update');
+    Route::post('system-settings/reset', 'SystemSettingsController@reset')->name('admin.system-settings.reset');
 }); // this should be the absolute last line of this file
 
 /**
