@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/filesharing",
+    "description": "Module chia sẻ file với hệ thống phân quyền",
+    "authors": [
+        {
+            "name": "A31 Factory",
+            "email": "admin@a31factory.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\FileSharing\\": "app/",
+            "Modules\\FileSharing\\Database\\Factories\\": "database/factories/",
+            "Modules\\FileSharing\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\FileSharing\\Tests\\": "tests/"
+        }
+    }
+}

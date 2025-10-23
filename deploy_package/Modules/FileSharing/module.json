@@ -1,0 +1,11 @@
+{
+    "name": "FileSharing",
+    "alias": "filesharing",
+    "description": "Module chia sẻ file với hệ thống phân quyền",
+    "keywords": ["file", "sharing", "upload", "download"],
+    "priority": 0,
+    "providers": [
+        "Modules\\FileSharing\\Providers\\FileSharingServiceProvider"
+    ],
+    "files": []
+}
