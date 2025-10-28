@@ -6,20 +6,19 @@ services:
     container_name: mysql_a31
     restart: unless-stopped
     ports:
-      - "3306:3306" # đổi port host nếu cần
+      - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: A31Factory
       MYSQL_DATABASE: a31_factory
-      MYSQL_USER: root
-      MYSQL_PASSWORD: A31Factory
+      MYSQL_ROOT_HOST: "%"   # QUAN TRỌNG — cho phép root login từ host
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
       - sail
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-pA31Factory"]
-      retries: 3
-      timeout: 5s
+      retries: 5
+      timeout: 10s
 
 networks:
   sail:

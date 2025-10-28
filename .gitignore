@@ -45,3 +45,4 @@ resources/views/vendor/backpack/ui/errors/
 **/500.blade.php
 deploy/
 deploy_package/
+.env

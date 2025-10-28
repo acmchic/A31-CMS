@@ -64,7 +64,7 @@ return [
 
     // Menu logo. You can replace this with an <img> tag if you have a logo.
 
-'project_logo' => '<img src="'.env('APP_URL').'/assets/logo/logo.png" alt="Logo" style="height:80px;">',
+'project_logo' => '<img src="'.env('APP_URL').'/assets/logo/logo.png" alt="Logo" style="height:45px;">',
 
     // Show / hide breadcrumbs on admin panel pages.
     'breadcrumbs' => true,

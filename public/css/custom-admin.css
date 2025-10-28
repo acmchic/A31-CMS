@@ -14,17 +14,17 @@
 /* ===== NAVBAR COLOR THEMES ===== */
 /* Để đổi theme, chỉ cần uncomment theme muốn dùng và comment theme đang dùng */
 
-/* ✅ THEME 1: Xanh da trời (Sky Blue) - Phù hợp Không quân - ĐANG DÙNG */
-/* .navbar-header,
+/* ✅ THEME 5: Xanh sáng cân bằng (Balanced Light Blue) - Dễ nhìn - ĐANG DÙNG */
+.navbar-header,
 .app-header,
 header.navbar,
 .navbar,
 nav.navbar {
-    background: linear-gradient(135deg, #4a90e2 0%, #2e5f8a 100%) !important;
-    background-color: #4a90e2 !important;
-} */
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+    background-color: #3b82f6 !important;
+}
 
-
+/* THEME 2: Xanh đậm (Dark Blue) - Đã tắt
 .navbar-header,
 .app-header,
 header.navbar,
@@ -33,6 +33,7 @@ nav.navbar {
     background: linear-gradient(135deg, #1e3a5f 0%, #0f1f3a 100%) !important;
     background-color: #1e3a5f !important;
 }
+*/
 
 /* THEME 3: Xanh lam đậm (Blue) - Cân bằng 
 .navbar-header,
@@ -45,11 +46,52 @@ nav.navbar {
 }
 */
 
-/* Đảm bảo text và icons màu trắng dễ đọc */
+/* Đảm bảo text và icons màu trắng dễ đọc - Áp dụng cho tất cả elements */
+.navbar-header,
 .navbar-header *,
+.app-header,
 .app-header *,
-header.navbar * {
-    color: #fff !important;
+header.navbar,
+header.navbar *,
+.navbar,
+.navbar *,
+nav.navbar,
+nav.navbar * {
+    color: #ffffff !important;
+}
+
+/* Đảm bảo các elements cụ thể có màu trắng */
+.navbar-header a,
+.navbar-header span,
+.navbar-header div,
+.navbar-header p,
+.navbar-header h1,
+.navbar-header h2,
+.navbar-header h3,
+.navbar-header h4,
+.navbar-header h5,
+.navbar-header h6,
+.app-header a,
+.app-header span,
+.app-header div,
+.app-header p,
+.app-header h1,
+.app-header h2,
+.app-header h3,
+.app-header h4,
+.app-header h5,
+.app-header h6,
+header.navbar a,
+header.navbar span,
+header.navbar div,
+header.navbar p,
+header.navbar h1,
+header.navbar h2,
+header.navbar h3,
+header.navbar h4,
+header.navbar h5,
+header.navbar h6 {
+    color: #ffffff !important;
 }
 
 /* Dropdown menu vẫn giữ màu nền sáng */
@@ -68,7 +110,7 @@ header.navbar .dropdown-menu * {
 /* Logo và brand */
 .navbar-header .navbar-brand,
 .app-header .navbar-brand {
-    color: #fff !important;
+    color: #ffffff !important;
 }
 
 /* Nav links */
@@ -78,11 +120,66 @@ header.navbar .nav-link {
     color: rgba(255, 255, 255, 0.9) !important;
 }
 
+/* Hiệu ứng hover nhẹ nhàng cho nav links - đổi màu text sang xám đậm */
 .navbar-header .nav-link:hover,
 .app-header .nav-link:hover,
 header.navbar .nav-link:hover {
-    color: #fff !important;
+    color: #9ca3af !important;
     background-color: rgba(255, 255, 255, 0.1) !important;
+    border-radius: 6px !important;
+    transition: all 0.3s ease !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Hiệu ứng hover cho tất cả text trong header - đổi màu text sang xám đậm */
+.navbar-header a:hover,
+.navbar-header span:hover,
+.navbar-header div:hover,
+.app-header a:hover,
+.app-header span:hover,
+.app-header div:hover,
+header.navbar a:hover,
+header.navbar span:hover,
+header.navbar div:hover {
+    color: #9ca3af !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-radius: 4px !important;
+    transition: all 0.2s ease !important;
+    padding: 2px 4px !important;
+}
+
+/* Hiệu ứng hover cho logo/brand - CHỈ áp dụng cho trang login, KHÔNG áp dụng cho header */
+body:not(.admin-panel) .navbar-brand:hover {
+    color: #9ca3af !important;
+    transform: scale(1.05) !important;
+    transition: all 0.3s ease !important;
+}
+
+/* Đảm bảo logo trong header KHÔNG có hiệu ứng hover và có kích thước bình thường */
+.navbar-header .navbar-brand:hover,
+.app-header .navbar-brand:hover,
+header.navbar .navbar-brand:hover {
+    color: #ffffff !important;
+    transform: none !important;
+    transition: none !important;
+}
+
+/* Đảm bảo logo trong header có kích thước bình thường */
+.navbar-header .brand-image,
+.app-header .brand-image,
+header.navbar .brand-image {
+    height: 32px !important;
+    width: auto !important;
+    max-height: 32px !important;
+    transform: none !important;
+}
+
+/* Đảm bảo logo container không bị phóng to */
+.navbar-header .navbar-brand,
+.app-header .navbar-brand,
+header.navbar .navbar-brand {
+    transform: none !important;
+    transition: none !important;
 }
 
 

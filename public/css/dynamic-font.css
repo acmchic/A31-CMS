@@ -2,23 +2,23 @@
 
 /* Apply background color globally */
 body {
-    background-color: #a53b3b !important;
+    background-color: #ffffff !important;
 }
 
 .page {
-    background-color: #a53b3b !important;
+    background-color: #ffffff !important;
 }
 
 .page-wrapper {
-    background-color: #a53b3b !important;
+    background-color: #ffffff !important;
 }
 
 .page-body {
-    background-color: #a53b3b !important;
+    background-color: #ffffff !important;
 }
 
 .container-fluid {
-    background-color: #a53b3b !important;
+    background-color: #ffffff !important;
 }
 
 /* Apply Inter font globally */
