@@ -29,8 +29,6 @@ class Employee extends Model
         'annual_leave_balance',
         'annual_leave_total',
         'annual_leave_used',
-        'delay_counter',
-        'hourly_counter',
         'is_active',
         'created_by',
         'updated_by'
@@ -44,8 +42,6 @@ class Employee extends Model
         'annual_leave_balance' => 0,
         'annual_leave_total' => 0,
         'annual_leave_used' => 0,
-        'delay_counter' => 0,
-        'hourly_counter' => 0,
     ];
 
     protected $dates = ['deleted_at', 'date_of_birth', 'start_date', 'quit_date'];

@@ -45,6 +45,15 @@ class RecordManagementController extends Controller
                 'permission' => 'record_management.view',
                 'count' => \Modules\RecordManagement\Models\SalaryUpRecord::count(),
             ],
+            [
+                'name' => 'Sổ Đăng ký An dưỡng, bồi dưỡng',
+                'description' => 'Quản lý đăng ký an dưỡng, bồi dưỡng cho quân nhân',
+                'icon' => 'la la-heart',
+                'color' => 'warning',
+                'route' => 'an-duong-record',
+                'permission' => 'record_management.view',
+                'count' => \Modules\RecordManagement\Models\AnDuongRecord::count(),
+            ],
             // TODO: Thêm các loại sổ khác ở đây
         ];
 

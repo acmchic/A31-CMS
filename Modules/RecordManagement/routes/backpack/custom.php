@@ -20,6 +20,17 @@ Route::group([
     Route::get('record-management', 'Modules\RecordManagement\Http\Controllers\RecordManagementController@index')
         ->name('record-management.index');
     
+    // Test route
+    Route::get('test-an-duong', function() {
+        try {
+            $controller = new \Modules\RecordManagement\Http\Controllers\Admin\AnDuongRecordCrudController();
+            $controller->setup();
+            return 'Controller setup OK';
+        } catch (\Exception $e) {
+            return 'Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
+        }
+    });
+    
     // API endpoints for auto-fill (inside admin prefix)
     Route::group(['namespace' => 'Modules\RecordManagement\Http\Controllers\Admin'], function () {
         Route::get('salary-up-record/api/employees-by-department/{departmentId}', 'SalaryUpRecordCrudController@getEmployeesByDepartment');
@@ -31,10 +42,8 @@ Route::group([
         Route::get('so-dieu-dong-record/api/employees-by-department/{departmentId}', 'SoDieuDongRecordCrudController@getEmployeesByDepartment');
         Route::get('so-dieu-dong-record/api/employee-info/{employeeId}', 'SoDieuDongRecordCrudController@getEmployeeInfo');
         
-        // Test route
-        Route::get('so-dieu-dong-record/api/test', function() {
-            return response()->json(['message' => 'API working']);
-        });
+        Route::get('an-duong-record/api/employees-by-department/{departmentId}', 'AnDuongRecordCrudController@getEmployeesByDepartment');
+        Route::get('an-duong-record/api/employee-info/{employeeId}', 'AnDuongRecordCrudController@getEmployeeInfo');
     });
     
     // CRUD cho từng loại sổ
@@ -48,8 +57,10 @@ Route::group([
         // Sổ đăng ký điều động nội bộ
         Route::crud('so-dieu-dong-record', 'SoDieuDongRecordCrudController');
         
+        // Sổ đăng ký an dưỡng, bồi dưỡng
+        Route::crud('an-duong-record', 'AnDuongRecordCrudController');
+        
         // TODO: Thêm các loại sổ khác ở đây
         // Route::crud('discipline-record', 'DisciplineRecordCrudController');
     });
 });
-
