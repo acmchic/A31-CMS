@@ -182,6 +182,157 @@ header.navbar .navbar-brand {
     transition: none !important;
 }
 
+/* ===== CHỈ ÁP DỤNG CHO TABLE ===== */
+/* Override CSS variables chỉ cho table và các element bên trong table */
+
+/* ===== CẢI THIỆN MÀU TEXT TRONG CÁC BẢNG ===== */
+/* Đảm bảo text trong tất cả các bảng có màu đen rõ ràng, tương phản tốt */
+
+/* Override CSS variables chỉ cho table */
+.table,
+.table *,
+.table th,
+.table td,
+.table thead th,
+.table tbody td,
+.table tbody tr td,
+table.table,
+table.table th,
+table.table td,
+table.table thead th,
+table.table tbody td,
+.card-table,
+.card-table *,
+.card-table td,
+.card-table th,
+.card-table span,
+.card-table div,
+.card-table a,
+.d-table,
+.d-table *,
+.d-table td,
+.d-table th,
+.d-table span,
+.d-table div,
+.d-table a {
+    --tblr-body-color: #000000 !important;
+    --tblr-emphasis-color: #000000 !important;
+    color: #000000 !important;
+}
+
+/* Table headers - màu đen, font-weight bold */
+.table thead th,
+table.table thead th {
+    color: #000000 !important;
+    font-weight: 600 !important;
+}
+
+/* Table cells - màu đen */
+.table tbody td,
+table.table tbody td {
+    color: #000000 !important;
+}
+
+/* Table links trong bảng */
+.table a,
+.table a:link,
+.table a:visited,
+table.table a,
+table.table a:link,
+table.table a:visited {
+    color: #000000 !important;
+}
+
+/* Table links hover */
+.table a:hover,
+table.table a:hover {
+    color: #1a1a1a !important;
+    text-decoration: underline !important;
+}
+
+/* Override text-muted trong bảng */
+.table .text-muted,
+.table .text-muted *,
+table.table .text-muted,
+table.table .text-muted * {
+    color: #000000 !important;
+}
+
+/* Card body text - đảm bảo text trong card là màu đen */
+.card-body,
+.card-body *,
+.card-body p,
+.card-body span,
+.card-body div,
+.card-body td,
+.card-body th,
+.card-body label {
+    color: #000000 !important;
+}
+
+/* Override text-muted trong card */
+.card-body .text-muted,
+.card-body .text-muted * {
+    color: #000000 !important;
+}
+
+/* Form labels và text trong form */
+.form-label,
+label,
+.form-control,
+.form-control:read-only,
+.form-control:disabled {
+    color: #000000 !important;
+}
+
+/* DataTables - đảm bảo text trong DataTables là màu đen */
+.dataTables_wrapper,
+.dataTables_wrapper *,
+.dataTables_wrapper .table th,
+.dataTables_wrapper .table td {
+    color: #000000 !important;
+}
+
+/* Badge trong bảng - giữ màu background nhưng text đen hoặc trắng tùy background */
+.table .badge,
+table.table .badge {
+    color: #ffffff !important;
+}
+
+/* Badge secondary/text-muted trong bảng - text đen */
+.table .badge-secondary,
+.table .badge-light,
+table.table .badge-secondary,
+table.table .badge-light {
+    background-color: #6c757d !important;
+    color: #ffffff !important;
+}
+
+/* Đảm bảo tất cả text trong CRUD list view là màu đen */
+.card .card-body .table th,
+.card .card-body .table td,
+.card .card-body table th,
+.card .card-body table td {
+    color: #000000 !important;
+}
+
+/* Table striped rows - đảm bảo text vẫn đen */
+.table-striped tbody tr:nth-of-type(odd) td,
+.table-striped tbody tr:nth-of-type(odd) th {
+    color: #000000 !important;
+}
+
+.table-striped tbody tr:nth-of-type(even) td,
+.table-striped tbody tr:nth-of-type(even) th {
+    color: #000000 !important;
+}
+
+/* Table hover - text vẫn đen khi hover */
+.table-hover tbody tr:hover td,
+.table-hover tbody tr:hover th {
+    color: #000000 !important;
+}
+
 
 
 

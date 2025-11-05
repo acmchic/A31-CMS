@@ -21,7 +21,7 @@ body {
     background-color: #ffffff !important;
 }
 
-/* Apply Inter font globally */
+/* Apply Roboto font globally */
 *:not([class*="la-"]):not([class*="fa-"]):not([class*="icon-"]):not(.icon):not(i) {
     font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif !important;
 }

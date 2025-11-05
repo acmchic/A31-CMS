@@ -28,3 +28,6 @@
 @if (backpack_theme_config('vite_styles') && count(backpack_theme_config('vite_styles')))
     @vite(backpack_theme_config('vite_styles'))
 @endif
+
+{{-- Custom styles được load sau tất cả CSS để override --}}
+@includeIf('vendor.backpack.ui.inc.header_styles')

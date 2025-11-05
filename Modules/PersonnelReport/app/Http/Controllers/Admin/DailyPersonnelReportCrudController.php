@@ -497,8 +497,10 @@ class DailyPersonnelReportCrudController extends CrudController
             abort(404, 'Phòng ban không tồn tại.');
         }
         
-        // Get all active employees in this department
-        $employees = $department->employees()->active()->get();
+        // Get all active employees in this department with relationships
+        $employees = $department->employees()->active()
+            ->with(['position', 'department'])
+            ->get();
         
         // Get report date from query string or use today
         $reportDate = request('report_date', now()->format('Y-m-d'));
@@ -582,13 +584,20 @@ class DailyPersonnelReportCrudController extends CrudController
             }
         }
         
+        // Kiểm tra nếu ngày báo cáo là quá khứ (trước ngày hiện tại)
+        // So sánh với start of today để chính xác hơn
+        $reportDateCarbon = \Carbon\Carbon::parse($reportDate)->startOfDay();
+        $todayCarbon = \Carbon\Carbon::today()->startOfDay();
+        $isReadOnly = $reportDateCarbon->lt($todayCarbon); // Less than today = past date
+        
         return view('personnelreport::daily_report_create_v2', [
             'crud' => $this->crud,
             'department' => $department,
             'employees' => $employees,
             'reportDate' => $reportDate,
             'existingReport' => $existingReport,
-            'absentEmployees' => $absentEmployees
+            'absentEmployees' => $absentEmployees,
+            'isReadOnly' => $isReadOnly
         ]);
     }
     

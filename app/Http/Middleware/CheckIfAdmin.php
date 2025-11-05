@@ -66,6 +66,38 @@ class CheckIfAdmin
             return $this->respondToUnauthorizedRequest($request);
         }
 
+        // Allow dashboard access for all authenticated users
+        if ($request->routeIs('backpack.dashboard') || $request->is('dashboard') || $request->is('admin/dashboard')) {
+            return $next($request);
+        }
+
+        // Allow profile routes for all authenticated users (they can only edit their own profile)
+        $profileRoutes = [
+            'backpack.account.info',
+            'admin.profile.edit',
+            'admin.profile.update',
+            'admin.profile.upload-photo',
+            'admin.profile.upload-signature',
+            'admin.profile.change-password',
+            'admin.profile.update-pin',
+            'admin.profile.delete-photo',
+            'admin.profile.delete-signature',
+            'backpack.account.info.store'
+        ];
+        
+        foreach ($profileRoutes as $routeName) {
+            if ($request->routeIs($routeName)) {
+                return $next($request);
+            }
+        }
+        
+        // Also check by path patterns
+        if ($request->is('edit-account-info') || $request->is('account/info') || 
+            $request->is('admin/edit-account-info') || $request->is('admin/account/info') ||
+            $request->is('profile*') || $request->is('admin/profile*')) {
+            return $next($request);
+        }
+
         if (! $this->checkIfUserIsAdmin(backpack_user())) {
             return $this->respondToUnauthorizedRequest($request);
         }

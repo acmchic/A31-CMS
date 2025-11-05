@@ -237,8 +237,79 @@
     h6 em {
         font-weight: normal;
     }
+    
+    /* Đổi màu text từ xám sang đen */
+    .form-label,
+    .form-label.small,
+    label,
+    .card-body label,
+    .card-body .form-label {
+        color: #000 !important;
+    }
+    
+    .form-control,
+    .form-control[readonly] {
+        color: #000 !important;
+    }
+    
+    .card-body,
+    .card-body * {
+        color: #000 !important;
+    }
+    
+    .card-body h6,
+    .card-body h6 strong {
+        color: #000 !important;
+    }
+    
+    /* Force all text to black - more specific */
+    .table th,
+    .table td,
+    .table tbody td,
+    .table thead th,
+    .table tbody tr td,
+    .card-body,
+    .card-body *,
+    .card-body p,
+    .card-body strong,
+    .card-body em,
+    .text-muted,
+    label,
+    .form-label,
+    .form-control,
+    .form-control[readonly] {
+        color: #000 !important;
+    }
+    
+    /* Override Bootstrap text-muted */
+    .text-muted,
+    .text-muted * {
+        color: #000 !important;
+    }
+    
+    /* Table specific */
+    table.table td,
+    table.table th {
+        color: #000 !important;
+    }
+    
+    table.table tbody tr td,
+    table.table tbody tr td strong {
+        color: #000 !important;
+    }
+    
+    /* Ensure all text in cards is black */
+    .card .card-body,
+    .card .card-body *,
+    .card .card-body p,
+    .card .card-body strong,
+    .card .card-body td,
+    .card .card-body th {
+        color: #000 !important;
+    }
 </style>
 @endsection
+
 
 
 

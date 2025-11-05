@@ -12,6 +12,28 @@ class Employee extends Model
 {
     use HasFactory, SoftDeletes, CrudTrait;
 
+    /**
+     * Boot the model.
+     * Tự động sync dữ liệu sang User khi Employee được update
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Sync dữ liệu sang User khi Employee được updated
+        static::updated(function ($employee) {
+            $employee->syncToUser();
+        });
+
+        // Sync dữ liệu sang User khi Employee được created (nếu có user liên kết)
+        static::created(function ($employee) {
+            // Chỉ sync nếu user đã được tạo trước đó
+            if ($employee->user) {
+                $employee->syncToUser();
+            }
+        });
+    }
+
     protected $fillable = [
         'name',
         'date_of_birth',
@@ -91,5 +113,40 @@ class Employee extends Model
     public function getStatusTextAttribute()
     {
         return $this->is_active ? 'Đang làm việc' : 'Đã nghỉ việc';
+    }
+
+    /**
+     * Sync dữ liệu từ Employee sang User.
+     * Employee là Single Source of Truth cho thông tin nhân viên.
+     * 
+     * @return void
+     */
+    public function syncToUser()
+    {
+        $user = $this->user;
+        
+        if (!$user) {
+            return;
+        }
+
+        // Sync name và department_id từ Employee sang User
+        $syncData = [
+            'name' => $this->name,
+            'department_id' => $this->department_id,
+        ];
+
+        // Chỉ update các field đã thay đổi để tránh trigger loop
+        $hasChanges = false;
+        if ($user->name !== $this->name) {
+            $hasChanges = true;
+        }
+        if ($user->department_id != $this->department_id) {
+            $hasChanges = true;
+        }
+
+        if ($hasChanges) {
+            // Sử dụng updateQuietly để tránh trigger events
+            $user->updateQuietly($syncData);
+        }
     }
 }

@@ -21,11 +21,6 @@ class DashboardController extends Controller
      */
     public function dashboard()
     {
-        // Check dashboard permission
-        if (!PermissionHelper::userCan('dashboard.view')) {
-            abort(403, 'Bạn không có quyền truy cập dashboard.');
-        }
-
         // Get statistics
         $stats = [
             'departments' => Department::count(),

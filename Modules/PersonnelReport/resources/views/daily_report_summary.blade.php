@@ -5,10 +5,10 @@
     <!-- Modern Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card shadow-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                <div class="card-body text-center text-white py-4">
-                    <h3 class="mb-2"><i class="la la-calendar-check"></i> BÁO CÁO QUÂN SỐ HÀNG NGÀY</h3>
-                    <h5 class="mb-0">Sổ Tổng Hợp Quân Số Toàn Nhà Máy A31</h5>
+            <div class="card bg-gradient-primary text-white shadow-lg" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;">
+                <div class="card-body text-center py-4" style="color: #ffffff !important;">
+                    <h3 class="mb-2" style="color: #ffffff !important;"><i class="la la-calendar-check" style="color: #ffffff !important;"></i> BÁO CÁO QUÂN SỐ HÀNG NGÀY</h3>
+                    <h5 class="mb-0" style="color: #ffffff !important;">Sổ Tổng Hợp Quân Số Toàn Nhà Máy A31</h5>
                 </div>
             </div>
         </div>
@@ -26,8 +26,8 @@
                                 <input type="date" name="report_date" class="form-control" value="{{ $selectedDate }}" required>
                             </div>
                             <div class="col-md-4">
-                                <button type="submit" class="btn btn-primary btn-block">
-                                    <i class="la la-search"></i> Xem báo cáo
+                                <button type="submit" class="btn btn-primary btn-block" style="color: #ffffff !important;">
+                                    <i class="la la-search" style="color: #ffffff !important;"></i> Xem báo cáo
                                 </button>
                             </div>
                         </div>
@@ -133,7 +133,7 @@
                                         $grandTotal['khac'] += $khac;
                                     @endphp
                                     
-                                    <tr class="{{ $report ? '' : 'text-muted' }}">
+                                    <tr class="{{ $report ? '' : '' }}">
                                         <td><strong>{{ $dept->name }}</strong></td>
                                         <td class="text-center">TỔNG</td>
                                         <td class="text-center">{{ $total }}</td>
@@ -287,7 +287,7 @@
                     </table>
                     
                     @if(!$hasAbsentEmployees)
-                        <p class="text-muted mb-0"><em>Không có nhân viên vắng mặt.</em></p>
+                        <p class="text-dark mb-0"><em>Không có nhân viên vắng mặt.</em></p>
                     @endif
                 </div>
             </div>
@@ -323,13 +323,133 @@
     vertical-align: middle !important;
 }
 
-.table thead th {
-    font-weight: bold;
-    font-size: 14px;
+/* ============================================
+   CHUẨN HÓA FONT SIZE CHO TRANG SUMMARY
+   ============================================ */
+
+/* Header gradient - đồng nhất cho cả 2 trang */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
 }
 
+/* Đảm bảo text trong header luôn màu trắng - CSS mạnh nhất */
+.card.bg-gradient-primary,
+.card.bg-gradient-primary *,
+.card.bg-gradient-primary h3,
+.card.bg-gradient-primary h4,
+.card.bg-gradient-primary h5,
+.card.bg-gradient-primary p,
+.card.bg-gradient-primary strong,
+.card.bg-gradient-primary i,
+.card.bg-gradient-primary .card-body,
+.card.bg-gradient-primary .card-body *,
+.card.bg-gradient-primary .card-body h3,
+.card.bg-gradient-primary .card-body h5,
+.card.bg-gradient-primary .card-body strong {
+    color: #ffffff !important;
+}
+
+/* Header chính */
+h3 {
+    font-size: 1.5rem !important;
+    font-weight: 600 !important;
+}
+
+h5 {
+    font-size: 1.1rem !important;
+    font-weight: 500 !important;
+}
+
+/* Labels */
+.form-label,
+label {
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+}
+
+/* Form controls */
+.form-control {
+    font-size: 0.95rem !important;
+}
+
+/* Table headers */
+.table thead th {
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+}
+
+/* Table cells */
 .table tbody td {
-    font-size: 13px;
+    font-size: 0.9rem !important;
+    color: #000 !important;
+}
+
+/* Badge */
+.badge-lg {
+    font-size: 1rem !important;
+}
+
+/* Card headers */
+.card-header h5 {
+    font-size: 1.1rem !important;
+    font-weight: 600 !important;
+}
+
+/* Buttons */
+.btn {
+    font-size: 0.95rem !important;
+}
+
+/* Đảm bảo text trong nút btn-primary màu trắng */
+.btn-primary,
+.btn-primary *,
+.btn-primary i,
+.btn-primary span {
+    color: #ffffff !important;
+}
+
+/* Force all text to black */
+.table th,
+.table td,
+.table tbody td,
+.table thead th,
+.table tbody tr td,
+.card-body,
+.card-body *,
+.card-body p,
+.card-body strong,
+.card-body em,
+.text-muted,
+label,
+.form-label {
+    color: #000 !important;
+}
+
+/* Override Bootstrap text-muted */
+.text-muted,
+.text-muted * {
+    color: #000 !important;
+}
+
+/* Table specific */
+table.table td,
+table.table th {
+    color: #000 !important;
+}
+
+table.table tbody tr td,
+table.table tbody tr td strong {
+    color: #000 !important;
+}
+
+/* Ensure all text in cards is black */
+.card .card-body,
+.card .card-body *,
+.card .card-body p,
+.card .card-body strong,
+.card .card-body td,
+.card .card-body th {
+    color: #000 !important;
 }
 </style>
 @endsection

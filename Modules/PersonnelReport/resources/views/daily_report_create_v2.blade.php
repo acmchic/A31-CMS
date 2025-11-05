@@ -7,10 +7,21 @@
     $totalEmployees = $employees->count();
     $presentCount = $totalEmployees - $absentCount;
     
+    // Kiểm tra chế độ read-only (ngày quá khứ)
+    $isReadOnly = $isReadOnly ?? false;
+    
+    // Tính danh sách nhân viên có mặt (loại trừ nhân viên vắng mặt)
+    $absentEmployeeIds = array_column($absentEmployees, 'employee_id');
+    $presentEmployees = $employees->filter(function($employee) use ($absentEmployeeIds) {
+        return !in_array($employee->id, $absentEmployeeIds);
+    });
+    
     // Debug
     \Log::info('Create-2 View Data', [
         'absentEmployees_count' => count($absentEmployees),
-        'absentEmployees' => $absentEmployees
+        'absentEmployees' => $absentEmployees,
+        'isReadOnly' => $isReadOnly,
+        'presentEmployees_count' => $presentEmployees->count()
     ]);
 @endphp
 
@@ -19,12 +30,10 @@
     <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card bg-gradient-primary text-white shadow-lg">
-                <div class="card-body text-center py-3">
-                    <h4 class="mb-0">
-                        <i class="la la-calendar-check"></i> BÁO CÁO QUÂN SỐ HÀNG NGÀY
-                    </h4>
-                    <p class="mb-0 mt-1"><strong>{{ $department->name }}</strong></p>
+            <div class="card bg-gradient-primary text-white shadow-lg" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;">
+                <div class="card-body text-center py-4" style="color: #ffffff !important;">
+                    <h3 class="mb-2" style="color: #ffffff !important;"><i class="la la-calendar-check" style="color: #ffffff !important;"></i> BÁO CÁO QUÂN SỐ HÀNG NGÀY</h3>
+                    <h5 class="mb-0" style="color: #ffffff !important;"><strong style="color: #ffffff !important;">{{ $department->name }}</strong></h5>
                 </div>
             </div>
         </div>
@@ -36,8 +45,8 @@
             <label class="form-label"><strong>Chọn ngày báo cáo:</strong></label>
             <div class="input-group">
                 <input type="date" id="report-date-input" class="form-control" value="{{ $reportDate }}">
-                <button type="button" class="btn btn-primary" onclick="changeDate()">
-                    <i class="la la-search"></i> Xem
+                <button type="button" class="btn btn-primary" onclick="changeDate()" style="color: #ffffff !important;">
+                    <i class="la la-search" style="color: #ffffff !important;"></i> Xem
                 </button>
             </div>
         </div>
@@ -48,7 +57,7 @@
         <div class="col-md-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-body text-center bg-light">
-                    <h6 class="text-muted mb-2">TỔNG QUÂN SỐ</h6>
+                    <h6 class="text-dark mb-2">TỔNG QUÂN SỐ</h6>
                     <h2 class="mb-0 text-dark" id="stat-total">{{ $totalEmployees }}</h2>
                 </div>
             </div>
@@ -56,7 +65,7 @@
         <div class="col-md-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-body text-center" style="background-color: #d4edda;">
-                    <h6 class="text-muted mb-2">CÓ MẶT</h6>
+                    <h6 class="text-dark mb-2">CÓ MẶT</h6>
                     <h2 class="mb-0 text-success" id="stat-present">{{ $presentCount }}</h2>
                 </div>
             </div>
@@ -64,7 +73,7 @@
         <div class="col-md-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-body text-center" style="background-color: #f8d7da;">
-                    <h6 class="text-muted mb-2">VẮNG MẶT</h6>
+                    <h6 class="text-dark mb-2">VẮNG MẶT</h6>
                     <h2 class="mb-0 text-danger" id="stat-absent">{{ $absentCount }}</h2>
                 </div>
             </div>
@@ -76,7 +85,7 @@
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header bg-light">
-                    <h6 class="mb-0"><strong>Chi tiết lý do vắng mặt:</strong></h6>
+                    <h5 class="mb-0"><strong>Chi tiết lý do vắng mặt:</strong></h5>
                 </div>
                 <div class="card-body">
                     <div class="row text-center">
@@ -111,12 +120,13 @@
         </div>
     </div>
 
+    @if(!$isReadOnly)
     <!-- Add Absent Employee Form -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header bg-success text-white">
-                    <h6 class="mb-0"><i class="la la-user-plus"></i> <strong>Thêm nhân viên vắng mặt</strong></h6>
+                    <h5 class="mb-0"><i class="la la-user-plus"></i> <strong>Thêm nhân viên vắng mặt</strong></h5>
                 </div>
                 <div class="card-body">
                     <div class="row align-items-end">
@@ -166,13 +176,14 @@
             </div>
         </div>
     </div>
+    @endif
 
     <!-- Absent Employees List -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header bg-light">
-                    <h6 class="mb-0"><strong>Danh sách nhân viên vắng mặt</strong></h6>
+                    <h5 class="mb-0"><strong>Danh sách nhân viên vắng mặt</strong></h5>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -184,13 +195,15 @@
                                     <th width="15%">Chức vụ</th>
                                     <th width="15%">Lý do</th>
                                     <th width="30%">Ghi chú</th>
+                                    @if(!$isReadOnly)
                                     <th width="10%">Thao tác</th>
+                                    @endif
                                 </tr>
                             </thead>
                             <tbody id="absent-tbody">
                                 @if($absentCount == 0)
                                 <tr id="no-data-row">
-                                    <td colspan="6" class="text-center text-muted">
+                                    <td colspan="{{ $isReadOnly ? '5' : '6' }}" class="text-center text-dark">
                                         <i class="la la-inbox la-3x"></i>
                                         <p class="mb-0">Chưa có nhân viên vắng mặt</p>
                                     </td>
@@ -216,11 +229,13 @@
                                             <td>{{ $employee->position->name ?? '-' }}</td>
                                             <td><span class="badge badge-info">{{ $reasonText }}</span></td>
                                             <td>{{ $absent['note'] ?? '-' }}</td>
+                                            @if(!$isReadOnly)
                                             <td>
                                                 <button type="button" class="btn btn-sm btn-danger" onclick="removeAbsent(this)">
                                                     <i class="la la-trash"></i>
                                                 </button>
                                             </td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 @endif
@@ -232,6 +247,7 @@
         </div>
     </div>
 
+    @if(!$isReadOnly)
     <!-- Submit Form -->
     <form method="POST" action="{{ route('daily-personnel-report.store-2') }}" id="report-form">
         @csrf
@@ -239,7 +255,7 @@
         <input type="hidden" name="report_date" id="hidden-report-date" value="{{ $reportDate }}">
         <input type="hidden" name="absent_employees" id="hidden-absent-employees" value="">
 
-        <div class="row">
+        <div class="row mb-4">
             <div class="col-12 text-center">
                 <button type="submit" class="btn btn-primary btn-lg px-5">
                     <i class="la la-save"></i> {{ $existingReport ? 'Cập nhật báo cáo' : 'Lưu báo cáo' }}
@@ -247,13 +263,78 @@
             </div>
         </div>
     </form>
+    @endif
+
+    <!-- Present Employees List -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><strong>Danh sách nhân viên có mặt</strong></h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="present-table">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th width="5%">#</th>
+                                    <th width="30%">Họ tên</th>
+                                    <th width="20%">Chức vụ</th>
+                                    <th width="15%">Cấp bậc</th>
+                                    <th width="30%">Phòng ban</th>
+                                </tr>
+                            </thead>
+                            <tbody id="present-tbody">
+                                @if($presentEmployees->count() == 0)
+                                <tr id="no-present-data-row">
+                                    <td colspan="5" class="text-center text-dark">
+                                        <i class="la la-inbox la-3x"></i>
+                                        <p class="mb-0">Không có nhân viên có mặt</p>
+                                    </td>
+                                </tr>
+                                @else
+                                    @foreach($presentEmployees as $index => $employee)
+                                        <tr>
+                                            <td>{{ $index + 1 }}</td>
+                                            <td><strong>{{ $employee->name }}</strong></td>
+                                            <td>{{ $employee->position->name ?? '-' }}</td>
+                                            <td>{{ $employee->rank_code ?? '-' }}</td>
+                                            <td>{{ $employee->department->name ?? '-' }}</td>
+                                        </tr>
+                                    @endforeach
+                                @endif
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal removed - using separate page instead -->
 
 <style>
+/* Header gradient - đồng nhất cho cả 2 trang */
 .bg-gradient-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+/* Đảm bảo text trong header luôn màu trắng - CSS mạnh nhất */
+.card.bg-gradient-primary,
+.card.bg-gradient-primary *,
+.card.bg-gradient-primary h3,
+.card.bg-gradient-primary h4,
+.card.bg-gradient-primary h5,
+.card.bg-gradient-primary p,
+.card.bg-gradient-primary strong,
+.card.bg-gradient-primary i,
+.card.bg-gradient-primary .card-body,
+.card.bg-gradient-primary .card-body *,
+.card.bg-gradient-primary .card-body h3,
+.card.bg-gradient-primary .card-body h5,
+.card.bg-gradient-primary .card-body strong {
+    color: #ffffff !important;
 }
 
 .card {
@@ -402,6 +483,97 @@ html {
 .select2-container--default .select2-selection--single .select2-selection__rendered {
     line-height: 36px;
 }
+
+/* ============================================
+   CHUẨN HÓA FONT SIZE CHO TRANG CREATE-2
+   ============================================ */
+
+/* Header chính - đồng nhất với summary page */
+.container-fluid h3,
+.container-fluid h4 {
+    font-size: 1.5rem !important;
+    font-weight: 600 !important;
+}
+
+.container-fluid h5 {
+    font-size: 1.1rem !important;
+    font-weight: 500 !important;
+}
+
+/* Card headers - đồng nhất tất cả */
+.card-header h5,
+.card-header h6 {
+    font-size: 1.1rem !important;
+    font-weight: 600 !important;
+}
+
+/* Statistics cards labels */
+.card-body h6.text-dark {
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+}
+
+/* Statistics numbers */
+.card-body h2 {
+    font-size: 2rem !important;
+    font-weight: 700 !important;
+}
+
+/* Labels trong form */
+.card-body label,
+.card-body label strong {
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+}
+
+/* Form controls - đồng nhất */
+.card-body .form-control,
+.card-body select,
+.card-body input,
+#report-date-input {
+    font-size: 0.95rem !important;
+    padding: 0.5rem 0.75rem !important;
+}
+
+/* Badge trong "Chi tiết lý do vắng mặt" */
+.badge-lg {
+    font-size: 0.95rem !important;
+    padding: 0.5rem 1rem !important;
+}
+
+.badge-lg strong {
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+}
+
+/* Table headers */
+.table thead th {
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+}
+
+/* Table cells */
+.table tbody td {
+    font-size: 0.9rem !important;
+}
+
+/* Buttons */
+.btn {
+    font-size: 0.95rem !important;
+}
+
+.btn-lg {
+    font-size: 1rem !important;
+    padding: 0.6rem 1.5rem !important;
+}
+
+/* Đảm bảo text trong nút btn-primary màu trắng */
+.btn-primary,
+.btn-primary *,
+.btn-primary i,
+.btn-primary span {
+    color: #ffffff !important;
+}
 </style>
 
 <script>
@@ -412,10 +584,22 @@ const departmentId = {{ $department->id }};
 // Initialize absent employees from backend
 let absentEmployees = @json($absentEmployees);
 
+// Check if read-only mode (past date)
+const isReadOnly = {{ $isReadOnly ? 'true' : 'false' }};
+
 document.addEventListener('DOMContentLoaded', function() {
     // Update statistics on load
     updateStatistics();
     updateReasonBreakdown();
+    updatePresentEmployeesTable();
+    
+    // Disable form inputs if read-only
+    if (isReadOnly) {
+        const dateInput = document.getElementById('report-date-input');
+        if (dateInput) {
+            dateInput.disabled = false; // Allow changing date to view other reports
+        }
+    }
 });
 
 function changeDate() {
@@ -426,6 +610,12 @@ function changeDate() {
 }
 
 function addAbsentEmployee() {
+    // Prevent adding if read-only
+    if (isReadOnly) {
+        alert('Không thể thêm nhân viên vắng mặt cho báo cáo quá khứ.');
+        return;
+    }
+    
     const employeeSelect = document.getElementById('select-employee');
     const reasonSelect = document.getElementById('select-reason');
     const noteInput = document.getElementById('input-note');
@@ -476,6 +666,7 @@ function addAbsentEmployee() {
     // Update statistics
     updateStatistics();
     updateReasonBreakdown();
+    updatePresentEmployeesTable();
 
     // Reset form
     employeeSelect.value = '';
@@ -510,23 +701,33 @@ function addRowToTable(employee, reason, note) {
     row.setAttribute('data-reason', reason);
     row.setAttribute('data-note', note);
 
-    row.innerHTML = `
-        <td>${rowNumber}</td>
-        <td><strong>${employee.name}</strong></td>
-        <td>${employee.position ? employee.position.name : '-'}</td>
-        <td><span class="badge badge-info">${reasonText}</span></td>
-        <td>${note || '-'}</td>
+    const actionColumn = isReadOnly ? '' : `
         <td>
             <button type="button" class="btn btn-sm btn-danger" onclick="removeAbsent(this)">
                 <i class="la la-trash"></i>
             </button>
         </td>
     `;
+    
+    row.innerHTML = `
+        <td>${rowNumber}</td>
+        <td><strong>${employee.name}</strong></td>
+        <td>${employee.position ? employee.position.name : '-'}</td>
+        <td><span class="badge badge-info">${reasonText}</span></td>
+        <td>${note || '-'}</td>
+        ${actionColumn}
+    `;
 
     tbody.appendChild(row);
 }
 
 function removeAbsent(button) {
+    // Prevent removing if read-only
+    if (isReadOnly) {
+        alert('Không thể xóa nhân viên vắng mặt từ báo cáo quá khứ.');
+        return;
+    }
+    
     if (!confirm('Bạn có chắc muốn xóa nhân viên này khỏi danh sách vắng mặt?')) {
         return;
     }
@@ -549,9 +750,10 @@ function removeAbsent(button) {
 
     // If no rows left, show "no data" message
     if (rows.length === 0) {
+        const colspan = isReadOnly ? 5 : 6;
         tbody.innerHTML = `
             <tr id="no-data-row">
-                <td colspan="6" class="text-center text-muted">
+                <td colspan="${colspan}" class="text-center text-dark">
                     <i class="la la-inbox la-3x"></i>
                     <p class="mb-0">Chưa có nhân viên vắng mặt</p>
                 </td>
@@ -562,6 +764,7 @@ function removeAbsent(button) {
     // Update statistics
     updateStatistics();
     updateReasonBreakdown();
+    updatePresentEmployeesTable();
 }
 
 function updateStatistics() {
@@ -596,10 +799,59 @@ function updateReasonBreakdown() {
     document.getElementById('reason-khac').textContent = counts['khac'];
 }
 
+function updatePresentEmployeesTable() {
+    const presentTbody = document.getElementById('present-tbody');
+    if (!presentTbody) return;
+    
+    // Get absent employee IDs
+    const absentEmployeeIds = absentEmployees.map(emp => parseInt(emp.employee_id));
+    
+    // Filter present employees (not in absent list)
+    const presentEmployeesList = employeesData.filter(emp => !absentEmployeeIds.includes(emp.id));
+    
+    // Clear existing rows
+    presentTbody.innerHTML = '';
+    
+    if (presentEmployeesList.length === 0) {
+        presentTbody.innerHTML = `
+            <tr id="no-present-data-row">
+                <td colspan="5" class="text-center text-dark">
+                    <i class="la la-inbox la-3x"></i>
+                    <p class="mb-0">Không có nhân viên có mặt</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    // Add present employees rows
+    presentEmployeesList.forEach((employee, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${index + 1}</td>
+            <td><strong>${employee.name}</strong></td>
+            <td>${employee.position ? employee.position.name : '-'}</td>
+            <td>${employee.rank_code || '-'}</td>
+            <td>${employee.department ? employee.department.name : '-'}</td>
+        `;
+        presentTbody.appendChild(row);
+    });
+}
+
 // Before form submit, update hidden field
-document.getElementById('report-form').addEventListener('submit', function(e) {
-    document.getElementById('hidden-absent-employees').value = JSON.stringify(absentEmployees);
-    document.getElementById('hidden-report-date').value = document.getElementById('report-date-input').value;
-});
+const reportForm = document.getElementById('report-form');
+if (reportForm) {
+    reportForm.addEventListener('submit', function(e) {
+        // Prevent submit if read-only
+        if (isReadOnly) {
+            e.preventDefault();
+            alert('Không thể lưu báo cáo quá khứ.');
+            return false;
+        }
+        
+        document.getElementById('hidden-absent-employees').value = JSON.stringify(absentEmployees);
+        document.getElementById('hidden-report-date').value = document.getElementById('report-date-input').value;
+    });
+}
 </script>
 @endsection

@@ -4,6 +4,7 @@ namespace Modules\RecordManagement\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class RecordManagementController extends Controller
 {
@@ -52,7 +53,7 @@ class RecordManagementController extends Controller
                 'color' => 'warning',
                 'route' => 'an-duong-record',
                 'permission' => 'record_management.view',
-                'count' => \Modules\RecordManagement\Models\AnDuongRecord::count(),
+                'count' => $this->getAnDuongRecordCount(),
             ],
             // TODO: Thêm các loại sổ khác ở đây
         ];
@@ -103,4 +104,19 @@ class RecordManagementController extends Controller
      * Remove the specified resource from storage.
      */
     public function destroy($id) {}
+
+    /**
+     * Get count of AnDuongRecord safely
+     * Returns 0 if table doesn't exist or there's an error
+     */
+    private function getAnDuongRecordCount()
+    {
+        try {
+            return \Modules\RecordManagement\Models\AnDuongRecord::count();
+        } catch (\Exception $e) {
+            // Log error but don't break the page
+            Log::warning('Error counting AnDuongRecord: ' . $e->getMessage());
+            return 0;
+        }
+    }
 }

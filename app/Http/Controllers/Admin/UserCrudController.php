@@ -24,6 +24,10 @@ class UserCrudController extends CrudController
 
     public function setupListOperation()
     {
+        // Prevent Backpack from eager loading 'username' as a relationship
+        // Only eager load actual relationships
+        $this->crud->query->with(['roles', 'permissions']);
+        
         $this->crud->addColumns([
             [
                 'name'  => 'name',
@@ -33,6 +37,17 @@ class UserCrudController extends CrudController
                     $query->orWhere('name', 'like', '%'.$searchTerm.'%')
                           ->orWhere('username', 'like', '%'.$searchTerm.'%');
                 },
+            ],
+            [
+                'name'      => 'user_account',
+                'label'     => 'Tài khoản',
+                'type'      => 'closure',
+                'function'  => function($entry) {
+                    return $entry->getAttribute('username') ?? '-';
+                },
+                'searchable' => false,
+                'orderable' => false,
+                'priority'  => 9999,
             ],
             [ // n-n relationship (with pivot table)
                 'label'     => trans('backpack::permissionmanager.roles'), // Table column heading
@@ -101,6 +116,14 @@ class UserCrudController extends CrudController
                 'label' => trans('backpack::permissionmanager.name'),
                 'type'  => 'text',
             ],
+            [
+                'name'      => 'user_account',
+                'label'     => 'Tài khoản',
+                'type'      => 'closure',
+                'function'  => function($entry) {
+                    return $entry->getAttribute('username') ?? '-';
+                },
+            ],
             [ // n-n relationship (with pivot table)
                 'label'     => trans('backpack::permissionmanager.roles'),
                 'type'      => 'select_multiple',
@@ -165,6 +188,14 @@ class UserCrudController extends CrudController
                 'type'  => 'text',
             ],
             [
+                'name'      => 'username',
+                'label'     => 'Tài khoản',
+                'type'      => 'text',
+                'attributes' => [
+                    'required' => true,
+                ],
+            ],
+            [
                 'name'  => 'email',
                 'label' => trans('backpack::permissionmanager.email'),
                 'type'  => 'email',
@@ -226,12 +257,30 @@ class UserCrudController extends CrudController
             $request->merge(['permissions' => []]);
         }
         
+        // Store username value and remove it from request to prevent Backpack from treating it as relationship
+        $usernameValue = $request->input('username');
+        $request->request->remove('username');
+        
         $this->crud->setRequest($request);
         $this->crud->setRequest($this->crud->validateRequest());
         $this->crud->setRequest($this->handlePasswordInput($this->crud->getRequest()));
         $this->crud->unsetValidation(); // validation has already been run
+        
+        // Call trait store to create the entry
+        $response = $this->traitStore();
+        
+        // Manually set username after creation to avoid relationship processing
+        if ($usernameValue && $this->crud->entry) {
+            $this->crud->entry->username = $usernameValue;
+            $this->crud->entry->save();
+        }
 
-        return $this->traitStore();
+        // Sync dữ liệu từ Employee sang User nếu có employee_id
+        if ($this->crud->entry && $this->crud->entry->employee_id && $this->crud->entry->employee) {
+            $this->crud->entry->syncFromEmployee();
+        }
+
+        return $response;
     }
 
     public function update()
@@ -243,12 +292,30 @@ class UserCrudController extends CrudController
             $request->merge(['permissions' => []]);
         }
         
+        // Store username value and remove it from request to prevent Backpack from treating it as relationship
+        $usernameValue = $request->input('username');
+        $request->request->remove('username');
+        
         $this->crud->setRequest($request);
         $this->crud->setRequest($this->crud->validateRequest());
         $this->crud->setRequest($this->handlePasswordInput($this->crud->getRequest()));
         $this->crud->unsetValidation(); // validation has already been run
+        
+        // Call trait update to update the entry
+        $response = $this->traitUpdate();
+        
+        // Manually set username after update to avoid relationship processing
+        if ($usernameValue && $this->crud->entry) {
+            $this->crud->entry->username = $usernameValue;
+            $this->crud->entry->save();
+        }
 
-        return $this->traitUpdate();
+        // Sync dữ liệu từ Employee sang User nếu có employee_id
+        if ($this->crud->entry && $this->crud->entry->employee_id && $this->crud->entry->employee) {
+            $this->crud->entry->syncFromEmployee();
+        }
+
+        return $response;
     }
 
     /**

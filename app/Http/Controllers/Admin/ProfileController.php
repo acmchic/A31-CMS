@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Intervention\Image\Facades\Image;
 use App\Helpers\PermissionHelper;
 
@@ -35,16 +38,31 @@ class ProfileController extends Controller
     {
         $user = backpack_user();
         
+        // Custom validation for username: check if it's unique except for current user
         $request->validate([
             'name' => 'required|string|max:255',
-            'username' => 'required|string|max:255|unique:users,username,' . $user->id,
+            'username' => [
+                'required',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) use ($user) {
+                    // Check if username exists for another user
+                    $exists = DB::table('users')
+                        ->where('username', $value)
+                        ->where('id', '!=', $user->id)
+                        ->exists();
+                    
+                    if ($exists) {
+                        $fail('Tên đăng nhập đã được sử dụng.');
+                    }
+                },
+            ],
             'profile_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'signature' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ], [
             'name.required' => 'Họ và tên là bắt buộc.',
             'name.max' => 'Họ và tên không được vượt quá 255 ký tự.',
             'username.required' => 'Tên đăng nhập là bắt buộc.',
-            'username.unique' => 'Tên đăng nhập đã được sử dụng.',
             'profile_photo.image' => 'File ảnh đại diện phải là hình ảnh.',
             'profile_photo.mimes' => 'Ảnh đại diện phải có định dạng: jpeg, png, jpg, gif.',
             'profile_photo.max' => 'Kích thước ảnh đại diện không được vượt quá 2MB.',
@@ -100,6 +118,11 @@ class ProfileController extends Controller
         }
 
         $user->update($data);
+
+        // Sync dữ liệu từ User sang Employee nếu có employee_id
+        if ($user->employee_id && $user->employee) {
+            $user->syncToEmployee();
+        }
 
         return redirect()->back()->with('success', 'Thông tin cá nhân đã được cập nhật thành công!');
     }

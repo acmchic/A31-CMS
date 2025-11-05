@@ -15,6 +15,29 @@ class User extends Authenticatable
     use HasFactory, Notifiable, CrudTrait, HasRoles;
 
     /**
+     * Boot the model.
+     * Tự động sync dữ liệu từ Employee khi User được tạo hoặc employee_id thay đổi
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Sync dữ liệu từ Employee khi User được created và có employee_id
+        static::created(function ($user) {
+            if ($user->employee_id && $user->employee) {
+                $user->syncFromEmployee();
+            }
+        });
+
+        // Sync dữ liệu từ Employee khi employee_id được update
+        static::updated(function ($user) {
+            if ($user->isDirty('employee_id') && $user->employee) {
+                $user->syncFromEmployee();
+            }
+        });
+    }
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -98,15 +121,101 @@ class User extends Authenticatable
     }
 
     // Helper method to get user's department
+    // Employee là Single Source of Truth, ưu tiên lấy từ Employee
     public function getDepartment()
     {
-        // First try to get from direct relationship
+        // Ưu tiên lấy từ Employee (Single Source of Truth)
+        if ($this->employee && $this->employee->department) {
+            return $this->employee->department;
+        }
+        
+        // Fallback to direct department relationship
         if ($this->department) {
             return $this->department;
         }
         
-        // Fallback to employee's department
-        return $this->employee ? $this->employee->department : null;
+        return null;
+    }
+
+    /**
+     * Get name - ưu tiên lấy từ Employee (Single Source of Truth) nếu có
+     * Nếu không có Employee, lấy từ User
+     */
+    public function getDisplayNameAttribute()
+    {
+        // Ưu tiên lấy từ Employee (Single Source of Truth)
+        if ($this->employee && $this->employee->name) {
+            return $this->employee->name;
+        }
+        
+        // Fallback về name trong User (đã được sync)
+        return $this->attributes['name'] ?? null;
+    }
+
+    /**
+     * Sync dữ liệu từ Employee sang User.
+     * Được gọi khi User được tạo hoặc employee_id thay đổi.
+     * 
+     * @return void
+     */
+    public function syncFromEmployee()
+    {
+        if (!$this->employee) {
+            return;
+        }
+
+        // Sync name và department_id từ Employee
+        $syncData = [
+            'name' => $this->employee->name,
+            'department_id' => $this->employee->department_id,
+        ];
+
+        // Chỉ update nếu có thay đổi
+        $hasChanges = false;
+        if ($this->getOriginal('name') !== $this->employee->name) {
+            $hasChanges = true;
+        }
+        if ($this->getOriginal('department_id') != $this->employee->department_id) {
+            $hasChanges = true;
+        }
+
+        if ($hasChanges) {
+            // Sử dụng updateQuietly để tránh trigger events loop
+            $this->updateQuietly($syncData);
+        }
+    }
+
+    /**
+     * Sync dữ liệu từ User sang Employee.
+     * Được gọi khi User được cập nhật từ profile page.
+     * 
+     * @return void
+     */
+    public function syncToEmployee()
+    {
+        if (!$this->employee) {
+            return;
+        }
+
+        // Sync name và department_id từ User sang Employee
+        $syncData = [
+            'name' => $this->name,
+            'department_id' => $this->department_id,
+        ];
+
+        // Chỉ update nếu có thay đổi
+        $hasChanges = false;
+        if ($this->employee->name !== $this->name) {
+            $hasChanges = true;
+        }
+        if ($this->employee->department_id != $this->department_id) {
+            $hasChanges = true;
+        }
+
+        if ($hasChanges) {
+            // Sử dụng updateQuietly để tránh trigger events loop
+            $this->employee->updateQuietly($syncData);
+        }
     }
 
     // Check if user can access specific department
