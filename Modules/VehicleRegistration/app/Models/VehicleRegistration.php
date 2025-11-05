@@ -14,12 +14,12 @@ class VehicleRegistration extends Model
 {
     use HasFactory, SoftDeletes, CrudTrait;
     use HasApprovalWorkflow, HasDigitalSignature, ApprovalButtons;
-    
+
     // ✅ Configure ApprovalWorkflow
     protected $workflowType = 'two_level';
     protected $pdfView = 'vehicleregistration::pdf.registration';
     protected $pdfDirectory = 'vehicle_registrations';
-    
+
     // ✅ Set default workflow_status for VehicleRegistration
     protected $attributes = [
         'workflow_status' => 'submitted', // VehicleRegistration starts with 'submitted', not 'pending'
@@ -28,7 +28,7 @@ class VehicleRegistration extends Model
 
     protected $fillable = [
         'user_id',
-        'vehicle_id', 
+        'vehicle_id',
         'driver_id',
         'departure_date',
         'return_date',
@@ -47,7 +47,7 @@ class VehicleRegistration extends Model
         'department_approved_by',
         'department_approved_at',
         'digital_signature_dept',
-        'director_approved_by', 
+        'director_approved_by',
         'director_approved_at',
         'digital_signature_director',
         'rejection_reason',
@@ -97,63 +97,63 @@ class VehicleRegistration extends Model
     {
         return $this->belongsTo(\App\Models\User::class, 'director_approved_by');
     }
-    
+
     // ✅ Map old column names to ApprovalWorkflow convention
     public function getWorkflowLevel1ByAttribute()
     {
         return $this->attributes['department_approved_by'] ?? null;
     }
-    
+
     public function getWorkflowLevel1AtAttribute()
     {
         return isset($this->attributes['department_approved_at']) ? $this->attributes['department_approved_at'] : null;
     }
-    
+
     public function getWorkflowLevel2ByAttribute()
     {
         return $this->attributes['director_approved_by'] ?? null;
     }
-    
+
     public function getWorkflowLevel2AtAttribute()
     {
         return isset($this->attributes['director_approved_at']) ? $this->attributes['director_approved_at'] : null;
     }
-    
+
     // ✅ Override relationships để dùng cột cũ
     public function level1Approver()
     {
         return $this->belongsTo(\App\Models\User::class, 'department_approved_by');
     }
-    
+
     public function level2Approver()
     {
         return $this->belongsTo(\App\Models\User::class, 'director_approved_by');
     }
-    
+
     // ✅ Override module permission
     protected function getModulePermission(): string
     {
         return 'vehicle_registration';
     }
-    
+
     // ✅ Custom PDF title
     public function getPdfTitle(): string
     {
         return 'Đăng ký xe số ' . $this->id;
     }
-    
+
     // ✅ Custom PDF filename for download
     public function getPdfFilename(): string
     {
         return 'dang_ky_xe_' . $this->id . '.pdf';
     }
-    
+
     // ✅ Custom PDF filename pattern for saving
     public function getCustomPdfFilename(): string
     {
         return 'dang_ky_xe.pdf';
     }
-    
+
     // ✅ Override PDF owner username - use requester's username
     public function getCustomPdfOwnerUsername(): string
     {
@@ -161,10 +161,10 @@ class VehicleRegistration extends Model
         if ($this->user) {
             return $this->user->username ?? 'user_' . $this->user->id;
         }
-        
+
         return 'unknown';
     }
-    
+
     // ✅ Custom PDF data
     public function getPdfData(): array
     {
@@ -173,7 +173,7 @@ class VehicleRegistration extends Model
             'approver' => $this->getCurrentLevelApprover(),
             'generated_at' => \Carbon\Carbon::now()->format('d/m/Y H:i:s'),
         ];
-        
+
         return array_merge($baseData, [
             'registration' => $this,
             'requester' => $this->user,
@@ -191,7 +191,7 @@ class VehicleRegistration extends Model
             'approved' => 'Đã phê duyệt',
             'rejected' => 'Đã từ chối'
         ];
-        
+
         return $statuses[$this->status] ?? $this->status;
     }
 
@@ -201,12 +201,12 @@ class VehicleRegistration extends Model
         if ($this->attributes['departure_datetime']) {
             return $this->attributes['departure_datetime'];
         }
-        
+
         // Fallback to combining date and time
         if ($this->departure_date && $this->departure_time) {
             return $this->departure_date->format('Y-m-d') . ' ' . $this->departure_time->format('H:i:s');
         }
-        
+
         return null;
     }
 
@@ -215,12 +215,12 @@ class VehicleRegistration extends Model
         if ($this->attributes['return_datetime']) {
             return $this->attributes['return_datetime'];
         }
-        
+
         // Fallback to combining date and time
         if ($this->return_date && $this->return_time) {
             return $this->return_date->format('Y-m-d') . ' ' . $this->return_time->format('H:i:s');
         }
-        
+
         return null;
     }
 
@@ -234,15 +234,15 @@ class VehicleRegistration extends Model
             'approved' => 'Đã duyệt',
             'rejected' => 'Đã từ chối'
         ];
-        
+
         return $workflows[$this->workflow_status] ?? $this->workflow_status;
     }
-    
+
     // ✅ Override getNextWorkflowStep for VehicleRegistration workflow
     public function getNextWorkflowStep(): ?string
     {
         $currentStep = $this->getCurrentWorkflowStep();
-        
+
         // VehicleRegistration has 3-step workflow: submitted → dept_review → approved
         $workflowMap = [
             'submitted' => 'dept_review',      // Step 1: Assign vehicle (dept)
@@ -251,10 +251,10 @@ class VehicleRegistration extends Model
             'approved' => null,                // Done
             'rejected' => null,                // Done
         ];
-        
+
         return $workflowMap[$currentStep] ?? null;
     }
-    
+
     // ✅ Override canBeApproved - check if has PDF already
     public function canBeApproved(): bool
     {
@@ -262,15 +262,15 @@ class VehicleRegistration extends Model
         if ($this->signed_pdf_path) {
             return false;
         }
-        
+
         if ($this->workflow_status === 'approved') {
             return false;
         }
-        
+
         // Can approve at dept_review or director_review
         return in_array($this->workflow_status, ['dept_review', 'director_review']);
     }
-    
+
     // ✅ Override canBeRejected
     public function canBeRejected(): bool
     {
@@ -278,11 +278,11 @@ class VehicleRegistration extends Model
         if ($this->signed_pdf_path) {
             return false;
         }
-        
+
         if ($this->workflow_status === 'approved') {
             return false;
         }
-        
+
         // Can reject at submitted or dept_review
         return in_array($this->workflow_status, ['submitted', 'dept_review', 'director_review']);
     }
@@ -293,7 +293,7 @@ class VehicleRegistration extends Model
         return $this->workflow_status === 'submitted';
     }
 
-    public function canBeApprovedByDirector() 
+    public function canBeApprovedByDirector()
     {
         return $this->workflow_status === 'dept_review';
     }
@@ -315,16 +315,15 @@ class VehicleRegistration extends Model
         if (!\App\Helpers\PermissionHelper::userCan('vehicle_registration.assign')) {
             return '';
         }
-        
-        // Step 1: Đội trưởng xe phân công (only for submitted status without vehicle)
+
         if ($this->workflow_status === 'submitted' && !$this->vehicle_id) {
             return '<a class="btn btn-sm btn-warning" href="' . backpack_url('vehicle-registration/' . $this->id . '/assign-vehicle') . '">
-                <i class="la la-car"></i> Phân xe & lái xe
+                <i class="la la-car"></i> lái xe
             </a>';
         }
         return '';
     }
-    
+
     // ❌ REMOVED: approveButton(), rejectButton(), downloadPdfButton()
     // ✅ These are now provided by ApprovalButtons trait from ApprovalWorkflow module!
 }

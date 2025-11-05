@@ -257,8 +257,8 @@
 
         <div class="row mb-4">
             <div class="col-12 text-center">
-                <button type="submit" class="btn btn-primary btn-lg px-5">
-                    <i class="la la-save"></i> {{ $existingReport ? 'Cập nhật báo cáo' : 'Lưu báo cáo' }}
+                <button type="submit" class="btn btn-primary btn-lg px-5" id="submit-report-btn">
+                    <i class="la la-paper-plane"></i> {{ $existingReport ? 'Cập nhật báo cáo' : 'Nộp báo cáo' }}
                 </button>
             </div>
         </div>
@@ -437,10 +437,19 @@ html {
 .btn-primary {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border: none;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
 }
 
 .btn-primary:hover {
     background: linear-gradient(135deg, #5568d3 0%, #64408b 100%);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+    transform: translateY(-1px) !important;
+}
+
+.btn-primary:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
 }
 
 /* Statistics cards hover effect */
@@ -535,15 +544,94 @@ html {
     padding: 0.5rem 0.75rem !important;
 }
 
-/* Badge trong "Chi tiết lý do vắng mặt" */
+/* Badge trong "Chi tiết lý do vắng mặt" - Cải thiện độ tương phản */
 .badge-lg {
     font-size: 0.95rem !important;
-    padding: 0.5rem 1rem !important;
+    padding: 0.75rem 1.25rem !important;
+    font-weight: 600 !important;
+    border-radius: 6px !important;
+    display: inline-block !important;
+    min-width: 120px !important;
+    text-align: center !important;
 }
 
 .badge-lg strong {
-    font-size: 1.1rem !important;
+    font-size: 1.2rem !important;
     font-weight: 700 !important;
+    margin-left: 4px !important;
+}
+
+/* Badge Info - Công tác - Màu xanh dương đậm, text trắng */
+.badge-info.badge-lg {
+    background-color: #0d6efd !important;
+    color: #ffffff !important;
+    border: 1px solid #0a58ca !important;
+}
+
+.badge-info.badge-lg,
+.badge-info.badge-lg *,
+.badge-info.badge-lg strong {
+    color: #ffffff !important;
+}
+
+/* Badge Primary - Cơ động - Màu xanh dương đậm, text trắng */
+.badge-primary.badge-lg {
+    background-color: #0066cc !important;
+    color: #ffffff !important;
+    border: 1px solid #0052a3 !important;
+}
+
+.badge-primary.badge-lg,
+.badge-primary.badge-lg *,
+.badge-primary.badge-lg strong {
+    color: #ffffff !important;
+}
+
+/* Badge Success - Học - Màu xanh lá đậm, text trắng */
+.badge-success.badge-lg {
+    background-color: #198754 !important;
+    color: #ffffff !important;
+    border: 1px solid #146c43 !important;
+}
+
+.badge-success.badge-lg,
+.badge-success.badge-lg *,
+.badge-success.badge-lg strong {
+    color: #ffffff !important;
+}
+
+/* Badge Warning - Phép - Màu cam/vàng đậm, text trắng */
+.badge-warning.badge-lg {
+    background-color: #ff9800 !important;
+    color: #ffffff !important;
+    border: 1px solid #e68900 !important;
+}
+
+.badge-warning.badge-lg,
+.badge-warning.badge-lg *,
+.badge-warning.badge-lg strong {
+    color: #ffffff !important;
+}
+
+/* Badge Secondary - Khác - Màu xám đậm, text trắng */
+.badge-secondary.badge-lg {
+    background-color: #6c757d !important;
+    color: #ffffff !important;
+    border: 1px solid #5c636a !important;
+}
+
+.badge-secondary.badge-lg,
+.badge-secondary.badge-lg *,
+.badge-secondary.badge-lg strong {
+    color: #ffffff !important;
+}
+
+/* Hover effect cho badge */
+.badge-lg:hover {
+    opacity: 0.9 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+    transition: all 0.2s ease !important;
 }
 
 /* Table headers */
@@ -563,16 +651,48 @@ html {
 }
 
 .btn-lg {
-    font-size: 1rem !important;
-    padding: 0.6rem 1.5rem !important;
+    font-size: 1.1rem !important;
+    padding: 0.75rem 2rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.3px !important;
+    transition: all 0.2s ease !important;
 }
 
-/* Đảm bảo text trong nút btn-primary màu trắng */
+/* Đảm bảo text trong nút btn-primary màu trắng và dễ đọc */
 .btn-primary,
 .btn-primary *,
 .btn-primary i,
 .btn-primary span {
     color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+}
+
+/* Button submit report - cải thiện style */
+#submit-report-btn {
+    font-size: 1.15rem !important;
+    padding: 0.875rem 2.5rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.5px !important;
+    border-radius: 6px !important;
+    box-shadow: 0 3px 6px rgba(102, 126, 234, 0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+#submit-report-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4) !important;
+    background: linear-gradient(135deg, #5568d3 0%, #64408b 100%) !important;
+}
+
+#submit-report-btn:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3) !important;
+}
+
+#submit-report-btn i {
+    font-size: 1.2rem !important;
+    margin-right: 8px !important;
+    vertical-align: middle !important;
 }
 </style>
 
@@ -845,7 +965,7 @@ if (reportForm) {
         // Prevent submit if read-only
         if (isReadOnly) {
             e.preventDefault();
-            alert('Không thể lưu báo cáo quá khứ.');
+            alert('Không thể nộp báo cáo quá khứ.');
             return false;
         }
         

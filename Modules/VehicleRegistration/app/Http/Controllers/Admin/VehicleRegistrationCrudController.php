@@ -105,18 +105,26 @@ class VehicleRegistrationCrudController extends CrudController
     {
         CRUD::column('id')->label('ID');
         CRUD::column('user_id')->label('Người đăng ký')->type('select')->entity('user')->attribute('name');
-        CRUD::column('departure_datetime')
-            ->label('Ngày đi')
+        
+        // Gộp Ngày đi và Ngày về thành 1 column hiển thị 2 dòng
+        CRUD::column('date_range')
+            ->label('Ngày đi / Ngày về')
             ->type('closure')
+            ->escaped(false) // Cho phép render HTML
             ->function(function($entry) {
-                return DateHelper::formatDate($entry->departure_datetime);
+                $departure = DateHelper::formatDate($entry->departure_datetime);
+                $return = DateHelper::formatDate($entry->return_datetime);
+                return '<div style="line-height: 1.6;">
+                    <div><strong>Đi:</strong> ' . $departure . '</div>
+                    <div><strong>Về:</strong> ' . $return . '</div>
+                </div>';
+            })
+            ->searchLogic(function ($query, $column, $searchTerm) {
+                // Cho phép search theo ngày đi và ngày về
+                $query->orWhere('departure_datetime', 'like', '%'.$searchTerm.'%')
+                      ->orWhere('return_datetime', 'like', '%'.$searchTerm.'%');
             });
-        CRUD::column('return_datetime')
-            ->label('Ngày về')
-            ->type('closure')
-            ->function(function($entry) {
-                return DateHelper::formatDate($entry->return_datetime);
-            });
+        
         CRUD::column('route')->label('Tuyến đường')->limit(50);
         CRUD::column('purpose')->label('Mục đích')->limit(50);
         CRUD::column('passenger_count')->label('Số người');
@@ -137,12 +145,14 @@ class VehicleRegistrationCrudController extends CrudController
             });
         CRUD::column('driver_name')->label('Lái xe')->default('--');
 
-        CRUD::column('status_display')->label('Trạng thái');
+        // Chỉ giữ lại Quy trình, bỏ Trạng thái và Ngày tạo
         CRUD::column('workflow_status_display')->label('Quy trình');
-        CRUD::column('created_at')->label('Ngày tạo')->type('datetime');
 
         // Add modal to the view - inject via JavaScript
         CRUD::addClause('whereRaw', '1=1'); // Dummy clause to ensure setup runs
+        
+        // Set custom list view để load CSS/JS riêng cho module
+        CRUD::setListView('vehicleregistration::list');
     }
 
     protected function setupCreateOperation()

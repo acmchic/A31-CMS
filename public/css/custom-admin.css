@@ -333,6 +333,219 @@ table.table .badge-light {
     color: #000000 !important;
 }
 
+/* ===== CẢI THIỆN MÀU SẮC CHO ACTION BUTTONS VÀ BADGES ===== */
+/* Sửa lại màu đỏ thẫm và xanh đậm thành màu sáng, dễ đọc hơn */
+
+/* Button Danger (Xóa) - Màu đỏ sáng, dễ đọc */
+.btn-danger,
+.btn-danger:not(:disabled):not(.disabled) {
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+.btn-danger:hover,
+.btn-danger:focus,
+.btn-danger:not(:disabled):not(.disabled):hover,
+.btn-danger:not(:disabled):not(.disabled):focus {
+    background-color: #c82333 !important;
+    border-color: #bd2130 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3) !important;
+}
+
+.btn-danger:active,
+.btn-danger:not(:disabled):not(.disabled):active {
+    background-color: #bd2130 !important;
+    border-color: #b21f2d !important;
+    color: #ffffff !important;
+}
+
+/* Button Primary (Xem, Sửa, Tải về) - Màu xanh sáng, dễ đọc */
+.btn-primary,
+.btn-primary:not(:disabled):not(.disabled) {
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:not(:disabled):not(.disabled):hover,
+.btn-primary:not(:disabled):not(.disabled):focus {
+    background-color: #0b5ed7 !important;
+    border-color: #0a58ca !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 4px rgba(13, 110, 253, 0.3) !important;
+}
+
+.btn-primary:active,
+.btn-primary:not(:disabled):not(.disabled):active {
+    background-color: #0a58ca !important;
+    border-color: #0a53be !important;
+    color: #ffffff !important;
+}
+
+/* Button Info - Màu xanh dương sáng */
+.btn-info,
+.btn-info:not(:disabled):not(.disabled) {
+    background-color: #0dcaf0 !important;
+    border-color: #0dcaf0 !important;
+    color: #000000 !important;
+    font-weight: 500 !important;
+}
+
+.btn-info:hover,
+.btn-info:focus,
+.btn-info:not(:disabled):not(.disabled):hover,
+.btn-info:not(:disabled):not(.disabled):focus {
+    background-color: #0aa2c0 !important;
+    border-color: #098a9f !important;
+    color: #000000 !important;
+}
+
+/* Button Success - Màu xanh lá sáng */
+.btn-success,
+.btn-success:not(:disabled):not(.disabled) {
+    background-color: #198754 !important;
+    border-color: #198754 !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+.btn-success:hover,
+.btn-success:focus,
+.btn-success:not(:disabled):not(.disabled):hover,
+.btn-success:not(:disabled):not(.disabled):focus {
+    background-color: #157347 !important;
+    border-color: #146c43 !important;
+    color: #ffffff !important;
+}
+
+/* Button Warning - Màu vàng/cam sáng */
+.btn-warning,
+.btn-warning:not(:disabled):not(.disabled) {
+    background-color: #ffc107 !important;
+    border-color: #ffc107 !important;
+    color: #000000 !important;
+    font-weight: 500 !important;
+}
+
+.btn-warning:hover,
+.btn-warning:focus,
+.btn-warning:not(:disabled):not(.disabled):hover,
+.btn-warning:not(:disabled):not(.disabled):focus {
+    background-color: #ffca2c !important;
+    border-color: #ffc720 !important;
+    color: #000000 !important;
+}
+
+/* Button Secondary - Màu xám sáng */
+.btn-secondary,
+.btn-secondary:not(:disabled):not(.disabled) {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+.btn-secondary:hover,
+.btn-secondary:focus,
+.btn-secondary:not(:disabled):not(.disabled):hover,
+.btn-secondary:not(:disabled):not(.disabled):focus {
+    background-color: #5c636a !important;
+    border-color: #565e64 !important;
+    color: #ffffff !important;
+}
+
+/* Badge Danger - Màu đỏ sáng */
+.badge-danger,
+.badge.bg-danger,
+.badge-danger.bg-danger {
+    background-color: #dc3545 !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+/* Badge Primary - Màu xanh sáng */
+.badge-primary,
+.badge.bg-primary,
+.badge-primary.bg-primary {
+    background-color: #0d6efd !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+/* Badge Info - Màu xanh dương sáng */
+.badge-info,
+.badge.bg-info,
+.badge-info.bg-info {
+    background-color: #0dcaf0 !important;
+    color: #000000 !important;
+    font-weight: 500 !important;
+}
+
+/* Badge Success - Màu xanh lá sáng */
+.badge-success,
+.badge.bg-success,
+.badge-success.bg-success {
+    background-color: #198754 !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+/* Badge Warning - Màu vàng/cam sáng */
+.badge-warning,
+.badge.bg-warning,
+.badge-warning.bg-warning {
+    background-color: #ffc107 !important;
+    color: #000000 !important;
+    font-weight: 500 !important;
+}
+
+/* Badge Secondary - Màu xám sáng */
+.badge-secondary,
+.badge.bg-secondary,
+.badge-secondary.bg-secondary {
+    background-color: #6c757d !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+/* Đảm bảo text trong button và badge luôn có màu tương phản tốt */
+.btn-danger *,
+.btn-primary *,
+.btn-info *,
+.btn-success *,
+.btn-warning *,
+.btn-secondary *,
+.badge-danger *,
+.badge-primary *,
+.badge-info *,
+.badge-success *,
+.badge-warning *,
+.badge-secondary * {
+    color: inherit !important;
+}
+
+/* Icon trong button - đảm bảo màu sắc đúng */
+.btn i,
+.btn .la,
+.btn .fa {
+    color: inherit !important;
+}
+
+/* Override các màu quá tối từ theme khác */
+.btn-danger.btn-dark,
+.btn-primary.btn-dark {
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    color: #ffffff !important;
+}
+
+
 
 
 
