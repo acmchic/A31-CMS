@@ -22,31 +22,23 @@ Route::group([
         (array) config('backpack.base.middleware_key', 'admin')
     ),
 ], function () {
-    // Leave Request routes - require leave.view permission
-    Route::group(['middleware' => 'permission:leave.view'], function () {
+    Route::group(['middleware' => 'permission:leave.view|leave.create'], function () {
         Route::crud('leave-request', LeaveRequestCrudController::class);
         Route::get('leave-request/{id}/download-pdf', [LeaveRequestCrudController::class, 'downloadPdf'])->name('leave-request.download-pdf');
     });
     
-    // Approval routes - require leave.approve permission
     Route::group(['middleware' => 'permission:leave.approve'], function () {
         Route::get('leave-request/{id}/approve', [LeaveRequestCrudController::class, 'approve'])->name('leave-request.approve');
     });
     
-    // Reject routes - require leave.approve permission (same as approve)
     Route::group(['middleware' => 'permission:leave.approve'], function () {
         Route::get('leave-request/{id}/reject', [LeaveRequestCrudController::class, 'reject'])->name('leave-request.reject');
     });
     
-    // Daily Report routes - require report.view permission
     Route::group(['middleware' => 'permission:report.view'], function () {
-        // API endpoint - PHẢI ĐẶT TRƯỚC Route::crud() để tránh conflict
         Route::get('daily-personnel-report/api/department-stats/{departmentId}', [DailyPersonnelReportCrudController::class, 'getDepartmentStats']);
-        
-        // New smart UI route
         Route::get('daily-personnel-report/create-2', [DailyPersonnelReportCrudController::class, 'create2'])->name('daily-personnel-report.create-2');
         Route::post('daily-personnel-report/store-2', [DailyPersonnelReportCrudController::class, 'store2'])->name('daily-personnel-report.store-2');
-        
         Route::crud('daily-personnel-report', DailyPersonnelReportCrudController::class);
     });
 });

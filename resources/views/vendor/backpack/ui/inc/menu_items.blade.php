@@ -8,7 +8,7 @@
 </li>
 
 {{-- Personnel Reports --}}
-@if(backpack_user()->hasPermissionTo('report.view.company') || backpack_user()->hasPermissionTo('report.view') || \App\Helpers\PermissionHelper::userCan('leave.view'))
+@if(backpack_user()->hasPermissionTo('report.view.company') || backpack_user()->hasPermissionTo('report.view') || \App\Helpers\PermissionHelper::userCan('leave.view') || \App\Helpers\PermissionHelper::userCan('leave.create'))
 <li class="nav-item dropdown">
     <a class="nav-link dropdown-toggle" href="#navbar-reports" data-bs-toggle="dropdown" role="button">
         <i class="la la-chart-bar nav-icon"></i> Báo cáo quân số
@@ -33,7 +33,7 @@
         </a>
         @endif
         
-        @if(\App\Helpers\PermissionHelper::userCan('leave.view'))
+        @if(\App\Helpers\PermissionHelper::userCan('leave.view') || \App\Helpers\PermissionHelper::userCan('leave.create'))
         <a class="dropdown-item" href="{{ backpack_url('leave-request') }}">
             <i class="la la-calendar-check"></i> Đăng ký nghỉ phép
         </a>

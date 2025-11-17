@@ -27,15 +27,17 @@ class CheckIfAdmin
      */
     private function checkIfUserIsAdmin($user)
     {
-        // Check if user has any admin-level permissions
         if (!$user) return false;
         
-        // Check if user has any system management permissions
-        return $user->hasAnyPermission([
+        if ($user->hasAnyPermission([
             'user.view', 'user.create', 'user.edit', 'user.delete',
             'role.view', 'role.create', 'role.edit', 'role.delete',
             'permission.view', 'permission.create', 'permission.edit', 'permission.delete'
-        ]);
+        ])) {
+            return true;
+        }
+        
+        return $user->getAllPermissions()->count() > 0;
     }
 
     /**

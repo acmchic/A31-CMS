@@ -6,12 +6,13 @@ echo "=== Building deploy package ==="
 APP_DIR="$(pwd)"
 DEPLOY_DIR="$APP_DIR/deploy"
 
-# reset deploy folder
-rm -rf "$DEPLOY_DIR"
+# create deploy folder if not exists (do not delete existing files)
 mkdir -p "$DEPLOY_DIR"
 
 REMOVED_FILE="$DEPLOY_DIR/removed.txt"
-> "$REMOVED_FILE"
+if [ ! -f "$REMOVED_FILE" ]; then
+    > "$REMOVED_FILE"
+fi
 
 # Helper: copy file or folder preserving structure
 copy_path() {

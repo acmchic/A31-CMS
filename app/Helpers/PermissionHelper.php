@@ -47,26 +47,17 @@ class PermissionHelper
 
     /**
      * Get user's data scope
-     * ✅ Check permissions thực tế thay vì chỉ dựa vào role name
      */
     public static function getUserScope($user, $module = null)
     {
         if (!$user) return 'none';
 
-        // Check actual permissions instead of hardcoding Admin role
-
-        // ✅ Check multiple variations of role names
         if ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc'])) return 'company';
         if ($user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng'])) return 'department';
         if ($user->hasRole(['Nhân sự', 'Nhan Vien', 'Nhân Viên'])) return 'own';
 
-        // ✅ NEW: Check permissions thực tế để xác định scope
-        // Nếu user có bất kỳ permission nào với scope .all hoặc .company → return 'company'
-        // Nếu có .department → return 'department'
-        // Nếu có .own → return 'own'
         $permissions = $user->getAllPermissions()->pluck('name')->toArray();
         
-        // Check for highest scope first
         foreach ($permissions as $perm) {
             if (str_contains($perm, '.view.all')) return 'all';
         }
@@ -83,11 +74,13 @@ class PermissionHelper
             if (str_contains($perm, '.view.own')) return 'own';
         }
         
-        // ✅ Fallback: Nếu có .view permission (không có scope) → cho phép xem all
-        // Điều này hỗ trợ các permission cũ như "leave.view" không có scope
         if ($module) {
             if ($user->hasPermissionTo($module . '.view')) {
-                return 'company'; // Default to company scope if has view permission
+                return 'company';
+            }
+            
+            if ($user->hasPermissionTo($module . '.create')) {
+                return $user->employee_id ? 'own' : 'company';
             }
         }
 

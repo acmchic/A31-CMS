@@ -26,11 +26,8 @@ class LeaveRequestCrudController extends CrudController
         CRUD::setEntityNameStrings('đơn xin nghỉ phép', 'đơn xin nghỉ phép');
 
         CRUD::orderBy('id', 'DESC');
-
-        // ✅ Disable search persistence - không lưu giá trị search cũ
         CRUD::set('list.persistentTable', false);
 
-        // Apply department filtering based on user permissions
         $this->applyDepartmentFilter();
     }
 
