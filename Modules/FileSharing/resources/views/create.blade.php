@@ -26,6 +26,44 @@
             <div class="card-body">
                 <form action="{{ route('file-sharing.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
+                    <!-- Folder Selection -->
+                    <div class="form-group">
+                        <label for="folder_id">Thư mục lưu trữ</label>
+                        <select class="form-control @error('folder_id') is-invalid @enderror" id="folder_id" name="folder_id">
+                            <option value="">-- Thư mục gốc --</option>
+                            @foreach($folderOptions as $id => $label)
+                                <option value="{{ $id }}" {{ old('folder_id', $defaultFolderId) == $id ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('folder_id')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                        <button type="button" class="btn btn-link p-0 mt-2" id="toggle-create-folder">
+                            <i class="la la-plus-circle"></i> Tạo thư mục mới
+                        </button>
+                    </div>
+
+                    <div id="create-folder-section" class="bg-light border rounded p-3 mb-3 d-none">
+                        <div class="form-group">
+                            <label for="new_folder_name" class="required">Tên thư mục mới <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control @error('new_folder_name') is-invalid @enderror" id="new_folder_name" name="new_folder_name" value="{{ old('new_folder_name') }}">
+                            @error('new_folder_name')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="form-group mb-0">
+                            <label for="new_folder_parent">Thuộc thư mục</label>
+                            <select class="form-control @error('new_folder_parent') is-invalid @enderror" id="new_folder_parent" name="new_folder_parent">
+                                <option value="">-- Thư mục gốc --</option>
+                                @foreach($folderOptions as $id => $label)
+                                <option value="{{ $id }}" {{ old('new_folder_parent', $defaultFolderId) == $id ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('new_folder_parent')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
                     
                     <!-- File Upload -->
                     <div class="form-group">
@@ -161,6 +199,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const isPublicCheckbox = document.getElementById('is_public');
     const rolesSection = document.getElementById('roles-section');
     const usersSection = document.getElementById('users-section');
+    const toggleCreateFolderBtn = document.getElementById('toggle-create-folder');
+    const createFolderSection = document.getElementById('create-folder-section');
+    const folderSelect = document.getElementById('folder_id');
+    const newFolderName = document.getElementById('new_folder_name');
+    const newFolderParent = document.getElementById('new_folder_parent');
 
     function toggleAccessSections() {
         if (isPublicCheckbox.checked) {
@@ -174,6 +217,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     isPublicCheckbox.addEventListener('change', toggleAccessSections);
     toggleAccessSections(); // Initial call
+
+    toggleCreateFolderBtn.addEventListener('click', function() {
+        const isHidden = createFolderSection.classList.contains('d-none');
+        createFolderSection.classList.toggle('d-none', !isHidden);
+
+        if (!isHidden) {
+            newFolderName.value = '';
+            newFolderParent.value = '';
+        } else {
+            newFolderParent.value = folderSelect.value;
+        }
+    });
+
+    if (newFolderName.value) {
+        createFolderSection.classList.remove('d-none');
+    }
 });
 </script>
 @endsection

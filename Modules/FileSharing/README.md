@@ -12,6 +12,7 @@ Module chia sẻ file với hệ thống phân quyền cho hệ thống A31 CMS.
 - ✅ Theo dõi số lần download
 - ✅ Giao diện thân thiện với Backpack CRUD
 - ✅ Download file với kiểm tra quyền
+- ✅ Tổ chức thư mục, tạo và upload file vào thư mục
 
 ## 📦 Cài đặt
 

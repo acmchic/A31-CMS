@@ -26,6 +26,8 @@ Route::group([
     
     Route::post('file-sharing', [FileSharingController::class, 'store'])
         ->name('file-sharing.store');
+    Route::post('file-sharing/folders', [FileSharingController::class, 'storeFolder'])
+        ->name('file-sharing.folders.store');
     
     Route::get('file-sharing/{id}', [FileSharingController::class, 'show'])
         ->name('file-sharing.show');

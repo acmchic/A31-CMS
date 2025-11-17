@@ -545,6 +545,70 @@ table.table .badge-light {
     color: #ffffff !important;
 }
 
+.file-action-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.file-action-group .btn {
+    padding: 0.35rem 0.7rem;
+    border-radius: 8px;
+}
+
+.file-action-group form {
+    margin: 0;
+}
+
+@supports not (gap: 0.4rem) {
+    .file-action-group > * + * {
+        margin-left: 0.4rem;
+    }
+}
+
+.folder-grid {
+    gap: 1rem;
+}
+
+.folder-card {
+    min-width: 200px;
+    background-color: #fff;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.folder-card:hover {
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(15, 34, 58, 0.12);
+    transform: translateY(-2px);
+}
+
+.folder-card .font-weight-semibold {
+    font-weight: 600;
+}
+
+.folder-actions-row > * {
+    margin-bottom: 0.5rem;
+}
+
+.folder-action-buttons .btn + .btn {
+    margin-left: 0.5rem;
+}
+
+/* Ensure modals display above custom cards */
+.modal-backdrop {
+    z-index: 1990 !important;
+}
+
+.modal,
+.modal.show {
+    z-index: 2000 !important;
+    pointer-events: auto;
+}
+
+.modal.show .modal-dialog {
+    pointer-events: auto;
+}
+
 
 
 

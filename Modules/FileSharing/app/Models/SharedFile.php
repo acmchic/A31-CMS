@@ -28,6 +28,7 @@ class SharedFile extends Model
         'download_count',
         'expires_at',
         'uploaded_by',
+        'folder_id',
     ];
 
     protected $casts = [
@@ -44,6 +45,14 @@ class SharedFile extends Model
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'uploaded_by');
+    }
+
+    /**
+     * Folder relationship.
+     */
+    public function folder(): BelongsTo
+    {
+        return $this->belongsTo(SharedFolder::class, 'folder_id');
     }
 
     /**

@@ -83,13 +83,64 @@
         </div>
     </div>
 
-    <!-- Upload Button -->
+    <!-- Folder Navigation + Upload -->
     <div class="col-12 mb-3">
-        @if(\App\Helpers\PermissionHelper::userCan('file_sharing.create'))
-            <a href="{{ route('file-sharing.create') }}" class="btn btn-primary">
-                <i class="la la-upload"></i> Upload File
-            </a>
-        @endif
+        <div class="d-flex flex-wrap justify-content-between align-items-center folder-actions-row">
+            <div class="folder-breadcrumbs">
+                <nav aria-label="folder navigation">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="{{ route('file-sharing.index') }}">
+                                <i class="la la-home"></i> Gốc
+                            </a>
+                        </li>
+                        @foreach($folderBreadcrumbs as $folder)
+                            <li class="breadcrumb-item {{ $loop->last ? 'active' : '' }}" {{ $loop->last ? 'aria-current=page' : '' }}>
+                                @if($loop->last)
+                                    {{ $folder->name }}
+                                @else
+                                    <a href="{{ route('file-sharing.index', ['folder' => $folder->id]) }}">{{ $folder->name }}</a>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ol>
+                </nav>
+            </div>
+            <div class="d-flex folder-action-buttons">
+                @if(\App\Helpers\PermissionHelper::userCan('file_sharing.create'))
+                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#createFolderModal">
+                        <i class="la la-folder-plus"></i> Thêm thư mục
+                    </button>
+                    <a href="{{ route('file-sharing.create', ['folder' => optional($currentFolder)->id]) }}" class="btn btn-primary">
+                        <i class="la la-upload"></i> Upload File
+                    </a>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <!-- Subfolders -->
+    <div class="col-12">
+        <div class="mb-4">
+            <h5 class="text-muted mb-3">
+                <i class="la la-folder"></i> Thư mục con
+            </h5>
+            @if($subFolders->isEmpty())
+                <div class="text-muted small">Không có thư mục con nào.</div>
+            @else
+                <div class="folder-grid d-flex flex-wrap">
+                    @foreach($subFolders as $folder)
+                        <a href="{{ route('file-sharing.index', ['folder' => $folder->id]) }}" class="folder-card border rounded d-flex align-items-center px-3 py-2">
+                            <i class="la la-folder mr-2 text-warning"></i>
+                            <div>
+                                <div class="font-weight-semibold">{{ $folder->name }}</div>
+                                <div class="small text-muted">{{ $folder->files_count }} file</div>
+                            </div>
+                        </a>
+                    @endforeach
+                </div>
+            @endif
+        </div>
     </div>
 
     <!-- Files List -->
@@ -125,6 +176,11 @@
                                                     <strong>{{ $file->original_name }}</strong>
                                                     @if($file->description)
                                                         <br><small class="text-muted">{{ Str::limit($file->description, 50) }}</small>
+                                                    @endif
+                                                    @if($file->folder_path)
+                                                        <div class="text-muted small mt-1">
+                                                            <i class="la la-folder-open mr-1"></i>Thư mục: {{ $file->folder_path }}
+                                                        </div>
                                                     @endif
                                                 </div>
                                             </div>
@@ -165,7 +221,7 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <div class="btn-group" role="group">
+                                            <div class="file-action-group d-inline-flex align-items-center">
                                                 <a href="{{ route('file-sharing.show', $file->id) }}" class="btn btn-sm btn-info" title="Xem chi tiết">
                                                     <i class="la la-eye"></i>
                                                 </a>
@@ -209,4 +265,67 @@
         </div>
     </div>
 </div>
+@if(\App\Helpers\PermissionHelper::userCan('file_sharing.create'))
+<!-- Create Folder Modal -->
+<div class="modal fade" id="createFolderModal" tabindex="-1" role="dialog" aria-labelledby="createFolderModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form action="{{ route('file-sharing.folders.store') }}" method="POST">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createFolderModalLabel">Tạo thư mục mới</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="folder_name" class="required">Tên thư mục <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="folder_name" name="name" required>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="parent_folder">Thuộc thư mục</label>
+                        <select class="form-control" id="parent_folder" name="parent_id">
+                            <option value="">-- Thư mục gốc --</option>
+                            @foreach($folderOptions as $id => $label)
+                                <option value="{{ $id }}" {{ optional($currentFolder)->id == $id ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="la la-save"></i> Tạo thư mục
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
+@push('after_scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var createFolderModal = document.getElementById('createFolderModal');
+    if (createFolderModal) {
+        if (createFolderModal.parentNode !== document.body) {
+            document.body.appendChild(createFolderModal);
+        }
+
+        createFolderModal.addEventListener('show.bs.modal', function () {
+            var parentSelect = createFolderModal.querySelector('#parent_folder');
+            var nameInput = createFolderModal.querySelector('#folder_name');
+            if (parentSelect) {
+                parentSelect.value = '{{ optional($currentFolder)->id }}';
+            }
+            if (nameInput) {
+                nameInput.value = '';
+                setTimeout(function () {
+                    nameInput.focus();
+                }, 200);
+            }
+        });
+    }
+});
+</script>
+@endpush
 @endsection
