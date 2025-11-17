@@ -96,8 +96,14 @@ class TcpdfPdfSigner
         if ($approver->signature_path) {
             $signatureImagePath = Storage::disk('public')->path($approver->signature_path);
             if (file_exists($signatureImagePath)) {
-                // Position signature image at fixed coordinates (right side, near approver area)
-                $pdf->Image($signatureImagePath, 130, 220, 50, 20, '', '', '', false, 300, '', false, false, 1);
+                try {
+                    $imagePath = $this->prepareImageForTcpdf($signatureImagePath);
+                    if ($imagePath) {
+                        $pdf->Image($imagePath, 130, 220, 50, 20, '', '', '', false, 300, '', false, false, 1);
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('Cannot add signature image to PDF: ' . $e->getMessage());
+                }
             }
         }
 
@@ -238,5 +244,87 @@ class TcpdfPdfSigner
         ';
 
         return $html;
+    }
+
+    /**
+     * Prepare image for TCPDF - convert PNG with alpha to JPG if needed
+     * Returns path to image file that TCPDF can handle
+     */
+    private function prepareImageForTcpdf($imagePath)
+    {
+        if (!file_exists($imagePath)) {
+            return null;
+        }
+
+        $extension = strtolower(pathinfo($imagePath, PATHINFO_EXTENSION));
+        
+        // If not PNG, return as is
+        if ($extension !== 'png') {
+            return $imagePath;
+        }
+
+        // Check if GD or Imagick is available
+        $hasGd = extension_loaded('gd') && function_exists('imagecreatefrompng');
+        $hasImagick = extension_loaded('imagick');
+
+        // If no image processing extension, try to use image as is (may fail)
+        if (!$hasGd && !$hasImagick) {
+            \Log::warning('No GD or Imagick extension available. PNG image may cause TCPDF error.');
+            return null;
+        }
+
+        // Check if PNG has alpha channel
+        $imageInfo = @getimagesize($imagePath);
+        if (!$imageInfo) {
+            return null;
+        }
+
+        $hasAlpha = ($imageInfo[2] === IMAGETYPE_PNG && ($imageInfo['channels'] ?? 0) === 4);
+
+        // If no alpha channel, can use PNG directly
+        if (!$hasAlpha) {
+            return $imagePath;
+        }
+
+        // PNG has alpha channel - need to convert to JPG
+        $jpgPath = str_replace('.png', '.jpg', $imagePath);
+        $jpgPath = str_replace('.PNG', '.jpg', $jpgPath);
+
+        try {
+            if ($hasImagick) {
+                $imagick = new \Imagick($imagePath);
+                $imagick->setImageBackgroundColor(new \ImagickPixel('white'));
+                $imagick->setImageAlphaChannel(\Imagick::ALPHACHANNEL_REMOVE);
+                $imagick->setImageFormat('jpeg');
+                $imagick->setImageCompressionQuality(90);
+                $imagick->writeImage($jpgPath);
+                $imagick->clear();
+                $imagick->destroy();
+            } elseif ($hasGd) {
+                $png = imagecreatefrompng($imagePath);
+                if (!$png) {
+                    return null;
+                }
+
+                $width = imagesx($png);
+                $height = imagesy($png);
+                $jpg = imagecreatetruecolor($width, $height);
+                
+                imagefill($jpg, 0, 0, imagecolorallocate($jpg, 255, 255, 255));
+                imagecopyresampled($jpg, $png, 0, 0, 0, 0, $width, $height, $width, $height);
+                
+                imagejpeg($jpg, $jpgPath, 90);
+                imagedestroy($png);
+                imagedestroy($jpg);
+            }
+
+            if (file_exists($jpgPath)) {
+                return $jpgPath;
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Failed to convert PNG to JPG: ' . $e->getMessage());
+        }
+
+        return null;
     }
 }
