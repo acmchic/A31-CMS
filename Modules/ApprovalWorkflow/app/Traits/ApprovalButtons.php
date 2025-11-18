@@ -32,7 +32,7 @@ trait ApprovalButtons
 
         return '
         <button class="btn btn-sm btn-success" onclick="showPinModal_' . $this->id . '()">
-            <i class="la la-check"></i> Phê duyệt & Ký số
+            <i class="la la-check"></i> Phê duyệt
         </button>
         <script>
         function showPinModal_' . $this->id . '() {
@@ -49,7 +49,7 @@ trait ApprovalButtons
                 <div class="modal-dialog" style="z-index: 100000 !important;">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">Xác nhận Phê duyệt & Ký số</h5>
+                            <h5 class="modal-title">Xác nhận Phê duyệt</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">

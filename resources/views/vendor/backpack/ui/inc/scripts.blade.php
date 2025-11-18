@@ -2,6 +2,7 @@
 @basset(asset('vendor/popper/popper.min.js'))
 @basset(asset('vendor/noty/noty.min.js'))
 @basset(asset('vendor/sweetalert/sweetalert.min.js'))
+@basset(asset('js/sweet-alert-common.js'))
 
 @if (backpack_theme_config('scripts') && count(backpack_theme_config('scripts')))
     @foreach (backpack_theme_config('scripts') as $path)

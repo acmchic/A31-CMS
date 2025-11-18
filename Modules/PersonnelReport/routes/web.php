@@ -33,6 +33,8 @@ Route::group([
     
     Route::group(['middleware' => 'permission:leave.approve'], function () {
         Route::get('leave-request/{id}/reject', [LeaveRequestCrudController::class, 'reject'])->name('leave-request.reject');
+        Route::post('leave-request/bulk-approve', [LeaveRequestCrudController::class, 'bulkApprove'])->name('leave-request.bulk-approve');
+        Route::post('leave-request/bulk-reject', [LeaveRequestCrudController::class, 'bulkReject'])->name('leave-request.bulk-reject');
     });
     
     Route::group(['middleware' => 'permission:report.view'], function () {

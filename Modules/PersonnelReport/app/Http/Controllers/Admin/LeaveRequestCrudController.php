@@ -28,75 +28,219 @@ class LeaveRequestCrudController extends CrudController
         CRUD::orderBy('id', 'DESC');
         CRUD::set('list.persistentTable', false);
 
-        $this->applyDepartmentFilter();
+        // Don't apply filtering in setup() - apply only in setupListOperation()
+        // This allows show/edit operations to work even if record is filtered out
     }
 
     /**
-     * Apply department filtering based on user permissions - clean approach
+     * Apply filtering based on workflow step and user role
      */
     private function applyDepartmentFilter()
     {
         $user = backpack_user();
-        $scope = PermissionHelper::getUserScope($user, 'leave'); // Pass module name
 
-        // ✅ Debug logging
-        $employeeDeptId = null;
+        // Apply month/year filter first
+        $this->applyMonthYearFilter();
+
+        // Check if filtering by specific workflow_status from URL
+        $statusFilter = request()->get('workflow_status');
+        if ($statusFilter && $statusFilter !== 'all') {
+            // Apply status filter for all users (including admin and leave.review)
+            CRUD::addClause('where', 'workflow_status', $statusFilter);
+            return;
+        }
+
+        // Admin sees everything (when no status filter)
+        if ($user->hasRole('Admin')) {
+            return;
+        }
+
+        // User with leave.review permission sees everything (like admin, when no status filter)
+        if (PermissionHelper::can($user, 'leave.review')) {
+            return;
+        }
+
+        // Apply workflow step filtering
+        $this->applyWorkflowStepFilter($user);
+    }
+
+    /**
+     * Apply month/year filter
+     */
+    private function applyMonthYearFilter()
+    {
+        $monthYear = request()->get('month_year');
+        
+        // If no filter, use current month/year as default
+        if (!$monthYear || $monthYear === 'all') {
+            if (!$monthYear) {
+                // Default to current month/year
+                $currentMonth = now()->format('Y-m');
+                CRUD::addClause('where', function($q) use ($currentMonth) {
+                    $startDate = \Carbon\Carbon::parse($currentMonth . '-01')->startOfMonth();
+                    $endDate = $startDate->copy()->endOfMonth();
+                    
+                    // Filter where from_date or to_date falls within the month
+                    $q->where(function($subQ) use ($startDate, $endDate) {
+                        $subQ->whereBetween('from_date', [$startDate, $endDate])
+                             ->orWhereBetween('to_date', [$startDate, $endDate])
+                             ->orWhere(function($q2) use ($startDate, $endDate) {
+                                 $q2->where('from_date', '<=', $startDate)
+                                    ->where('to_date', '>=', $endDate);
+                             });
+                    });
+                });
+            }
+            return;
+        }
+
+        // Parse month/year (format: YYYY-MM)
+        if (preg_match('/^(\d{4})-(\d{2})$/', $monthYear, $matches)) {
+            $year = $matches[1];
+            $month = $matches[2];
+            $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+            $endDate = $startDate->copy()->endOfMonth();
+
+            CRUD::addClause('where', function($q) use ($startDate, $endDate) {
+                // Filter where from_date or to_date falls within the month
+                $q->where(function($subQ) use ($startDate, $endDate) {
+                    $subQ->whereBetween('from_date', [$startDate, $endDate])
+                         ->orWhereBetween('to_date', [$startDate, $endDate])
+                         ->orWhere(function($q2) use ($startDate, $endDate) {
+                             $q2->where('from_date', '<=', $startDate)
+                                ->where('to_date', '>=', $endDate);
+                         });
+                });
+            });
+        }
+    }
+
+    /**
+     * Filter by workflow step - only show requests at current user's approval step
+     */
+    private function applyWorkflowStepFilter($user)
+    {
+        $statusFilter = request()->get('workflow_status');
+        $isDepartmentHead = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban']);
+        
+        // Reviewer: user with leave.review permission (not just role BGD)
+        $isReviewer = PermissionHelper::can($user, 'leave.review');
+        
+        // Director: BGD role but NOT reviewer (or Giám đốc role)
+        $hasBgdRole = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc']);
+        $hasGiámDocRole = $user->hasRole(['Giám đốc']);
+        $isDirector = ($hasBgdRole && !$isReviewer) || $hasGiámDocRole;
+        
+        $userDepartmentId = $user->department_id;
+
         if ($user->employee_id) {
-            $emp = \Modules\OrganizationStructure\Models\Employee::find($user->employee_id);
-            $employeeDeptId = $emp ? $emp->department_id : null;
+            $emp = Employee::find($user->employee_id);
+            if ($emp && $emp->department_id) {
+                $userDepartmentId = $emp->department_id;
+            }
         }
 
-        \Log::info('LeaveRequest Filter Debug', [
-            'user_id' => $user->id,
-            'user_name' => $user->name,
-            'user_roles' => $user->roles->pluck('name'),
-            'user_permissions' => $user->getAllPermissions()->pluck('name'),
-            'scope' => $scope,
-            'department_id' => $user->department_id,
-            'employee_department_id' => $employeeDeptId,
-        ]);
+        // Build query conditions with OR
+        CRUD::addClause('where', function($q) use ($user, $isDepartmentHead, $isReviewer, $isDirector, $userDepartmentId, $statusFilter) {
+            $hasCondition = false;
 
-        switch ($scope) {
-            case 'all':
-            case 'company':
-                // No filtering - can see all leave requests
-                break;
+            // Step 1: User who created can see their own requests at any status (except rejected)
+            if ($user->employee_id) {
+                $q->where(function($subQ) use ($user, $statusFilter) {
+                    $subQ->where('employee_id', $user->employee_id);
+                    if ($statusFilter && $statusFilter !== 'all') {
+                        $subQ->where('workflow_status', $statusFilter);
+                    } else {
+                        $subQ->where('workflow_status', '!=', EmployeeLeave::WORKFLOW_REJECTED);
+                    }
+                });
+                $hasCondition = true;
+            }
 
-            case 'department':
-                // Can see department's leave requests
-                $departmentId = $user->department_id;
-                if (!$departmentId && $user->employee_id) {
-                    $emp = \Modules\OrganizationStructure\Models\Employee::find($user->employee_id);
-                    $departmentId = $emp ? $emp->department_id : null;
+            // Step 2: Department head can see all status requests in their department (except rejected)
+            if ($isDepartmentHead && $userDepartmentId) {
+                $employeeIds = Employee::where('department_id', $userDepartmentId)->pluck('id');
+                if ($employeeIds->isNotEmpty()) {
+                    if ($hasCondition) {
+                        $q->orWhere(function($subQ) use ($employeeIds, $statusFilter) {
+                            $subQ->whereIn('employee_id', $employeeIds);
+                            if ($statusFilter && $statusFilter !== 'all') {
+                                $subQ->where('workflow_status', $statusFilter);
+                            } else {
+                                $subQ->where('workflow_status', '!=', EmployeeLeave::WORKFLOW_REJECTED);
+                            }
+                        });
+                    } else {
+                        $q->where(function($subQ) use ($employeeIds, $statusFilter) {
+                            $subQ->whereIn('employee_id', $employeeIds);
+                            if ($statusFilter && $statusFilter !== 'all') {
+                                $subQ->where('workflow_status', $statusFilter);
+                            } else {
+                                $subQ->where('workflow_status', '!=', EmployeeLeave::WORKFLOW_REJECTED);
+                            }
+                        });
+                        $hasCondition = true;
+                    }
                 }
+            }
 
-                if ($departmentId) {
-                    $employeeIds = Employee::where('department_id', $departmentId)->pluck('id');
-                    \Log::info('Department Filter Applied', [
-                        'department_id' => $departmentId,
-                        'employee_ids' => $employeeIds->toArray(),
-                    ]);
-                    CRUD::addClause('whereIn', 'employee_id', $employeeIds);
+            // Step 3: Reviewer can see requests approved by department head (waiting for their approval)
+            if ($isReviewer) {
+                if ($statusFilter && $statusFilter !== 'all') {
+                    // If filtering by specific status, only show if it's reviewer's status
+                    if ($statusFilter === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD) {
+                        if ($hasCondition) {
+                            $q->orWhere('workflow_status', $statusFilter);
+                        } else {
+                            $q->where('workflow_status', $statusFilter);
+                            $hasCondition = true;
+                        }
+                    }
                 } else {
-                    \Log::warning('No department_id found for user', ['user_id' => $user->id]);
-                    CRUD::addClause('where', 'id', 0);
+                    if ($hasCondition) {
+                        $q->orWhere('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD);
+                    } else {
+                        $q->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD);
+                        $hasCondition = true;
+                    }
                 }
-                break;
+            }
 
-            case 'own':
-                // Can see only own leave requests
-                if ($user->employee_id) {
-                    CRUD::addClause('where', 'employee_id', $user->employee_id);
+            // Step 4: Director can see requests approved by reviewer (waiting for their approval)
+            // AND requests already approved by them (for tracking)
+            if ($isDirector) {
+                if ($statusFilter && $statusFilter !== 'all') {
+                    // If filtering by specific status, only show if it's director's status
+                    if ($statusFilter === EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER || 
+                        $statusFilter === EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR) {
+                        if ($hasCondition) {
+                            $q->orWhere('workflow_status', $statusFilter);
+                        } else {
+                            $q->where('workflow_status', $statusFilter);
+                            $hasCondition = true;
+                        }
+                    }
                 } else {
-                    CRUD::addClause('where', 'id', 0);
+                    if ($hasCondition) {
+                        $q->orWhere(function($subQ) {
+                            $subQ->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER)
+                                 ->orWhere('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR);
+                        });
+                    } else {
+                        $q->where(function($subQ) {
+                            $subQ->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER)
+                                 ->orWhere('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR);
+                        });
+                        $hasCondition = true;
+                    }
                 }
-                break;
+            }
 
-            default:
-                \Log::warning('Unknown scope, hiding all records', ['scope' => $scope, 'user_id' => $user->id]);
-                CRUD::addClause('where', 'id', 0);
-                break;
-        }
+            // If no conditions, hide all
+            if (!$hasCondition) {
+                $q->where('id', 0);
+            }
+        });
     }
 
     /**
@@ -107,36 +251,46 @@ class LeaveRequestCrudController extends CrudController
     {
         $user = backpack_user();
 
-        // Remove buttons based on permissions
         if (!PermissionHelper::can($user, 'leave.create')) {
             CRUD::removeButton('create');
         }
 
-        // ✅ Hide Edit, Delete buttons for approved leaves (done via model method)
         CRUD::removeButton('update');
         CRUD::removeButton('delete');
-        CRUD::addButtonFromModelFunction('line', 'edit_conditional', 'editButtonConditional', 'beginning');
+        CRUD::removeButton('show');
+
         CRUD::addButtonFromModelFunction('line', 'delete_conditional', 'deleteButtonConditional', 'beginning');
+        CRUD::addButtonFromModelFunction('line', 'edit_conditional', 'editButtonConditional', 'beginning');
+        CRUD::addButtonFromModelFunction('line', 'show', 'showButton', 'beginning');
 
-        // ✅ Add ApprovalWorkflow buttons - these come from ApprovalButtons trait in the model
-        if (PermissionHelper::can($user, 'leave.approve')) {
-            CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
-            CRUD::addButtonFromModelFunction('line', 'reject', 'rejectButton', 'beginning');
-        }
-
-        // Download PDF button for anyone who can view
         if (PermissionHelper::can($user, 'leave.view')) {
             CRUD::addButtonFromModelFunction('line', 'download_pdf', 'downloadPdfButton', 'beginning');
+        }
+
+        $hasApprove = PermissionHelper::can($user, 'leave.approve');
+        $hasReview = PermissionHelper::can($user, 'leave.review');
+        
+        if ($hasApprove || $hasReview) {
+            CRUD::addButtonFromModelFunction('line', 'reject', 'rejectButton', 'beginning');
+            CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
         }
     }
 
     protected function setupListOperation()
     {
-        // ✅ Add widget to disable browser autocomplete on search input
+        // Apply filtering only for list operation
+        $this->applyDepartmentFilter();
+
+        // Add status filter cards widget
+        $this->addStatusFilterCards();
+
+        // Add month/year filter widget
+        $this->addMonthYearFilter();
+
         \Widget::add()->type('view')->view('personnelreport::widgets.disable-search-autocomplete');
 
-        // Setup buttons based on user role
         $this->setupButtonsForRole();
+        $this->setupBulkActions();
 
         CRUD::column('employee_name')
             ->label('Nhân sự')
@@ -182,8 +336,43 @@ class LeaveRequestCrudController extends CrudController
         CRUD::column('workflow_status')
             ->label('Trạng thái')
             ->type('closure')
+            ->escaped(false)
             ->function(function($entry) {
-                return $entry->workflow_status_text;
+                $status = $entry->workflow_status;
+                $text = $entry->workflow_status_text;
+                
+                // Define icon and color for each status
+                $statusConfig = [
+                    EmployeeLeave::WORKFLOW_PENDING => [
+                        'icon' => 'la-clock',
+                        'color' => '#ffc107', // Yellow
+                    ],
+                    EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => [
+                        'icon' => 'la-check-circle',
+                        'color' => '#17a2b8', // Info blue
+                    ],
+                    EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER => [
+                        'icon' => 'la-check-circle',
+                        'color' => '#007bff', // Primary blue
+                    ],
+                    EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR => [
+                        'icon' => 'la-check-double',
+                        'color' => '#28a745', // Success green
+                    ],
+                    EmployeeLeave::WORKFLOW_REJECTED => [
+                        'icon' => 'la-times-circle',
+                        'color' => '#dc3545', // Danger red
+                    ],
+                ];
+                
+                // Get config for current status, fallback to default
+                $config = $statusConfig[$status] ?? [
+                    'icon' => 'la-circle',
+                    'color' => '#6c757d', // Secondary gray
+                ];
+                
+                return '<i class="la ' . $config['icon'] . '" style="color: ' . $config['color'] . '; font-size: 18px; margin-right: 6px; vertical-align: middle;"></i>' . 
+                       '<span style="vertical-align: middle;">' . $text . '</span>';
             });
 
         CRUD::column('note')
@@ -194,14 +383,27 @@ class LeaveRequestCrudController extends CrudController
 
     protected function setupCreateOperation()
     {
-        CRUD::setValidation([
-            'employee_id' => 'required|exists:employees,id',
+        $user = backpack_user();
+        $isAdmin = $user->hasRole(['Admin', 'admin']);
+        $isBanGiamDoc = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+        $isTruongPhong = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban']);
+        $isNhanVien = !($isAdmin || $isBanGiamDoc || $isTruongPhong);
+
+        $validationRules = [
             'leave_type' => 'required|string|in:business,attendance,study,leave,other',
             'from_date' => 'required|date|after_or_equal:today',
             'to_date' => 'required|date|after_or_equal:from_date',
             'location' => 'required|string|max:255',
             'note' => 'nullable|string|max:500'
-        ], [
+        ];
+
+        if ($isNhanVien && $user->employee_id) {
+            $validationRules['employee_id'] = 'nullable|exists:employees,id';
+        } else {
+            $validationRules['employee_id'] = 'required|exists:employees,id';
+        }
+
+        CRUD::setValidation($validationRules, [
             'employee_id.required' => 'Vui lòng chọn Nhân sự',
             'employee_id.exists' => 'Nhân sự không tồn tại',
             'leave_type.required' => 'Vui lòng chọn loại nghỉ',
@@ -217,14 +419,22 @@ class LeaveRequestCrudController extends CrudController
             'note.max' => 'Ghi chú không được quá 500 ký tự'
         ]);
 
-        // Filter employees based on user's department
+        // Filter employees based on user's role and department
         $employeeOptions = [];
         $user = backpack_user();
-        if ($user->hasRole('admin')) {
+        
+        // Check user roles
+        $isAdmin = $user->hasRole(['Admin', 'admin']);
+        $isBanGiamDoc = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+        $isTruongPhong = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban']);
+        
+        if ($isAdmin || $isBanGiamDoc) {
+            // Admin or Ban Giám đốc: show all employees
             $employeeOptions = Employee::with('department')->get()->mapWithKeys(function($emp) {
                 return [$emp->id => $emp->name . ' (' . ($emp->department ? $emp->department->name : 'N/A') . ')'];
             });
-        } else {
+        } elseif ($isTruongPhong) {
+            // Trưởng phòng: show employees in same department
             // First try to get department from user's direct department_id
             $departmentId = $user->department_id;
 
@@ -241,6 +451,14 @@ class LeaveRequestCrudController extends CrudController
                         return [$emp->id => $emp->name];
                     });
             }
+        } else {
+            // Nhân viên cá nhân: chỉ hiển thị chính user đó
+            if ($user->employee_id) {
+                $employee = Employee::find($user->employee_id);
+                if ($employee) {
+                    $employeeOptions = [$employee->id => $employee->name];
+                }
+            }
         }
 
         // Define leave types using constants
@@ -252,11 +470,18 @@ class LeaveRequestCrudController extends CrudController
             EmployeeLeave::TYPE_OTHER => 'Khác'
         ];
 
-        CRUD::field('employee_id')
+        $employeeField = CRUD::field('employee_id')
             ->label('Nhân sự')
             ->type('select_from_array')
             ->options($employeeOptions)
             ->tab('Thông tin cơ bản');
+        
+        if (!($isAdmin || $isBanGiamDoc || $isTruongPhong) && $user->employee_id) {
+            $employeeField->default($user->employee_id);
+            if (count($employeeOptions) == 1) {
+                $employeeField->allows_null(false);
+            }
+        }
 
         CRUD::field('leave_type')
             ->label('Loại nghỉ')
@@ -267,11 +492,13 @@ class LeaveRequestCrudController extends CrudController
         CRUD::field('from_date')
             ->label('Từ ngày')
             ->type('date')
+            ->wrapper(['class' => 'form-group col-md-6'])
             ->tab('Thông tin cơ bản');
-
+        
         CRUD::field('to_date')
             ->label('Đến ngày')
             ->type('date')
+            ->wrapper(['class' => 'form-group col-md-6'])
             ->tab('Thông tin cơ bản');
 
         CRUD::field('location')
@@ -288,78 +515,78 @@ class LeaveRequestCrudController extends CrudController
     protected function setupUpdateOperation()
     {
         $this->setupCreateOperation();
-
-        // Add status field for approval/rejection
-        CRUD::field('status')
-            ->label('Trạng thái')
-            ->type('select_from_array')
-            ->options([
-                EmployeeLeave::STATUS_PENDING => 'Chờ duyệt',
-                EmployeeLeave::STATUS_APPROVED => 'Đã duyệt',
-                EmployeeLeave::STATUS_REJECTED => 'Từ chối',
-                EmployeeLeave::STATUS_CANCELLED => 'Đã hủy'
-            ])
-            ->tab('Thông tin cơ bản');
-
-        CRUD::field('workflow_status')
-            ->label('Trạng thái')
-            ->type('select_from_array')
-            ->options([
-                EmployeeLeave::WORKFLOW_PENDING => 'Chờ xử lý',
-                EmployeeLeave::WORKFLOW_APPROVED_BY_APPROVER => 'Đã phê duyệt',
-                EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR => 'Đã phê duyệt hoàn tất',
-                EmployeeLeave::WORKFLOW_REJECTED => 'Đã từ chối'
-            ])
-            ->tab('Thông tin cơ bản');
+        $this->addWorkflowProgressWidget();
 
         CRUD::field('rejection_reason')
             ->label('Lý do từ chối')
             ->type('textarea')
+            ->attributes(['readonly' => true, 'disabled' => false])
+            ->visible(function($entry) {
+                return $entry && $entry->workflow_status === EmployeeLeave::WORKFLOW_REJECTED && !empty($entry->rejection_reason);
+            })
             ->tab('Thông tin cơ bản');
     }
 
-    protected function setupShowOperation()
-    {
-        $this->setupListOperation();
-
-        CRUD::column('approved_by')
-            ->label('Người duyệt')
-            ->type('closure')
-            ->function(function($entry) {
-                return $entry->approver ? $entry->approver->name : 'N/A';
-            });
-
-        CRUD::column('approved_at')
-            ->label('Ngày duyệt')
-            ->type('datetime');
-
-        CRUD::column('reviewer_id')
-            ->label('Người xem xét')
-            ->type('closure')
-            ->function(function($entry) {
-                return $entry->reviewer ? $entry->reviewer->name : 'N/A';
-            });
-
-        CRUD::column('reviewed_at')
-            ->label('Ngày xem xét')
-            ->type('datetime');
-
-        CRUD::column('rejection_reason')
-            ->label('Lý do từ chối');
-
-        CRUD::column('created_by')
-            ->label('Người tạo');
-
-        CRUD::column('updated_by')
-            ->label('Người cập nhật');
-    }
 
     public function store()
     {
-        $this->crud->setRequest($this->crud->validateRequest());
-
         $user = backpack_user();
         $request = $this->crud->getRequest();
+
+        $isAdmin = $user->hasRole(['Admin', 'admin']);
+        $isBanGiamDoc = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+        $isTruongPhong = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban']);
+
+        if (!($isAdmin || $isBanGiamDoc || $isTruongPhong) && $user->employee_id) {
+            $request->merge(['employee_id' => $user->employee_id]);
+            $this->crud->setRequest($request);
+        }
+
+        $this->crud->setRequest($this->crud->validateRequest());
+        $request = $this->crud->getRequest();
+
+        $employeeId = $request->input('employee_id');
+        $fromDate = $request->input('from_date');
+        $toDate = $request->input('to_date');
+
+        if ($employeeId && $fromDate && $toDate) {
+            $overlappingLeaves = EmployeeLeave::where('employee_id', $employeeId)
+                ->where(function($q) use ($fromDate, $toDate) {
+                    $q->where(function($subQ) use ($fromDate, $toDate) {
+                        $subQ->whereBetween('from_date', [$fromDate, $toDate])
+                             ->orWhereBetween('to_date', [$fromDate, $toDate])
+                             ->orWhere(function($q2) use ($fromDate, $toDate) {
+                                 $q2->where('from_date', '<=', $fromDate)
+                                    ->where('to_date', '>=', $toDate);
+                             });
+                    });
+                })
+                ->first();
+
+            if ($overlappingLeaves) {
+                \Alert::error('Nhân sự này đã có đơn nghỉ phép trong khoảng thời gian từ ' . 
+                             \Carbon\Carbon::parse($overlappingLeaves->from_date)->format('d/m/Y') . 
+                             ' đến ' . 
+                             \Carbon\Carbon::parse($overlappingLeaves->to_date)->format('d/m/Y') . 
+                             '. Vui lòng chọn khoảng thời gian khác.')->flash();
+                
+                return redirect()->back()->withInput();
+            }
+        }
+
+        $employee = Employee::find($employeeId);
+        $departmentHead = null;
+
+        if ($employee && $employee->department_id) {
+            $departmentHead = \App\Models\User::where('department_id', $employee->department_id)
+                ->where(function($q) {
+                    $q->where('is_department_head', true)
+                      ->orWhereHas('roles', function($r) {
+                          $r->whereIn('name', ['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban']);
+                      });
+                })
+                ->first();
+        }
 
         // Set additional fields
         $request->merge([
@@ -370,9 +597,27 @@ class LeaveRequestCrudController extends CrudController
         ]);
 
         $this->crud->setRequest($request);
-        $this->crud->unsetValidation(); // validation has already been run
+        $this->crud->unsetValidation();
 
-        return $this->traitStore();
+        $response = $this->traitStore();
+
+        if ($departmentHead) {
+            \Log::info('Leave request created, assigned to department head', [
+                'leave_id' => $this->crud->entry->id ?? null,
+                'department_head' => $departmentHead->name,
+                'department_id' => $employee->department_id
+            ]);
+        }
+
+        if ($response instanceof \Illuminate\Http\RedirectResponse) {
+            $saveAction = $request->input('_save_action', 'save_and_back');
+            
+            if ($saveAction === 'save_and_back' || $saveAction === 'save_and_new') {
+                return redirect($this->crud->route);
+            }
+        }
+
+        return $response;
     }
 
     public function update()
@@ -381,6 +626,37 @@ class LeaveRequestCrudController extends CrudController
 
         $user = backpack_user();
         $request = $this->crud->getRequest();
+
+        $entry = $this->crud->getCurrentEntry();
+        $employeeId = $request->input('employee_id');
+        $fromDate = $request->input('from_date');
+        $toDate = $request->input('to_date');
+
+        if ($employeeId && $fromDate && $toDate && $entry) {
+            $overlappingLeaves = EmployeeLeave::where('employee_id', $employeeId)
+                ->where('id', '!=', $entry->id)
+                ->where(function($q) use ($fromDate, $toDate) {
+                    $q->where(function($subQ) use ($fromDate, $toDate) {
+                        $subQ->whereBetween('from_date', [$fromDate, $toDate])
+                             ->orWhereBetween('to_date', [$fromDate, $toDate])
+                             ->orWhere(function($q2) use ($fromDate, $toDate) {
+                                 $q2->where('from_date', '<=', $fromDate)
+                                    ->where('to_date', '>=', $toDate);
+                             });
+                    });
+                })
+                ->first();
+
+            if ($overlappingLeaves) {
+                \Alert::error('Nhân sự này đã có đơn nghỉ phép trong khoảng thời gian từ ' . 
+                             \Carbon\Carbon::parse($overlappingLeaves->from_date)->format('d/m/Y') . 
+                             ' đến ' . 
+                             \Carbon\Carbon::parse($overlappingLeaves->to_date)->format('d/m/Y') . 
+                             '. Vui lòng chọn khoảng thời gian khác.')->flash();
+                
+                return redirect()->back()->withInput();
+            }
+        }
 
         // If status is being changed to approved, set approved_by and approved_at
         if ($request->input('status') == EmployeeLeave::STATUS_APPROVED) {
@@ -405,8 +681,488 @@ class LeaveRequestCrudController extends CrudController
     // ✅ These are now handled by ApprovalWorkflow module's ApprovalController!
 
     /**
+     * Setup bulk actions for BGD (Bulk approve/reject)
+     */
+    private function setupBulkActions()
+    {
+        $user = backpack_user();
+        $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc', 'Admin']);
+
+        if ($isDirector) {
+            CRUD::enableBulkActions();
+            CRUD::addButton('top', 'bulk_approve', 'view', 'personnelreport::buttons.bulk_approve', 'end');
+            CRUD::addButton('top', 'bulk_reject', 'view', 'personnelreport::buttons.bulk_reject', 'end');
+        }
+    }
+
+    /**
+     * Bulk approve leave requests
+     */
+    public function bulkApprove()
+    {
+        $request = request();
+        $ids = $request->input('ids', []);
+        $user = backpack_user();
+
+        if (empty($ids)) {
+            return response()->json(['success' => false, 'message' => 'Vui lòng chọn ít nhất một đơn nghỉ phép'], 400);
+        }
+
+        $approvalService = app(\Modules\ApprovalWorkflow\Services\ApprovalService::class);
+        $approved = 0;
+        $failed = 0;
+        $errors = [];
+
+        foreach ($ids as $id) {
+            try {
+                $leaveRequest = EmployeeLeave::find($id);
+                if (!$leaveRequest) {
+                    $failed++;
+                    continue;
+                }
+
+                if (!$leaveRequest->canBeApproved()) {
+                    $failed++;
+                    $errors[] = "Đơn #{$id} không thể phê duyệt ở trạng thái hiện tại";
+                    continue;
+                }
+
+                $approvalService->approve($leaveRequest, $user);
+                $approved++;
+            } catch (\Exception $e) {
+                $failed++;
+                $errors[] = "Đơn #{$id}: " . $e->getMessage();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Đã phê duyệt {$approved} đơn nghỉ phép" . ($failed > 0 ? ", {$failed} đơn không thể phê duyệt" : ""),
+            'approved' => $approved,
+            'failed' => $failed,
+            'errors' => $errors
+        ]);
+    }
+
+    /**
+     * Bulk reject leave requests
+     */
+    public function bulkReject()
+    {
+        $request = request();
+        $ids = $request->input('ids', []);
+        $reason = $request->input('reason', 'Từ chối hàng loạt');
+        $user = backpack_user();
+
+        if (empty($ids)) {
+            return response()->json(['success' => false, 'message' => 'Vui lòng chọn ít nhất một đơn nghỉ phép'], 400);
+        }
+
+        $approvalService = app(\Modules\ApprovalWorkflow\Services\ApprovalService::class);
+        $rejected = 0;
+        $failed = 0;
+        $errors = [];
+
+        foreach ($ids as $id) {
+            try {
+                $leaveRequest = EmployeeLeave::find($id);
+                if (!$leaveRequest) {
+                    $failed++;
+                    continue;
+                }
+
+                if (!$leaveRequest->canBeRejected()) {
+                    $failed++;
+                    $errors[] = "Đơn #{$id} không thể từ chối ở trạng thái hiện tại";
+                    continue;
+                }
+
+                $approvalService->reject($leaveRequest, $user, $reason);
+                $rejected++;
+            } catch (\Exception $e) {
+                $failed++;
+                $errors[] = "Đơn #{$id}: " . $e->getMessage();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Đã từ chối {$rejected} đơn nghỉ phép" . ($failed > 0 ? ", {$failed} đơn không thể từ chối" : ""),
+            'rejected' => $rejected,
+            'failed' => $failed,
+            'errors' => $errors
+        ]);
+    }
+
+    /**
+     * Add status filter cards widget
+     */
+    private function addStatusFilterCards()
+    {
+        $user = backpack_user();
+
+        // Get counts for each status (respecting current user's filtering)
+        // Cards should always show total counts for each status, not filtered by current status filter
+        $baseQuery = EmployeeLeave::query();
+
+        // Apply same filtering as list (for user permissions, not status filter)
+        // For admin and leave.review users, show all counts
+        if (!$user->hasRole('Admin') && !PermissionHelper::can($user, 'leave.review')) {
+            // Apply same filtering logic but for counting
+            $isDepartmentHead = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban']);
+            
+            // Reviewer: user with leave.review permission (not just role BGD)
+            $isReviewer = PermissionHelper::can($user, 'leave.review');
+            
+            // Director: BGD role but NOT reviewer (or Giám đốc role)
+            $hasBgdRole = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc']);
+            $hasGiámDocRole = $user->hasRole(['Giám đốc']);
+            $isDirector = ($hasBgdRole && !$isReviewer) || $hasGiámDocRole;
+            
+            $userDepartmentId = $user->department_id;
+
+            if ($user->employee_id) {
+                $emp = Employee::find($user->employee_id);
+                if ($emp && $emp->department_id) {
+                    $userDepartmentId = $emp->department_id;
+                }
+            }
+
+            $baseQuery->where(function($q) use ($user, $isDepartmentHead, $isReviewer, $isDirector, $userDepartmentId) {
+                $hasCondition = false;
+
+                if ($user->employee_id) {
+                    $q->where(function($subQ) use ($user) {
+                        $subQ->where('employee_id', $user->employee_id)
+                             ->where('workflow_status', '!=', EmployeeLeave::WORKFLOW_REJECTED);
+                    });
+                    $hasCondition = true;
+                }
+
+                if ($isDepartmentHead && $userDepartmentId) {
+                    $employeeIds = Employee::where('department_id', $userDepartmentId)->pluck('id');
+                    if ($employeeIds->isNotEmpty()) {
+                        if ($hasCondition) {
+                            $q->orWhere(function($subQ) use ($employeeIds) {
+                                $subQ->whereIn('employee_id', $employeeIds)
+                                     ->where('workflow_status', '!=', EmployeeLeave::WORKFLOW_REJECTED);
+                            });
+                        } else {
+                            $q->where(function($subQ) use ($employeeIds) {
+                                $subQ->whereIn('employee_id', $employeeIds)
+                                     ->where('workflow_status', '!=', EmployeeLeave::WORKFLOW_REJECTED);
+                            });
+                            $hasCondition = true;
+                        }
+                    }
+                }
+
+                if ($isReviewer) {
+                    if ($hasCondition) {
+                        $q->orWhere('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD);
+                    } else {
+                        $q->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD);
+                        $hasCondition = true;
+                    }
+                }
+
+                // Director can see requests approved by reviewer (waiting for approval)
+                // AND requests already approved by them (for tracking)
+                if ($isDirector) {
+                    if ($hasCondition) {
+                        $q->orWhere(function($subQ) {
+                            $subQ->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER)
+                                 ->orWhere('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR);
+                        });
+                    } else {
+                        $q->where(function($subQ) {
+                            $subQ->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER)
+                                 ->orWhere('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR);
+                        });
+                        $hasCondition = true;
+                    }
+                }
+
+                if (!$hasCondition) {
+                    $q->where('id', 0);
+                }
+            });
+        }
+
+        // Get counts for each status
+        $statusCounts = [
+            'pending' => (clone $baseQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_PENDING)->count(),
+            'approved_by_department_head' => (clone $baseQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD)->count(),
+            'approved_by_reviewer' => (clone $baseQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER)->count(),
+            'approved_by_director' => (clone $baseQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR)->count(),
+            'rejected' => (clone $baseQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_REJECTED)->count(),
+            'all' => (clone $baseQuery)->count(),
+        ];
+
+        \Widget::add([
+            'type' => 'view',
+            'view' => 'personnelreport::widgets.status_filter_cards',
+            'content' => [
+                'statusCounts' => $statusCounts,
+                'route' => $this->crud->getRoute()
+            ]
+        ])->to('before_content');
+    }
+
+    /**
+     * Add month/year filter widget
+     */
+    private function addMonthYearFilter()
+    {
+        // Get all distinct month/year from employee_leave table
+        $monthYears = EmployeeLeave::selectRaw('DATE_FORMAT(from_date, "%Y-%m") as month_year')
+            ->distinct()
+            ->whereNotNull('from_date')
+            ->orderBy('month_year', 'desc')
+            ->pluck('month_year')
+            ->toArray();
+
+        // Get current month/year
+        $currentMonthYear = now()->format('Y-m');
+        
+        // Add current month if not in list
+        if (!in_array($currentMonthYear, $monthYears)) {
+            array_unshift($monthYears, $currentMonthYear);
+        }
+
+        // Get selected month/year from request (default to current)
+        $selectedMonthYear = request()->get('month_year', $currentMonthYear);
+
+        // Build options array
+        $options = [['value' => 'all', 'label' => 'Tất cả']];
+        foreach ($monthYears as $my) {
+            $date = \Carbon\Carbon::parse($my . '-01');
+            $options[] = [
+                'value' => $my,
+                'label' => $date->format('m/Y') // Format: 11/2025
+            ];
+        }
+
+        \Widget::add([
+            'type' => 'view',
+            'view' => 'personnelreport::widgets.month_year_filter',
+            'content' => [
+                'options' => $options,
+                'selected' => $selectedMonthYear,
+                'route' => $this->crud->getRoute()
+            ]
+        ])->to('before_content');
+    }
+
+    protected function addWorkflowProgressWidget()
+    {
+        $entry = $this->crud->getCurrentEntry();
+
+        if (!$entry) {
+            return;
+        }
+
+        $steps = [
+            [
+                'key' => 'created',
+                'label' => 'Tạo đơn'
+            ],
+            [
+                'key' => EmployeeLeave::WORKFLOW_PENDING,
+                'label' => 'Chỉ huy xác nhận'
+            ],
+            [
+                'key' => EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD,
+                'label' => 'Thẩm định'
+            ],
+            [
+                'key' => EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER,
+                'label' => 'BGD phê duyệt'
+            ],
+            [
+                'key' => EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR,
+                'label' => 'Hoàn tất'
+            ]
+        ];
+
+        $stepDates = [];
+        $stepUsers = [];
+
+        if ($entry->created_at) {
+            $stepDates['created'] = $entry->created_at->format('d/m/Y H:i');
+        }
+        if ($entry->employee) {
+            $stepUsers['created'] = $entry->employee->name ?? 'N/A';
+        }
+
+        if ($entry->created_at) {
+            $stepDates[EmployeeLeave::WORKFLOW_PENDING] = $entry->created_at->format('d/m/Y H:i');
+        }
+        if ($entry->employee) {
+            $stepUsers[EmployeeLeave::WORKFLOW_PENDING] = $entry->employee->name ?? 'N/A';
+        }
+
+        if ($entry->approved_at_department_head && $entry->workflow_status !== EmployeeLeave::WORKFLOW_PENDING) {
+            $stepDates[EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD] = $entry->approved_at_department_head->format('d/m/Y H:i');
+        }
+        if ($entry->approved_by_department_head && $entry->workflow_status !== EmployeeLeave::WORKFLOW_PENDING) {
+            $deptHead = \App\Models\User::find($entry->approved_by_department_head);
+            if ($deptHead) {
+                $stepUsers[EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD] = $deptHead->name ?? 'N/A';
+            }
+        }
+
+        if ($entry->approved_at_reviewer && in_array($entry->workflow_status, [
+            EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER,
+            EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR
+        ])) {
+            $stepDates[EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER] = $entry->approved_at_reviewer->format('d/m/Y H:i');
+        }
+        if ($entry->approved_by_reviewer && in_array($entry->workflow_status, [
+            EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER,
+            EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR
+        ])) {
+            $reviewer = \App\Models\User::find($entry->approved_by_reviewer);
+            if ($reviewer) {
+                $stepUsers[EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER] = $reviewer->name ?? 'N/A';
+            }
+        }
+
+        if ($entry->approved_at_director && $entry->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR) {
+            $stepDates[EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR] = $entry->approved_at_director->format('d/m/Y H:i');
+        }
+        if ($entry->approved_by_director && $entry->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR) {
+            $director = \App\Models\User::find($entry->approved_by_director);
+            if ($director) {
+                $stepUsers[EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR] = $director->name ?? 'N/A';
+            }
+        }
+
+        $currentStatusKey = $entry->workflow_status;
+        $currentStepIndex = 0;
+
+        switch ($currentStatusKey) {
+            case EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR:
+                $currentStepIndex = 4;
+                break;
+            case EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER:
+                $currentStepIndex = 3;
+                break;
+            case EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD:
+                $currentStepIndex = 2;
+                break;
+            case EmployeeLeave::WORKFLOW_PENDING:
+                $currentStepIndex = 1;
+                break;
+            case EmployeeLeave::WORKFLOW_REJECTED:
+                if ($entry->approved_at_reviewer) {
+                    $currentStepIndex = 3;
+                } elseif ($entry->approved_at_department_head) {
+                    $currentStepIndex = 2;
+                } else {
+                    $currentStepIndex = 1;
+                }
+                break;
+            default:
+                if ($entry->approved_at_director) {
+                    $currentStepIndex = 4;
+                } elseif ($entry->approved_at_reviewer) {
+                    $currentStepIndex = 3;
+                } elseif ($entry->approved_at_department_head) {
+                    $currentStepIndex = 2;
+                } else {
+                    $currentStepIndex = 1;
+                }
+                break;
+        }
+
+        \Widget::add([
+            'type' => 'view',
+            'view' => 'components.workflow-progress',
+            'content' => [
+                'steps' => $steps,
+                'currentStatus' => $entry->workflow_status,
+                'currentStepIndex' => $currentStepIndex,
+                'rejected' => $entry->workflow_status === EmployeeLeave::WORKFLOW_REJECTED,
+                'stepDates' => $stepDates,
+                'stepUsers' => $stepUsers
+            ]
+        ])->to('before_content');
+    }
+
+    protected function setupShowOperation()
+    {
+        $this->addWorkflowProgressWidget();
+
+        // Setup columns for show (but don't apply filtering)
+        $this->setupButtonsForRole();
+
+        CRUD::column('employee_name')
+            ->label('Nhân sự')
+            ->type('closure')
+            ->function(function($entry) {
+                return $entry->employee ? $entry->employee->name : 'N/A';
+            });
+
+        CRUD::column('department_name')
+            ->label('Phòng ban')
+            ->type('closure')
+            ->function(function($entry) {
+                return $entry->employee && $entry->employee->department
+                    ? $entry->employee->department->name
+                    : 'N/A';
+            });
+
+        CRUD::column('leave_type')
+            ->label('Loại nghỉ')
+            ->type('closure')
+            ->function(function($entry) {
+                $types = [
+                    'business' => 'Công tác',
+                    'attendance' => 'Có mặt',
+                    'study' => 'Đi học',
+                    'leave' => 'Nghỉ phép',
+                    'other' => 'Khác'
+                ];
+                return $types[$entry->leave_type] ?? $entry->leave_type;
+            });
+
+        CRUD::column('from_date')
+            ->label('Từ ngày')
+            ->type('date');
+
+        CRUD::column('to_date')
+            ->label('Đến ngày')
+            ->type('date');
+
+        CRUD::column('location')
+            ->label('Địa điểm');
+
+        CRUD::column('workflow_status')
+            ->label('Trạng thái')
+            ->type('closure')
+            ->function(function($entry) {
+                return $entry->workflow_status_text;
+            });
+
+        CRUD::column('note')
+            ->label('Ghi chú')
+            ->limit(500);
+
+        // Only show rejection_reason if it exists
+        CRUD::column('rejection_reason')
+            ->label('Lý do từ chối')
+            ->type('closure')
+            ->function(function($entry) {
+                return $entry->rejection_reason ?: null;
+            })
+            ->visible(function($entry) {
+                return !empty($entry->rejection_reason);
+            });
+    }
+
+    /**
      * Download signed PDF
-     * ✅ Keep this method for backward compatibility with existing routes
      */
     public function downloadPdf($id)
     {

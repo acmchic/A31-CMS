@@ -20,6 +20,9 @@ class UserCrudController extends CrudController
         $this->crud->setModel(config('backpack.permissionmanager.models.user'));
         $this->crud->setEntityNameStrings(trans('backpack::permissionmanager.user'), trans('backpack::permissionmanager.users'));
         $this->crud->setRoute(backpack_url('user'));
+        
+        // Disable persistent table to prevent auto-redirect with role parameter
+        $this->crud->set('list.persistentTable', false);
     }
 
     public function setupListOperation()
@@ -27,6 +30,9 @@ class UserCrudController extends CrudController
         // Prevent Backpack from eager loading 'username' as a relationship
         // Only eager load actual relationships
         $this->crud->query->with(['roles', 'permissions']);
+        
+        // Clear localStorage for user route if no role parameter (prevent auto-redirect)
+        // This will be handled in the view via after_scripts stack
         
         $this->crud->addColumns([
             [

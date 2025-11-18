@@ -57,7 +57,7 @@
                         <i class="la la-times"></i> Hủy
                     </button>
                     <button type="submit" class="btn btn-success" id="approveBtn">
-                        <i class="la la-check"></i> Phê duyệt & Ký số
+                        <i class="la la-check"></i> Phê duyệt
                     </button>
                 </div>
             </form>
@@ -98,12 +98,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const confirmed = document.getElementById('confirm_approve').checked;
 
         if (!pin) {
-            alert('Vui lòng nhập PIN chứng thư số');
+            showWarning('Vui lòng nhập PIN chứng thư số', 'Lỗi');
             return;
         }
 
         if (!confirmed) {
-            alert('Vui lòng xác nhận phê duyệt');
+            showWarning('Vui lòng xác nhận phê duyệt', 'Lỗi');
             return;
         }
 
@@ -125,30 +125,21 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Success
-                alert('✅ Phê duyệt thành công! Tài liệu đã được ký số.');
-
-                // Close modal
-                bootstrap.Modal.getInstance(document.getElementById('approveModal')).hide();
-
-                // Reload page
-                window.location.reload();
+                showSuccess('Tài liệu đã được ký số', 'Phê duyệt thành công', 2000, function() {
+                    bootstrap.Modal.getInstance(document.getElementById('approveModal')).hide();
+                    window.location.reload();
+                });
             } else {
-                // Error
-                alert('❌ Lỗi: ' + (data.message || 'Không thể phê duyệt'));
-
-                // Reset button
+                showError(data.message || 'Không thể phê duyệt', 'Lỗi');
                 approveBtn.disabled = false;
-                approveBtn.innerHTML = '<i class="la la-check"></i> Phê duyệt & Ký số';
+                approveBtn.innerHTML = '<i class="la la-check"></i> Phê duyệt';
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('❌ Có lỗi xảy ra khi phê duyệt');
-
-            // Reset button
+            showError('Có lỗi xảy ra khi phê duyệt', 'Lỗi kết nối');
             approveBtn.disabled = false;
-            approveBtn.innerHTML = '<i class="la la-check"></i> Phê duyệt & Ký số';
+            approveBtn.innerHTML = '<i class="la la-check"></i> Phê duyệt';
         });
     });
 });

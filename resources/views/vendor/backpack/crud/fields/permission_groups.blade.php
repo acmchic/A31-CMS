@@ -87,7 +87,7 @@ $(document).ready(function() {
         },
         'personnel_report': {
             title: '📊 Báo cáo quân số',
-            permissions: ['report.view.company', 'report.view', 'report.create', 'report.edit', 'report.delete', 'report.approve', 'leave.view', 'leave.create', 'leave.edit', 'leave.delete', 'leave.approve']
+            permissions: ['report.view.company', 'report.view', 'report.create', 'report.edit', 'report.delete', 'report.approve', 'leave.view', 'leave.create', 'leave.edit', 'leave.delete', 'leave.approve', 'leave.review']
         },
         'record_management': {
             title: '📚 Quản lý sổ sách',
@@ -143,6 +143,7 @@ $(document).ready(function() {
         'leave.edit': 'Sửa đơn nghỉ phép',
         'leave.delete': 'Xóa đơn nghỉ phép',
         'leave.approve': 'Phê duyệt đơn nghỉ phép',
+        'leave.review': 'Thẩm định nghỉ phép',
         'record_management.view': 'Xem quản lý sổ sách',
         'record_management.view.own': 'Xem sổ sách cá nhân',
         'record_management.view.department': 'Xem sổ sách phòng ban',

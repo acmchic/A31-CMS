@@ -111,6 +111,18 @@ class CleanPermissionSeeder extends Seeder
             }
         }
 
+        // Add special permissions for leave module (review)
+        $this->command->line("Module: Đơn nghỉ phép (Special permissions)");
+        $leaveReviewPermission = "leave.review";
+        Permission::create([
+            'id' => $permissionId,
+            'name' => $leaveReviewPermission,
+            'guard_name' => 'web'
+        ]);
+        $allPermissions[] = $leaveReviewPermission;
+        $this->command->line("  {$permissionId}: {$leaveReviewPermission} (Thẩm định Đơn nghỉ phép)");
+        $permissionId++;
+
         // Create 4 standard roles
         $roles = [
             'Admin' => [

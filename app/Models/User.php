@@ -69,12 +69,6 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
-
-     public function username()
-    {
-        return 'username';
-    }
-
     protected function casts(): array
     {
         return [

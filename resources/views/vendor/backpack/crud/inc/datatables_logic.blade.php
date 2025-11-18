@@ -16,6 +16,16 @@
   @basset(base_path('vendor/backpack/crud/src/resources/assets/img/spinner.svg'), false)
 
   <script>
+    // Clear localStorage for user route if no role parameter (prevent auto-redirect)
+    @if($crud->getRoute() === 'user' && !request()->has('role'))
+    (function() {
+        var userRoute = "user";
+        var slug = userRoute.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+        localStorage.removeItem(slug + "_list_url");
+        localStorage.removeItem(slug + "_list_url_time");
+    })();
+    @endif
+    
     // here we will check if the cached dataTables paginator length is conformable with current paginator settings.
     // datatables caches the ajax responses with pageLength in LocalStorage so when changing this
     // settings in controller users get unexpected results. To avoid that we will reset
@@ -73,6 +83,14 @@
         // IT HAS! Check if it is our own persistence redirect.
         if (window.location.search.indexOf('persistent-table=true') < 1) {
             // IF NOT: we don't want to redirect the user.
+            saved_list_url = false;
+        }
+    } else {
+        // If current URL has no parameters, clear saved URL to prevent auto-redirect
+        // This prevents redirecting to a filtered view when user wants to see all
+        if (saved_list_url) {
+            localStorage.removeItem('{{ Str::slug($crud->getRoute()) }}_list_url');
+            localStorage.removeItem('{{ Str::slug($crud->getRoute()) }}_list_url_time');
             saved_list_url = false;
         }
     }

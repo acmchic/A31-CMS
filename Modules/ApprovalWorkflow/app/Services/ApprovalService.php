@@ -29,27 +29,111 @@ class ApprovalService
             throw new \Exception('No next workflow step defined for status: ' . $currentStatus);
         }
 
-        // Determine which level we're approving
+        // Special handling for EmployeeLeave with custom fields
+        if ($model instanceof \Modules\PersonnelReport\Models\EmployeeLeave) {
+            return $this->approveEmployeeLeave($model, $approver, $currentStatus, $nextStatus, $options);
+        }
+
+        // Default handling for other models
         $level = $this->getCurrentApprovalLevel($currentStatus);
         
-        // Update model with approval info
         $updateData = [
             'workflow_status' => $nextStatus,
             "workflow_level{$level}_by" => $approver->id,
             "workflow_level{$level}_at" => now(),
         ];
 
-        // Add signature path if provided
         if (isset($options['signature_path'])) {
             $updateData["workflow_level{$level}_signature"] = $options['signature_path'];
         }
 
         $model->update($updateData);
-
-        // Create approval history record
         $this->createHistory($model, $approver, 'approved', $level, $options);
 
         return true;
+    }
+
+    /**
+     * Approve EmployeeLeave with custom field mapping
+     */
+    protected function approveEmployeeLeave($model, $approver, $currentStatus, $nextStatus, $options)
+    {
+        // Ensure nextStatus is a string literal (not constant reference)
+        if (is_string($nextStatus)) {
+            $nextStatusValue = $nextStatus;
+        } else {
+            // If it's a constant, get its actual string value
+            $nextStatusValue = (string) $nextStatus;
+        }
+        
+        // Map workflow status to correct fields and ensure string values
+        $updateData = [];
+        
+        switch ($currentStatus) {
+            case \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_PENDING:
+            case 'pending':
+                $updateData['workflow_status'] = 'approved_by_department_head'; // Use string literal
+                $updateData['approved_by_department_head'] = $approver->id;
+                $updateData['approved_at_department_head'] = now();
+                break;
+
+            case \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD:
+            case 'approved_by_department_head':
+                $updateData['workflow_status'] = 'approved_by_reviewer'; // Use string literal
+                $updateData['approved_by_reviewer'] = $approver->id;
+                $updateData['approved_at_reviewer'] = now();
+                break;
+
+            case \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER:
+            case 'approved_by_reviewer':
+                $updateData['workflow_status'] = 'approved_by_director'; // Use string literal
+                $updateData['approved_by_director'] = $approver->id;
+                $updateData['approved_at_director'] = now();
+                break;
+
+            // Legacy support
+            case 'approved_by_approver':
+                $updateData['workflow_status'] = 'approved_by_reviewer'; // Use string literal
+                $updateData['approved_by_reviewer'] = $approver->id;
+                $updateData['approved_at_reviewer'] = now();
+                break;
+        }
+
+        // If workflow_status not set, use nextStatus (fallback)
+        if (!isset($updateData['workflow_status'])) {
+            $updateData['workflow_status'] = $nextStatusValue;
+        }
+
+        if (isset($options['signature_path'])) {
+            if ($currentStatus === \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_PENDING || $currentStatus === 'pending') {
+                $updateData['approver_signature_path'] = $options['signature_path'];
+            } elseif ($currentStatus === \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER || $currentStatus === 'approved_by_reviewer') {
+                $updateData['director_signature_path'] = $options['signature_path'];
+            }
+        }
+
+        // Use update() with explicit string values
+        $model->update($updateData);
+        
+        $level = $this->getCurrentApprovalLevelForEmployeeLeave($currentStatus);
+        $this->createHistory($model, $approver, 'approved', $level, $options);
+
+        return true;
+    }
+
+    /**
+     * Get approval level for EmployeeLeave
+     */
+    protected function getCurrentApprovalLevelForEmployeeLeave(string $status): int
+    {
+        $map = [
+            \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_PENDING => 1,
+            \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => 2,
+            \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER => 3,
+            \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR => 4,
+        ];
+
+        return $map[$status] ?? 1;
     }
 
     /**
@@ -62,9 +146,38 @@ class ApprovalService
         }
 
         $currentStatus = $model->workflow_status;
-        $level = $this->getCurrentApprovalLevel($currentStatus);
 
-        // Update model
+        // Special handling for EmployeeLeave
+        if ($model instanceof \Modules\PersonnelReport\Models\EmployeeLeave) {
+            $updateData = [
+                'workflow_status' => \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_REJECTED,
+                'rejection_reason' => $reason,
+            ];
+
+            // Set rejection by field based on current step
+            switch ($currentStatus) {
+                case \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_PENDING:
+                    $updateData['approved_by_department_head'] = $approver->id;
+                    $updateData['approved_at_department_head'] = now();
+                    break;
+                case \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD:
+                    $updateData['approved_by_reviewer'] = $approver->id;
+                    $updateData['approved_at_reviewer'] = now();
+                    break;
+                case \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER:
+                    $updateData['approved_by_director'] = $approver->id;
+                    $updateData['approved_at_director'] = now();
+                    break;
+            }
+
+            $model->update($updateData);
+            $level = $this->getCurrentApprovalLevelForEmployeeLeave($currentStatus);
+            $this->createHistory($model, $approver, 'rejected', $level, array_merge($options, ['reason' => $reason]));
+            return true;
+        }
+
+        // Default handling
+        $level = $this->getCurrentApprovalLevel($currentStatus);
         $model->update([
             'workflow_status' => 'rejected',
             'rejection_reason' => $reason,
@@ -72,11 +185,7 @@ class ApprovalService
             "workflow_level{$level}_at" => now(),
         ]);
 
-        // Create approval history record
-        $this->createHistory($model, $approver, 'rejected', $level, array_merge($options, [
-            'reason' => $reason
-        ]));
-
+        $this->createHistory($model, $approver, 'rejected', $level, array_merge($options, ['reason' => $reason]));
         return true;
     }
 
@@ -141,7 +250,7 @@ class ApprovalService
     {
         if ($status === 'pending') {
             return 1;
-        } elseif ($status === 'level1_approved') {
+        } elseif ($status === 'level1_approved' || $status === 'approved_by_approver') {
             return 2;
         } elseif ($status === 'level2_approved') {
             return 3;

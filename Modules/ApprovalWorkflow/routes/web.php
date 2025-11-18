@@ -27,6 +27,10 @@ Route::group([
         Route::post('approve/{modelClass}/{id}', [ApprovalController::class, 'approveWithPin'])
             ->name('approve-with-pin');
         
+        // Approve without PIN (for reviewer step)
+        Route::post('approve-without-pin/{modelClass}/{id}', [ApprovalController::class, 'approveWithoutPin'])
+            ->name('approve-without-pin');
+        
         // Reject
         Route::post('reject/{modelClass}/{id}', [ApprovalController::class, 'reject'])
             ->name('reject');

@@ -86,6 +86,79 @@ class ApprovalController extends Controller
     }
 
     /**
+     * Approve without PIN (for reviewer step - intermediate step without signature)
+     *
+     * POST /approval/approve-without-pin/{modelClass}/{id}
+     */
+    public function approveWithoutPin(Request $request, string $modelClass, int $id)
+    {
+        try {
+            // Decode model class from base64
+            $modelClass = base64_decode($modelClass);
+
+            if (!class_exists($modelClass)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid model class'
+                ], 400);
+            }
+
+            // Find model
+            $model = $modelClass::findOrFail($id);
+
+            // Check permission - allow leave.review permission
+            $user = backpack_user();
+            $modulePermission = $this->getModulePermission($modelClass);
+
+            $hasApprovePermission = PermissionHelper::can($user, "{$modulePermission}.approve");
+            $hasReviewPermission = PermissionHelper::can($user, "{$modulePermission}.review");
+
+            if (!$hasApprovePermission && !$hasReviewPermission) {
+                return response()->json([
+                    'success' => false,
+                    'message' => getUserTitle($user) . ' không có quyền phê duyệt'
+                ], 403);
+            }
+
+            // Check if current step is reviewer step
+            if ($model instanceof \Modules\PersonnelReport\Models\EmployeeLeave) {
+                if ($model->workflow_status !== \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Chỉ có thể gửi lên BGD khi đơn ở trạng thái đã được Trưởng phòng xác nhận'
+                    ], 400);
+                }
+            }
+
+            // Approve without signature (just workflow update)
+            $this->approvalService->approve(
+                $model,
+                $user,
+                $request->only(['comment', 'metadata'])
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Đã gửi lên BGD thành công!',
+                'data' => [
+                    'workflow_status' => $model->workflow_status
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Approval without PIN error:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Reject (generic endpoint)
      *
      * POST /approval/reject/{modelClass}/{id}

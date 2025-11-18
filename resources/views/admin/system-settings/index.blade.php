@@ -90,7 +90,7 @@ table, th, td {
                         <button type="submit" class="btn btn-primary">
                             <i class="la la-save"></i> Lưu cài đặt
                         </button>
-                        <a href="{{ route('admin.system-settings.reset') }}" class="btn btn-secondary" onclick="return confirm('Bạn có chắc muốn khôi phục cài đặt mặc định?')">
+                        <a href="javascript:void(0)" class="btn btn-secondary" onclick="confirmResetSettings()">
                             <i class="la la-undo"></i> Khôi phục mặc định
                         </a>
                     </div>
@@ -139,6 +139,21 @@ document.getElementById('background_color_text').addEventListener('input', funct
 function updatePreview() {
     const color = document.getElementById('background_color').value;
     document.body.style.backgroundColor = color;
+}
+
+function confirmResetSettings() {
+    showConfirm({
+        title: 'Xác nhận khôi phục',
+        html: '<i class="la la-question-circle" style="font-size: 48px; color: #ffc107; margin-bottom: 15px;"></i><p style="margin-top: 10px;">Bạn có chắc muốn khôi phục cài đặt mặc định?</p>',
+        icon: 'warning',
+        confirmText: 'Khôi phục',
+        cancelText: 'Hủy',
+        confirmClass: 'btn btn-warning',
+        dangerMode: false,
+        onConfirm: function() {
+            window.location.href = '{{ route('admin.system-settings.reset') }}';
+        }
+    });
 }
 </script>
 @endsection

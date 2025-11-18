@@ -213,7 +213,7 @@
                                     <div class="text-center mt-2">
                                         <a href="{{ route('admin.profile.delete-photo') }}"
                                            class="btn btn-danger btn-sm"
-                                           onclick="event.preventDefault(); if(confirm('{{ getUserTitle($user) }} có chắc chắn muốn xóa ảnh đại diện?')) { this.closest('form').nextElementSibling.submit(); }">
+                                           onclick="event.preventDefault(); confirmDeletePhoto()">
                                             <i class="la la-trash"></i> Xóa ảnh
                                         </a>
                                     </div>
@@ -278,7 +278,7 @@
                                     <div class="text-center mt-2">
                                         <a href="{{ route('admin.profile.delete-signature') }}"
                                            class="btn btn-danger btn-sm"
-                                           onclick="event.preventDefault(); if(confirm('{{ getUserTitle($user) }} có chắc chắn muốn xóa chữ ký?')) { document.getElementById('deleteSignatureForm').submit(); }">
+                                           onclick="event.preventDefault(); confirmDeleteSignature()">
                                             <i class="la la-trash"></i> Xóa chữ ký
                                         </a>
                                     </div>
@@ -368,14 +368,14 @@
         if (file) {
             // Validate file size (2MB max)
             if (file.size > 2 * 1024 * 1024) {
-                alert('Kích thước ảnh không được vượt quá 2MB');
+            showError('Kích thước ảnh không được vượt quá 2MB', 'Lỗi');
                 this.value = '';
                 return;
             }
             
             // Validate file type
             if (!file.type.match('image.*')) {
-                alert('Vui lòng chọn file ảnh');
+            showError('Vui lòng chọn file ảnh', 'Lỗi');
                 this.value = '';
                 return;
             }
@@ -404,14 +404,14 @@
             if (file) {
                 // Validate file size
                 if (file.size > 2 * 1024 * 1024) {
-                    alert('Kích thước ảnh không được vượt quá 2MB');
+            showError('Kích thước ảnh không được vượt quá 2MB', 'Lỗi');
                     this.value = '';
                     return;
                 }
                 
                 // Validate file type
                 if (!file.type.match('image.*')) {
-                    alert('Vui lòng chọn file ảnh');
+            showError('Vui lòng chọn file ảnh', 'Lỗi');
                     this.value = '';
                     return;
                 }
@@ -431,6 +431,26 @@
                 }, 500);
             }
         });
+    }
+
+    function confirmDeletePhoto() {
+        confirmDelete(
+            '{{ getUserTitle($user) }} có chắc chắn muốn xóa ảnh đại diện?',
+            null,
+            function() {
+                document.getElementById('deletePhotoForm').submit();
+            }
+        );
+    }
+
+    function confirmDeleteSignature() {
+        confirmDelete(
+            '{{ getUserTitle($user) }} có chắc chắn muốn xóa chữ ký?',
+            null,
+            function() {
+                document.getElementById('deleteSignatureForm').submit();
+            }
+        );
     }
 </script>
 @endsection
