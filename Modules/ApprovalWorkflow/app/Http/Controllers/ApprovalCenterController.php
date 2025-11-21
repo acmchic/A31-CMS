@@ -62,6 +62,9 @@ class ApprovalCenterController extends Controller
             $departmentName = 'BAN GIÁM ĐỐC';
         }
 
+        // Get pending counts by type for badge display
+        $pendingCounts = $this->service->getPendingCountsByType($user);
+
         return view('approvalworkflow::approval-center.index', [
             'requests' => $requests,
             'selectedRequest' => $selectedRequest,
@@ -71,6 +74,7 @@ class ApprovalCenterController extends Controller
                 'time_range' => $timeRange,
             ],
             'departmentName' => $departmentName,
+            'pendingCounts' => $pendingCounts,
         ]);
     }
 

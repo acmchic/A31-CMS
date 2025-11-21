@@ -20,22 +20,78 @@
 <div class="row" style="height: calc(100vh - 200px);">
     <!-- Left Column: Request List -->
     <div class="col-md-5 border-end" style="overflow-y: auto; max-height: 100%;">
+        <!-- Type Cards -->
+        <div class="mb-3">
+            <input type="hidden" id="filter-type" value="{{ $filters['type'] }}">
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <div class="card type-card {{ $filters['type'] === 'leave' ? 'active' : '' }}" 
+                         data-type="leave" 
+                         style="cursor: pointer; position: relative; transition: all 0.2s;">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <h6 class="mb-0 fw-semibold">Nghỉ phép</h6>
+                                </div>
+                                @php
+                                    $user = backpack_user();
+                                    $leaveCount = 0;
+                                    if ($user->hasRole('Admin') || \App\Helpers\PermissionHelper::can($user, 'leave.review')) {
+                                        $leaveCount = $pendingCounts['leave']['review'] ?? 0;
+                                    } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
+                                        $leaveCount = $pendingCounts['leave']['director'] ?? 0;
+                                    } else {
+                                        $leaveCount = $pendingCounts['leave']['pending'] ?? 0;
+                                    }
+                                @endphp
+                                @if($leaveCount > 0)
+                                    <span class="badge bg-danger rounded-pill" style="font-size: 0.75rem; min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;">
+                                        {{ $leaveCount }}
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card type-card {{ $filters['type'] === 'vehicle' ? 'active' : '' }}" 
+                         data-type="vehicle" 
+                         style="cursor: pointer; position: relative; transition: all 0.2s;">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <h6 class="mb-0 fw-semibold">Xe công</h6>
+                                </div>
+                                @php
+                                    $vehicleCount = 0;
+                                    if ($user->hasRole('Admin') || \App\Helpers\PermissionHelper::can($user, 'leave.review')) {
+                                        $vehicleCount = $pendingCounts['vehicle']['review'] ?? 0;
+                                    } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
+                                        $vehicleCount = $pendingCounts['vehicle']['director'] ?? 0;
+                                    } else {
+                                        $vehicleCount = $pendingCounts['vehicle']['pending'] ?? 0;
+                                    }
+                                @endphp
+                                @if($vehicleCount > 0)
+                                    <span class="badge bg-danger rounded-pill" style="font-size: 0.75rem; min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;">
+                                        {{ $vehicleCount }}
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Filters -->
         <div class="card mb-3">
             <div class="card-body">
-                <div class="row g-2">
-                    <div class="col-md-4">
-                        <label class="form-label small text-muted mb-1">Loại</label>
-                        <select id="filter-type" class="form-select">
-                            <option value="all" {{ $filters['type'] === 'all' ? 'selected' : '' }}>Tất cả loại</option>
-                            <option value="leave" {{ $filters['type'] === 'leave' ? 'selected' : '' }}>Nghỉ phép</option>
-                            <option value="vehicle" {{ $filters['type'] === 'vehicle' ? 'selected' : '' }}>Xe công</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-6">
                         <label class="form-label small text-muted mb-1">Trạng thái</label>
                         <select id="filter-status" class="form-select">
-                            <option value="all" {{ $filters['status'] === 'all' ? 'selected' : '' }}>Tất cả trạng thái</option>
+                            <option value="all" {{ $filters['status'] === 'all' ? 'selected' : '' }}>Tất cả</option>
                             <option value="pending" {{ $filters['status'] === 'pending' ? 'selected' : '' }}>Chỉ huy xác nhận</option>
                             <option value="approved_by_department_head" {{ $filters['status'] === 'approved_by_department_head' ? 'selected' : '' }}>Thẩm định</option>
                             <option value="approved_by_reviewer" {{ $filters['status'] === 'approved_by_reviewer' ? 'selected' : '' }}>BGD phê duyệt</option>
@@ -43,10 +99,10 @@
                             <option value="rejected" {{ $filters['status'] === 'rejected' ? 'selected' : '' }}>Đã từ chối</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <label class="form-label small text-muted mb-1">Thời gian</label>
                         <select id="filter-time" class="form-select">
-                            <option value="all" {{ $filters['time_range'] === 'all' ? 'selected' : '' }}>Mọi thời điểm</option>
+                            <option value="all" {{ $filters['time_range'] === 'all' ? 'selected' : '' }}>Tất cả</option>
                             <option value="today" {{ $filters['time_range'] === 'today' ? 'selected' : '' }}>Hôm nay</option>
                             <option value="week" {{ $filters['time_range'] === 'week' ? 'selected' : '' }}>Tuần này</option>
                             <option value="month" {{ $filters['time_range'] === 'month' ? 'selected' : '' }}>Tháng này</option>
@@ -115,8 +171,34 @@
     animation: placeholder-glow 2s ease-in-out infinite;
 }
 
+/* Type Cards */
+.type-card {
+    border: 2px solid #e5e7eb;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.type-card:hover {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+.type-card.active {
+    border-color: #007bff;
+    background-color: #f0f7ff;
+}
+
+.type-card .card-body {
+    position: relative;
+}
+
+.type-card .badge {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    flex-shrink: 0;
+}
+
 /* Improve select dropdowns */
-#filter-type, #filter-status, #filter-time {
+#filter-status, #filter-time {
     font-size: 0.95rem;
     padding: 0.5rem 0.75rem;
     min-height: 38px;
@@ -367,8 +449,39 @@
 @push('after_scripts')
 <script>
 $(document).ready(function() {
+    // Initialize type cards based on current filter
+    const currentType = $('#filter-type').val() || 'all';
+    if (currentType === 'leave') {
+        $('.type-card[data-type="leave"]').addClass('active');
+    } else if (currentType === 'vehicle') {
+        $('.type-card[data-type="vehicle"]').addClass('active');
+    }
+
+    // Type card click handlers
+    $('.type-card').on('click', function() {
+        const type = $(this).data('type');
+        const currentType = $('#filter-type').val() || 'all';
+        
+        // If clicking the same active card, do nothing (keep it active)
+        // If clicking different card, switch to that type
+        if ($(this).hasClass('active') && currentType === type) {
+            // Already active, do nothing
+            return;
+        }
+        
+        // Update active state
+        $('.type-card').removeClass('active');
+        $(this).addClass('active');
+        
+        // Set filter type
+        $('#filter-type').val(type);
+        
+        // Apply filters
+        applyFilters();
+    });
+
     // Filter change handlers
-    $('#filter-type, #filter-status, #filter-time').on('change', function() {
+    $('#filter-status, #filter-time').on('change', function() {
         applyFilters();
     });
 
@@ -526,6 +639,9 @@ $(document).ready(function() {
                                     <label for="bulk-pin-input" class="form-label">
                                         <i class="la la-lock"></i> Mã PIN phê duyệt <span class="text-danger">*</span>
                                     </label>
+                                    <div id="bulk-pin-error" class="alert alert-danger d-none mb-2" role="alert">
+                                        <i class="la la-exclamation-triangle"></i> <span id="bulk-pin-error-text"></span>
+                                    </div>
                                     <input type="password"
                                            class="form-control"
                                            id="bulk-pin-input"
@@ -563,7 +679,11 @@ $(document).ready(function() {
         }
 
         $('#confirm-bulk-approve').on('change', updateConfirmButton);
-        $('#bulk-pin-input').on('input', updateConfirmButton);
+        $('#bulk-pin-input').on('input', function() {
+            updateConfirmButton();
+            // Hide error message when user starts typing
+            $('#bulk-pin-error').addClass('d-none');
+        });
 
         // Handle confirm - use off() first to prevent duplicate handlers
         $('#confirm-bulk-approve-btn').off('click').on('click', function() {
@@ -603,95 +723,243 @@ $(document).ready(function() {
         $.ajax({
             url: '{{ route("approval-center.bulk-approve") }}',
             method: 'POST',
+            dataType: 'json',
             data: {
                 requests: requests,
                 pin: pin,
                 _token: '{{ csrf_token() }}'
             },
             success: function(response) {
+                // Log response for debugging
+                console.log('Bulk approve response:', response);
+                
                 try {
+                    // Ensure response is an object
+                    if (typeof response === 'string') {
+                        try {
+                            response = JSON.parse(response);
+                        } catch (e) {
+                            console.error('Failed to parse response:', e);
+                        }
+                    }
+                    
                     if (response && response.success) {
                         // Show success message with details
                         const approvedCount = response.approved_count || 0;
                         const failedCount = response.failed_count || 0;
-                        let message = `Đã phê duyệt thành công ${approvedCount} đơn`;
+                        const errors = response.errors || [];
                         
-                        if (failedCount > 0) {
-                            message += `. ${failedCount} đơn không thể phê duyệt.`;
-                            if (response.errors && response.errors.length > 0) {
-                                message += '\n\nLỗi:\n' + response.errors.slice(0, 5).join('\n');
-                                if (response.errors.length > 5) {
-                                    message += '\n... và ' + (response.errors.length - 5) + ' lỗi khác';
-                                }
+                        // Determine action type (phê duyệt or thẩm định) based on requests
+                        let actionType = 'phê duyệt';
+                        const hasReviewerStep = requests.some(function(req) {
+                            return req.is_reviewer_step === true || req.is_reviewer_step === '1';
+                        });
+                        if (hasReviewerStep) {
+                            actionType = 'thẩm định';
+                        }
+                        
+                        // Build message with clear error display
+                        let message = '';
+                        let notificationType = 'success';
+                        let notificationTitle = 'Thành công';
+                        let notificationIcon = 'fa fa-check-circle';
+                        
+                        if (approvedCount > 0 && failedCount === 0) {
+                            // All successful - show clear success message
+                            if (approvedCount === 1) {
+                                message = `Đã ${actionType} thành công 1 đơn`;
+                            } else {
+                                message = `Đã ${actionType} thành công ${approvedCount} đơn`;
+                            }
+                            notificationType = 'success';
+                            notificationTitle = actionType === 'thẩm định' ? 'Thẩm định thành công' : 'Phê duyệt thành công';
+                            notificationIcon = 'fa fa-check-circle';
+                        } else if (approvedCount > 0 && failedCount > 0) {
+                            // Partial success - show errors
+                            message = `Đã ${actionType} ${approvedCount} đơn, ${failedCount} đơn thất bại`;
+                            if (errors.length > 0) {
+                                message += '\n\nCác lỗi:\n';
+                                errors.forEach(function(error, index) {
+                                    message += `${index + 1}. ${error}\n`;
+                                });
+                            }
+                            notificationType = 'warning';
+                            notificationTitle = 'Hoàn tất (có lỗi)';
+                            notificationIcon = 'fa fa-exclamation-triangle';
+                        } else if (approvedCount === 0 && failedCount > 0) {
+                            // All failed - show errors
+                            message = `Không thể ${actionType} đơn nào. ${failedCount} đơn thất bại`;
+                            if (errors.length > 0) {
+                                message += '\n\nCác lỗi:\n';
+                                errors.forEach(function(error, index) {
+                                    message += `${index + 1}. ${error}\n`;
+                                });
+                            }
+                            notificationType = 'error';
+                            notificationTitle = 'Thất bại';
+                            notificationIcon = 'fa fa-times-circle';
+                        } else {
+                            // Fallback - use response message
+                            message = response.message || 'Đã xử lý';
+                            // Only show errors if there are actual failures
+                            if (failedCount > 0 && errors.length > 0) {
+                                message += '\n\nCác lỗi:\n';
+                                errors.forEach(function(error, index) {
+                                    message += `${index + 1}. ${error}\n`;
+                                });
                             }
                         }
 
-                        // Show notification
-                        if (typeof new PNotify !== 'undefined') {
-                            new PNotify({
-                                title: failedCount > 0 ? 'Hoàn tất (có lỗi)' : 'Thành công',
-                                text: message,
-                                type: failedCount > 0 ? 'warning' : 'success',
-                                icon: failedCount > 0 ? 'fa fa-exclamation-triangle' : 'fa fa-check',
-                                delay: 3000
-                            });
-                        } else {
-                            alert(message);
-                        }
+                        // Only close modal and reload when ALL requests succeeded
+                        if (approvedCount > 0 && failedCount === 0) {
+                            // All successful - show success notification and close modal
+                            if (typeof Noty !== 'undefined') {
+                                new Noty({
+                                    type: 'success',
+                                    text: '<strong>' + notificationTitle + '</strong><br>' + message,
+                                    layout: 'topRight',
+                                    timeout: 4000,
+                                    progressBar: true,
+                                    closeWith: ['click', 'button']
+                                }).show();
+                            }
+                            
+                            // Close modal and reload
+                            if (modalInstance) {
+                                modalInstance.hide();
+                            } else if (modalElement) {
+                                const bsModal = new bootstrap.Modal(modalElement);
+                                bsModal.hide();
+                            } else {
+                                // Fallback: use jQuery if Bootstrap API fails
+                                $('#bulkApproveModal').modal('hide');
+                            }
 
-                        // Close modal using Bootstrap 5 API
+                            // Reload page after a short delay to allow modal to close
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 300);
+                        } else {
+                            // Has errors - show error message in modal, keep modal open
+                            let errorText = 'Sai mã PIN, vui lòng thử lại';
+                            
+                            // Check if error message contains PIN-related error
+                            if (errors.length > 0) {
+                                const firstError = errors[0];
+                                if (firstError.includes('PIN') || firstError.includes('pin') || firstError.includes('Mã PIN')) {
+                                    errorText = 'Sai mã PIN, vui lòng thử lại';
+                                } else {
+                                    errorText = firstError;
+                                }
+                            } else if (message && (message.includes('PIN') || message.includes('pin') || message.includes('Mã PIN'))) {
+                                errorText = 'Sai mã PIN, vui lòng thử lại';
+                            }
+                            
+                            // Show error message in modal
+                            $('#bulk-pin-error-text').text(errorText);
+                            $('#bulk-pin-error').removeClass('d-none');
+                            
+                            // Re-enable button
+                            $btn.prop('disabled', false).html('<i class="la la-check-double"></i> Xác nhận phê duyệt');
+                            // Clear PIN input to allow retry
+                            $('#bulk-pin-input').val('').focus();
+                        }
+                    } else {
+                        // Request failed completely - keep modal open, show error in modal
+                        const errorMsg = response?.message || 'Không thể phê duyệt';
+                        const errors = response?.errors || [];
+                        
+                        // Determine error text to show
+                        let errorText = 'Sai mã PIN, vui lòng thử lại';
+                        
+                        if (errors.length > 0) {
+                            const firstError = errors[0];
+                            if (firstError.includes('PIN') || firstError.includes('pin') || firstError.includes('Mã PIN')) {
+                                errorText = 'Sai mã PIN, vui lòng thử lại';
+                            } else {
+                                errorText = firstError;
+                            }
+                        } else if (errorMsg && (errorMsg.includes('PIN') || errorMsg.includes('pin') || errorMsg.includes('Mã PIN'))) {
+                            errorText = 'Sai mã PIN, vui lòng thử lại';
+                        } else if (errorMsg) {
+                            errorText = errorMsg;
+                        }
+                        
+                        // Show error message in modal
+                        $('#bulk-pin-error-text').text(errorText);
+                        $('#bulk-pin-error').removeClass('d-none');
+                        
+                        // Keep modal open, re-enable button, clear PIN for retry
+                        $btn.prop('disabled', false).html('<i class="la la-check-double"></i> Xác nhận phê duyệt');
+                        $('#bulk-pin-input').val('').focus();
+                    }
+                } catch (e) {
+                    console.error('Error processing response:', e, response);
+                    // If we got here but response.success is true, it might have actually succeeded
+                    // Try to reload anyway
+                    if (response && response.success && (response.approved_count > 0 || response.failed_count === 0)) {
+                        // Likely a display issue, but request succeeded - close modal and reload
                         if (modalInstance) {
                             modalInstance.hide();
                         } else if (modalElement) {
                             const bsModal = new bootstrap.Modal(modalElement);
                             bsModal.hide();
-                        } else {
-                            // Fallback: use jQuery if Bootstrap API fails
-                            $('#bulkApproveModal').modal('hide');
                         }
-
-                        // Reload page after a short delay to allow modal to close
                         setTimeout(function() {
                             window.location.reload();
                         }, 300);
                     } else {
-                        const errorMsg = response?.message || 'Không thể phê duyệt';
-                        alert('Có lỗi xảy ra: ' + errorMsg);
+                        alert('Có lỗi xảy ra khi xử lý kết quả: ' + (e.message || 'Unknown error'));
                         $btn.prop('disabled', false).html('<i class="la la-check-double"></i> Xác nhận phê duyệt');
                     }
-                } catch (e) {
-                    console.error('Error processing response:', e);
-                    alert('Có lỗi xảy ra khi xử lý kết quả');
-                    $btn.prop('disabled', false).html('<i class="la la-check-double"></i> Xác nhận phê duyệt');
                 }
             },
             error: function(xhr) {
                 let errorMsg = 'Có lỗi xảy ra khi phê duyệt';
+                let errors = [];
                 
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    errorMsg = xhr.responseJSON.message;
+                if (xhr.responseJSON) {
+                    if (xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    if (xhr.responseJSON.errors && Array.isArray(xhr.responseJSON.errors)) {
+                        errors = xhr.responseJSON.errors;
+                    }
                 } else if (xhr.responseText) {
                     try {
                         const errorData = JSON.parse(xhr.responseText);
                         errorMsg = errorData.message || errorMsg;
+                        if (errorData.errors && Array.isArray(errorData.errors)) {
+                            errors = errorData.errors;
+                        }
                     } catch (e) {
                         // Keep default error message
                     }
                 }
-
-                if (typeof new PNotify !== 'undefined') {
-                    new PNotify({
-                        title: 'Lỗi',
-                        text: errorMsg,
-                        type: 'error',
-                        icon: 'fa fa-times',
-                        delay: 3000
-                    });
-                } else {
-                    alert(errorMsg);
+                
+                // Determine error text to show
+                let errorText = 'Sai mã PIN, vui lòng thử lại';
+                
+                if (errors.length > 0) {
+                    const firstError = errors[0];
+                    if (firstError.includes('PIN') || firstError.includes('pin') || firstError.includes('Mã PIN')) {
+                        errorText = 'Sai mã PIN, vui lòng thử lại';
+                    } else {
+                        errorText = firstError;
+                    }
+                } else if (errorMsg && (errorMsg.includes('PIN') || errorMsg.includes('pin') || errorMsg.includes('Mã PIN'))) {
+                    errorText = 'Sai mã PIN, vui lòng thử lại';
+                } else if (errorMsg) {
+                    errorText = errorMsg;
                 }
+                
+                // Show error message in modal
+                $('#bulk-pin-error-text').text(errorText);
+                $('#bulk-pin-error').removeClass('d-none');
 
+                // Keep modal open, re-enable button, clear PIN for retry
                 $btn.prop('disabled', false).html('<i class="la la-check-double"></i> Xác nhận phê duyệt');
+                $('#bulk-pin-input').val('').focus();
             },
             complete: function() {
                 // Ensure button is re-enabled if still in loading state
@@ -719,7 +987,8 @@ $(document).ready(function() {
     });
 
     function applyFilters() {
-        const type = $('#filter-type').val();
+        // Get type from hidden input
+        const type = $('#filter-type').val() || 'all';
         const status = $('#filter-status').val();
         const timeRange = $('#filter-time').val();
 
@@ -1129,6 +1398,9 @@ $(document).ready(function() {
                         <div class="modal-body">
                             <div class="mb-3">
                                 <label class="form-label">Mã PIN <span class="text-danger">*</span></label>
+                                <div id="pin-error" class="alert alert-danger d-none mb-2" role="alert">
+                                    <i class="la la-exclamation-triangle"></i> <span id="pin-error-text"></span>
+                                </div>
                                 <input type="password" class="form-control" id="pin-input" placeholder="Nhập mã PIN">
                             </div>
                             <div class="mb-3">
@@ -1147,6 +1419,12 @@ $(document).ready(function() {
 
         $('body').append(modal);
         $('#pinModal').modal('show');
+        
+        // Hide error message when user starts typing
+        $('#pin-input').on('input', function() {
+            $('#pin-error').addClass('d-none');
+        });
+        
         $('#pinModal').on('hidden.bs.modal', function() {
             $(this).remove();
         });
@@ -1384,17 +1662,18 @@ $(document).ready(function() {
             },
             success: function(response) {
                 if (response.success) {
-                    // Show success message
-                    if (typeof new PNotify !== 'undefined') {
-                        new PNotify({
-                            title: 'Thành công',
-                            text: response.message,
+                    // Show success message for thẩm định
+                    if (typeof Noty !== 'undefined') {
+                        new Noty({
                             type: 'success',
-                            icon: 'fa fa-check',
-                            delay: 3000
-                        });
+                            text: '<strong>Thẩm định thành công</strong><br>' + (response.message || 'Đã thẩm định và gửi lên Ban Giám đốc thành công'),
+                            layout: 'topRight',
+                            timeout: 4000,
+                            progressBar: true,
+                            closeWith: ['click', 'button']
+                        }).show();
                     } else {
-                        alert(response.message);
+                        alert('Thẩm định thành công\n\n' + (response.message || 'Đã thẩm định và gửi lên Ban Giám đốc thành công'));
                     }
 
                     // Close modal
@@ -1588,11 +1867,39 @@ $(document).ready(function() {
 
                 if (response.success) {
                     $('#assignApproversModal').modal('hide');
-                    alert(response.message);
-                    // Reload page to show updated status
-                    location.reload();
+                    
+                    // Show success notification for thẩm định
+                    if (typeof Noty !== 'undefined') {
+                        new Noty({
+                            type: 'success',
+                            text: '<strong>Thẩm định thành công</strong><br>' + (response.message || 'Đã thẩm định và gửi lên Ban Giám đốc thành công'),
+                            layout: 'topRight',
+                            timeout: 4000,
+                            progressBar: true,
+                            closeWith: ['click', 'button']
+                        }).show();
+                    } else {
+                        alert('Thẩm định thành công\n\n' + (response.message || 'Đã thẩm định và gửi lên Ban Giám đốc thành công'));
+                    }
+                    
+                    // Reload page after a short delay to show notification
+                    setTimeout(function() {
+                        location.reload();
+                    }, 500);
                 } else {
-                    alert(response.message);
+                    // Show error notification
+                    if (typeof Noty !== 'undefined') {
+                        new Noty({
+                            type: 'error',
+                            text: '<strong>Lỗi</strong><br>' + (response.message || 'Không thể thẩm định'),
+                            layout: 'topRight',
+                            timeout: 5000,
+                            progressBar: true,
+                            closeWith: ['click', 'button']
+                        }).show();
+                    } else {
+                        alert('Lỗi\n\n' + (response.message || 'Không thể thẩm định'));
+                    }
                 }
             },
             error: function(xhr) {
@@ -1634,16 +1941,72 @@ $(document).ready(function() {
                     if (needsPin && $('#pinModal').length) {
                         $('#pinModal').modal('hide');
                     }
-                    alert(response.message);
-                    location.reload();
+                    
+                    // Show success notification
+                    if (typeof Noty !== 'undefined') {
+                        new Noty({
+                            type: 'success',
+                            text: '<strong>Phê duyệt thành công</strong><br>' + (response.message || 'Đã phê duyệt thành công'),
+                            layout: 'topRight',
+                            timeout: 4000,
+                            progressBar: true,
+                            closeWith: ['click', 'button']
+                        }).show();
+                    } else {
+                        alert('Phê duyệt thành công\n\n' + (response.message || 'Đã phê duyệt thành công'));
+                    }
+                    
+                    // Reload after a short delay to show notification
+                    setTimeout(function() {
+                        location.reload();
+                    }, 500);
                 } else {
-                    alert(response.message);
+                    // Show error message in modal - keep modal open
+                    let errorText = 'Sai mã PIN, vui lòng thử lại';
+                    const errorMsg = response?.message || 'Không thể phê duyệt';
+                    
+                    if (errorMsg.includes('PIN') || errorMsg.includes('pin') || errorMsg.includes('Mã PIN')) {
+                        errorText = 'Sai mã PIN, vui lòng thử lại';
+                    } else {
+                        errorText = errorMsg;
+                    }
+                    
+                    // Show error message in modal
+                    if (needsPin && $('#pin-error').length) {
+                        $('#pin-error-text').text(errorText);
+                        $('#pin-error').removeClass('d-none');
+                    }
+                    
+                    // Keep modal open, clear PIN for retry
+                    if (needsPin && $('#pin-input').length) {
+                        $('#pin-input').val('').focus();
+                    }
                 }
             },
             error: function(xhr) {
                 btn.prop('disabled', false).html(originalText);
-                const message = xhr.responseJSON?.message || 'Có lỗi xảy ra';
-                alert(message);
+                
+                // Get error message from response
+                let errorText = 'Sai mã PIN, vui lòng thử lại';
+                if (xhr.responseJSON) {
+                    const errorMsg = xhr.responseJSON.message || 'Có lỗi xảy ra';
+                    if (errorMsg.includes('PIN') || errorMsg.includes('pin') || errorMsg.includes('Mã PIN')) {
+                        errorText = 'Sai mã PIN, vui lòng thử lại';
+                    } else {
+                        errorText = errorMsg;
+                    }
+                }
+                
+                // Show error message in modal
+                if (needsPin && $('#pin-error').length) {
+                    $('#pin-error-text').text(errorText);
+                    $('#pin-error').removeClass('d-none');
+                }
+                
+                // Keep modal open, clear PIN for retry
+                if (needsPin && $('#pin-input').length) {
+                    $('#pin-input').val('').focus();
+                }
             }
         });
     };
@@ -1651,11 +2014,7 @@ $(document).ready(function() {
     window.submitRejection = function(id, modelType) {
         const reason = $('#reason-input').val();
 
-        if (!reason || reason.trim().length < 5) {
-            alert('Vui lòng nhập lý do từ chối (ít nhất 5 ký tự)');
-            return;
-        }
-
+        
         $.ajax({
             url: '{{ route("approval-center.reject") }}',
             method: 'POST',

@@ -34,6 +34,77 @@ class ApprovalCenterService
     }
 
     /**
+     * Get pending request counts by type for current user
+     */
+    public function getPendingCountsByType($user)
+    {
+        $counts = [
+            'leave' => [
+                'pending' => 0, // Chỉ huy xác nhận
+                'review' => 0,  // Thẩm định
+                'director' => 0 // BGD phê duyệt
+            ],
+            'vehicle' => [
+                'pending' => 0,
+                'review' => 0,
+                'director' => 0
+            ]
+        ];
+
+        // Get leave counts
+        $leaveQuery = EmployeeLeave::query();
+        $this->filterLeaveByUserPermissions($leaveQuery, $user, ['status' => 'all']);
+        
+        // Count by status
+        $counts['leave']['pending'] = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_PENDING)->count();
+        $counts['leave']['review'] = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD)->count();
+        
+        // For director count, only count requests where user is in selected_approvers
+        $directorQuery = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER);
+        if ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
+            $userId = (int)$user->id;
+            $directorQuery->where(function($q) use ($userId) {
+                $q->whereJsonContains('selected_approvers', $userId)
+                  ->orWhereJsonContains('selected_approvers', (string)$userId)
+                  ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode($userId)])
+                  ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode((string)$userId)]);
+            });
+        }
+        $counts['leave']['director'] = $directorQuery->count();
+
+        // Get vehicle counts
+        $vehicleQuery = VehicleRegistration::query();
+        $this->filterVehicleByUserPermissions($vehicleQuery, $user);
+        
+        // Vehicle workflow is simpler - just count pending/review status
+        $counts['vehicle']['pending'] = (clone $vehicleQuery)->whereIn('workflow_status', ['submitted', 'dept_review'])->count();
+        $counts['vehicle']['review'] = 0; // Vehicle doesn't have review step
+        $counts['vehicle']['director'] = 0; // Vehicle doesn't have director step
+
+        return $counts;
+    }
+
+    /**
+     * Get the appropriate pending count for current user based on their role
+     */
+    public function getPendingCountForUser($user, $type = 'leave')
+    {
+        $counts = $this->getPendingCountsByType($user);
+        
+        // Determine which count to show based on user role
+        if ($user->hasRole('Admin') || PermissionHelper::can($user, 'leave.review')) {
+            // Thẩm định: show review count
+            return $counts[$type]['review'];
+        } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
+            // Ban giám đốc: show director count
+            return $counts[$type]['director'];
+        } else {
+            // Trưởng phòng/Quản đốc: show pending count
+            return $counts[$type]['pending'];
+        }
+    }
+
+    /**
      * Get leave requests
      */
     protected function getLeaveRequests($user, $filters)
@@ -683,14 +754,8 @@ class ApprovalCenterService
             $date = \Carbon\Carbon::parse($date);
         }
         
-        $months = [
-            1 => 'Th01', 2 => 'Th02', 3 => 'Th03', 4 => 'Th04',
-            5 => 'Th05', 6 => 'Th06', 7 => 'Th07', 8 => 'Th08',
-            9 => 'Th09', 10 => 'Th10', 11 => 'Th11', 12 => 'Th12'
-        ];
-        
-        $month = $months[$date->month] ?? $date->format('m');
-        return $date->format("d {$month}, H:i");
+        // Format: dd/mm/yyyy, HH:mm
+        return $date->format('d/m/Y, H:i');
     }
 
     /**
