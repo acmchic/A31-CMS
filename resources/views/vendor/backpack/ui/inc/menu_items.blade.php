@@ -2,10 +2,19 @@
 
 {{-- Dashboard --}}
 <li class="nav-item">
-    <a class="nav-link" href="{{ backpack_url('dashboard') }}">
-        <i class="la la-home nav-icon"></i> Trang chủ
+    <a class="nav-link" href="{{ backpack_url('dashboard') }}" title="Trang chủ">
+        <i class="la la-home nav-icon"></i>
     </a>
 </li>
+
+{{-- Approval Center --}}
+@if(\App\Helpers\PermissionHelper::userCan('leave.approve') || \App\Helpers\PermissionHelper::userCan('leave.review') || \App\Helpers\PermissionHelper::userCan('vehicle_registration.approve') || backpack_user()->hasRole('Admin'))
+<li class="nav-item">
+    <a class="nav-link" href="{{ url('approval-center') }}">
+        <i class="la la-check-circle nav-icon"></i> Trung tâm phê duyệt
+    </a>
+</li>
+@endif
 
 {{-- Personnel Reports --}}
 @if(backpack_user()->hasPermissionTo('report.view.company') || backpack_user()->hasPermissionTo('report.view') || \App\Helpers\PermissionHelper::userCan('leave.view') || \App\Helpers\PermissionHelper::userCan('leave.create'))

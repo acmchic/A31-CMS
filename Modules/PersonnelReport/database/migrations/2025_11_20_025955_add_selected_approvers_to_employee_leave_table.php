@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('shared_files', function (Blueprint $table) {
-            $table->string('folder_path')->nullable()->after('file_path')->comment('Đường dẫn thư mục tương đối khi upload cả folder');
+        Schema::table('employee_leave', function (Blueprint $table) {
+            $table->json('selected_approvers')->nullable()->after('approved_by_reviewer')->comment('Danh sách ID người phê duyệt được chọn bởi reviewer');
         });
     }
 
@@ -21,14 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('shared_files', function (Blueprint $table) {
-            $table->dropColumn('folder_path');
+        Schema::table('employee_leave', function (Blueprint $table) {
+            $table->dropColumn('selected_approvers');
         });
     }
 };
-
-
-
-
-
-

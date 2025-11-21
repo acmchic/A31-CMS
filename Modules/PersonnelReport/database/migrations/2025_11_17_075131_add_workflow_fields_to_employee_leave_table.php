@@ -12,8 +12,8 @@ return new class extends Migration
             if (!Schema::hasColumn('employee_leave', 'approved_by_department_head')) {
                 $table->unsignedBigInteger('approved_by_department_head')->nullable()->after('approved_by_approver');
                 $table->timestamp('approved_at_department_head')->nullable()->after('approved_at_approver');
-            }
-            
+    }
+
             if (!Schema::hasColumn('employee_leave', 'approved_by_reviewer')) {
                 $table->unsignedBigInteger('approved_by_reviewer')->nullable()->after('approved_by_department_head');
                 $table->timestamp('approved_at_reviewer')->nullable()->after('approved_at_department_head');

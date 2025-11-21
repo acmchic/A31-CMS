@@ -57,12 +57,13 @@ class EmployeeLeave extends Model
         'approved_at_director',
         'director_comment',
         'director_signature_path',
+        'selected_approvers',
         'created_by',
         'updated_by',
         'deleted_by'
     ];
 
-    protected $dates = ['deleted_at', 'from_date', 'to_date', 'start_at', 'end_at', 'approved_at', 'reviewed_at', 'approved_at_department_head', 'approved_at_reviewer'];
+    protected $dates = ['deleted_at', 'from_date', 'to_date', 'start_at', 'end_at', 'approved_at', 'reviewed_at', 'approved_at_department_head', 'approved_at_reviewer', 'approved_at_director'];
 
     protected $casts = [
         'from_date' => 'date',
@@ -73,9 +74,11 @@ class EmployeeLeave extends Model
         'reviewed_at' => 'datetime',
         'approved_at_department_head' => 'datetime',
         'approved_at_reviewer' => 'datetime',
+        'approved_at_director' => 'datetime',
         'is_authorized' => 'boolean',
         'is_checked' => 'boolean',
-        'workflow_status' => 'string'
+        'workflow_status' => 'string',
+        'selected_approvers' => 'array'
     ];
 
     // Leave status constants
@@ -368,6 +371,413 @@ class EmployeeLeave extends Model
         })->first();
     }
 
+    /**
+     * Get all directors (BGD) - for reviewer to select
+     */
+    public static function getDirectors()
+    {
+        return \App\Models\User::whereHas('roles', function($q) {
+            $q->whereIn('name', ['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+        })->get();
+    }
+
+    /**
+     * Get selected approvers (directors selected by reviewer)
+     */
+    public function getSelectedApprovers()
+    {
+        if (!$this->selected_approvers) {
+            return collect([]);
+        }
+        
+        $approverIds = is_array($this->selected_approvers) 
+            ? $this->selected_approvers 
+            : json_decode($this->selected_approvers, true);
+            
+        if (!is_array($approverIds)) {
+            return collect([]);
+        }
+        
+        return \App\Models\User::whereIn('id', $approverIds)->get();
+    }
+
+    /**
+     * Check if user is in selected approvers list
+     */
+    public function isUserSelectedApprover($userId)
+    {
+        if (!$this->selected_approvers) {
+            return false;
+        }
+        
+        $approverIds = is_array($this->selected_approvers) 
+            ? $this->selected_approvers 
+            : json_decode($this->selected_approvers, true);
+            
+        if (!is_array($approverIds)) {
+            return false;
+        }
+        
+        // Convert all IDs to integers for comparison (handle both string and int in JSON)
+        $approverIds = array_map('intval', $approverIds);
+        $userId = (int)$userId;
+        
+        return in_array($userId, $approverIds);
+    }
+
+    /**
+     * Override approve button to handle reviewer step differently
+     */
+    public function approveButton()
+    {
+        if (!$this->canBeApproved()) {
+            return '';
+        }
+
+        $user = backpack_user();
+        $modulePermission = $this->getModulePermission();
+
+        if (!\App\Helpers\PermissionHelper::can($user, "{$modulePermission}.approve")) {
+            return '';
+        }
+
+        // Check if this is reviewer step
+        $isReviewerStep = $this->workflow_status === self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
+        $hasReviewPermission = \App\Helpers\PermissionHelper::can($user, 'leave.review');
+
+        if ($isReviewerStep && $hasReviewPermission) {
+            // For reviewer step: show "Người phê duyệt" button
+            return $this->assignApproversButton();
+        }
+
+        // For other steps: show normal approve button with PIN
+        // Copy code from ApprovalButtons trait since we can't use parent:: with traits
+        $modelClass = base64_encode(get_class($this));
+        $modalId = 'pinModal_' . $this->id;
+        $approvalUrl = route('approval.approve-with-pin', ['modelClass' => $modelClass, 'id' => $this->id]);
+
+        return '
+        <button class="btn btn-sm btn-success" onclick="showPinModal_' . $this->id . '()">
+            <i class="la la-check"></i> Phê duyệt
+        </button>
+        <script>
+        function showPinModal_' . $this->id . '() {
+            // Clear any search input before showing modal (prevent Chrome autofill)
+            const searchInputs = document.querySelectorAll(\'input[type="search"], .dataTables_filter input\');
+            searchInputs.forEach(input => {
+                if (input.value === "admin" || input.value.toLowerCase().includes("admin")) {
+                    input.value = "";
+                }
+            });
+
+            var modalHtml = `
+            <div class="modal fade" id="' . $modalId . '" tabindex="-1" data-bs-backdrop="static" style="z-index: 99999 !important;">
+                <div class="modal-dialog" style="z-index: 100000 !important;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Xác nhận Phê duyệt</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <!-- Error message container -->
+                            <div id="error_message_' . $this->id . '" class="alert alert-danger" style="display:none;" role="alert">
+                                <i class="la la-exclamation-circle"></i> <span id="error_text_' . $this->id . '"></span>
+                            </div>
+
+                            <p class="mb-3">Vui lòng nhập mã PIN chữ ký số của bạn để xác thực:</p>
+
+                            <!-- Hidden fake username field to prevent Chrome from filling search box -->
+                            <input type="text" name="fake_username_' . $this->id . '" style="position:absolute;top:-9999px;left:-9999px;" autocomplete="username" tabindex="-1">
+
+                            <div class="mb-3">
+                                <label class="form-label">Mã PIN <span class="text-danger">*</span></label>
+                                <input
+                                    type="password"
+                                    class="form-control"
+                                    id="pin_input_' . $this->id . '"
+                                    name="certificate_pin_' . $this->id . '"
+                                    placeholder="Nhập mã PIN"
+                                    autocomplete="new-password"
+                                    autocorrect="off"
+                                    autocapitalize="none"
+                                    spellcheck="false"
+                                    autofocus>
+                                <div class="form-text">Mã PIN này đã được thiết lập trong trang Thông tin cá nhân</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Ghi chú (tùy chọn)</label>
+                                <textarea
+                                    class="form-control"
+                                    id="comment_input_' . $this->id . '"
+                                    rows="2"
+                                    placeholder="Nhập ghi chú nếu có"
+                                    autocomplete="off"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                            <button type="button" class="btn btn-success" onclick="submitApproval_' . $this->id . '()">
+                                <i class="la la-check"></i> Xác nhận Ký số
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            var existingModal = document.getElementById(\'' . $modalId . '\');
+            if (existingModal) {
+                existingModal.remove();
+            }
+
+            document.body.insertAdjacentHTML(\'beforeend\', modalHtml);
+            var modal = new bootstrap.Modal(document.getElementById(\'' . $modalId . '\'));
+            modal.show();
+
+            document.getElementById(\'' . $modalId . '\').addEventListener(\'shown.bs.modal\', function() {
+                document.getElementById(\'pin_input_' . $this->id . '\').focus();
+            });
+
+            document.getElementById(\'' . $modalId . '\').addEventListener(\'hidden.bs.modal\', function() {
+                this.remove();
+            });
+        }
+
+        function submitApproval_' . $this->id . '() {
+            var pin = document.getElementById(\'pin_input_' . $this->id . '\').value;
+            var comment = document.getElementById(\'comment_input_' . $this->id . '\').value;
+            var errorDiv = document.getElementById(\'error_message_' . $this->id . '\');
+            var errorText = document.getElementById(\'error_text_' . $this->id . '\');
+
+            // Hide error message
+            errorDiv.style.display = \'none\';
+
+            // Validate PIN
+            if (!pin || pin.trim() === \'\') {
+                errorText.textContent = \'Vui lòng nhập mã PIN!\';
+                errorDiv.style.display = \'block\';
+                document.getElementById(\'pin_input_' . $this->id . '\').focus();
+                return;
+            }
+
+            if (pin.length < 1) {
+                errorText.textContent = \'Mã PIN phải có ít nhất 1 ký tự!\';
+                errorDiv.style.display = \'block\';
+                document.getElementById(\'pin_input_' . $this->id . '\').focus();
+                return;
+            }
+
+            var formData = new FormData();
+            formData.append(\'_token\', document.querySelector(\'meta[name=csrf-token]\').getAttribute(\'content\'));
+            formData.append(\'certificate_pin\', pin);
+            formData.append(\'comment\', comment);
+
+            // Disable submit button during request
+            var submitBtn = event.target;
+            var originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = \'<i class="la la-spinner la-spin"></i> Đang xử lý...\';
+
+            fetch(\'' . $approvalUrl . '\', {
+                method: \'POST\',
+                body: formData,
+                headers: {
+                    \'X-Requested-With\': \'XMLHttpRequest\'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+
+                if (data.success) {
+                    // Close modal and reload on success
+                    var modalEl = document.getElementById(\'' . $modalId . '\');
+                    var modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    alert(\'✅ \' + data.message);
+                    window.location.reload();
+                } else {
+                    // Show error in modal, keep modal open
+                    errorText.textContent = data.message || \'Không thể phê duyệt\';
+                    errorDiv.style.display = \'block\';
+                    document.getElementById(\'pin_input_' . $this->id . '\').focus();
+                }
+            })
+            .catch(error => {
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+
+                // Show error in modal, keep modal open
+                errorText.textContent = \'Có lỗi xảy ra khi kết nối máy chủ\';
+                errorDiv.style.display = \'block\';
+            });
+        }
+        </script>
+        <style>
+            .modal-backdrop { z-index: 99998 !important; }
+            #' . $modalId . ' { z-index: 99999 !important; }
+        </style>
+        ';
+    }
+
+    /**
+     * Generate "Assign Approvers" button for reviewer step
+     */
+    protected function assignApproversButton()
+    {
+        $modalId = 'assignApproversModal_' . $this->id;
+        $getDirectorsUrl = route('approval-center.directors');
+        $assignUrl = route('approval-center.assign-approvers');
+
+        return '
+        <button class="btn btn-sm btn-primary" onclick="showAssignApproversModal_' . $this->id . '()">
+            <i class="la la-user-plus"></i> Người phê duyệt
+        </button>
+        <script>
+        function showAssignApproversModal_' . $this->id . '() {
+            // Fetch directors
+            fetch(\'' . $getDirectorsUrl . '\', {
+                method: \'GET\',
+                headers: { 
+                    \'X-Requested-With\': \'XMLHttpRequest\',
+                    \'Accept\': \'application/json\'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.directors) {
+                    showDirectorsModal_' . $this->id . '(data.directors);
+                } else {
+                    alert(\'Không thể tải danh sách Ban Giám đốc\');
+                }
+            })
+            .catch(error => {
+                console.error(\'Error:\', error);
+                alert(\'Có lỗi xảy ra khi tải danh sách Ban Giám đốc\');
+            });
+        }
+
+        function showDirectorsModal_' . $this->id . '(directors) {
+            var directorsList = "";
+            directors.forEach(function(director) {
+                var checkboxId = "director_" + director.id + "_' . $this->id . '";
+                var checkboxClass = "director-checkbox-' . $this->id . '";
+                var deptText = director.department || "N/A";
+                
+                directorsList += "<div class=\"form-check mb-2\">";
+                directorsList += "<input class=\"form-check-input " + checkboxClass + "\" type=\"checkbox\" value=\"" + director.id + "\" id=\"" + checkboxId + "\">";
+                directorsList += "<label class=\"form-check-label\" for=\"" + checkboxId + "\">";
+                directorsList += director.name + " <small class=\"text-muted\">(" + deptText + ")</small>";
+                directorsList += "</label></div>";
+            });
+
+            var modalHtml = "";
+            modalHtml += "<div class=\"modal fade\" id=\"' . $modalId . '\" tabindex=\"-1\" data-bs-backdrop=\"static\" style=\"z-index: 99999 !important;\">";
+            modalHtml += "<div class=\"modal-dialog\" style=\"z-index: 100000 !important;\">";
+            modalHtml += "<div class=\"modal-content\">";
+            modalHtml += "<div class=\"modal-header bg-primary text-white\">";
+            modalHtml += "<h5 class=\"modal-title\"><i class=\"la la-user-plus\"></i> Chọn người phê duyệt</h5>";
+            modalHtml += "<button type=\"button\" class=\"btn-close btn-close-white\" data-bs-dismiss=\"modal\"></button>";
+            modalHtml += "</div>";
+            modalHtml += "<div class=\"modal-body\">";
+            modalHtml += "<div id=\"assign_error_' . $this->id . '\" class=\"alert alert-danger\" style=\"display:none;\" role=\"alert\">";
+            modalHtml += "<i class=\"la la-exclamation-circle\"></i> <span id=\"assign_error_text_' . $this->id . '\"></span>";
+            modalHtml += "</div>";
+            modalHtml += "<p class=\"mb-3\">Chọn một hoặc nhiều người trong Ban Giám đốc để gửi đơn phê duyệt:</p>";
+            modalHtml += "<div style=\"max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;\">";
+            modalHtml += directorsList;
+            modalHtml += "</div>";
+            modalHtml += "<div class=\"mt-3\">";
+            modalHtml += "<small class=\"text-muted\"><i class=\"la la-info-circle\"></i> Chỉ những người được chọn mới thấy đơn này trong danh sách phê duyệt</small>";
+            modalHtml += "</div>";
+            modalHtml += "</div>";
+            modalHtml += "<div class=\"modal-footer\">";
+            modalHtml += "<button type=\"button\" class=\"btn btn-secondary\" data-bs-dismiss=\"modal\">Hủy</button>";
+            modalHtml += "<button type=\"button\" class=\"btn btn-primary\" onclick=\"submitAssignApprovers_' . $this->id . '()\"><i class=\"la la-check\"></i> Xác nhận</button>";
+            modalHtml += "</div>";
+            modalHtml += "</div>";
+            modalHtml += "</div>";
+            modalHtml += "</div>";
+
+            var existingModal = document.getElementById(\'' . $modalId . '\');
+            if (existingModal) existingModal.remove();
+
+            document.body.insertAdjacentHTML(\'beforeend\', modalHtml);
+            var modal = new bootstrap.Modal(document.getElementById(\'' . $modalId . '\'));
+            modal.show();
+
+            document.getElementById(\'' . $modalId . '\').addEventListener(\'hidden.bs.modal\', function() {
+                this.remove();
+            });
+        }
+
+        function submitAssignApprovers_' . $this->id . '() {
+            var selectedIds = [];
+            document.querySelectorAll(\'.director-checkbox-' . $this->id . ':checked\').forEach(function(checkbox) {
+                selectedIds.push(parseInt(checkbox.value));
+            });
+
+            var errorDiv = document.getElementById(\'assign_error_' . $this->id . '\');
+            var errorText = document.getElementById(\'assign_error_text_' . $this->id . '\');
+            errorDiv.style.display = \'none\';
+
+            if (selectedIds.length === 0) {
+                errorText.textContent = \'Vui lòng chọn ít nhất một người phê duyệt\';
+                errorDiv.style.display = \'block\';
+                return;
+            }
+
+            var formData = new FormData();
+            formData.append(\'_token\', document.querySelector(\'meta[name=csrf-token]\').getAttribute(\'content\'));
+            formData.append(\'id\', ' . $this->id . ');
+            formData.append(\'model_type\', \'leave\');
+            formData.append(\'approver_ids\', JSON.stringify(selectedIds));
+
+            var submitBtn = event.target;
+            var originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = \'<i class="la la-spinner la-spin"></i> Đang xử lý...\';
+
+            fetch(\'' . $assignUrl . '\', {
+                method: \'POST\',
+                body: formData,
+                headers: { \'X-Requested-With\': \'XMLHttpRequest\' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+
+                if (data.success) {
+                    var modalEl = document.getElementById(\'' . $modalId . '\');
+                    var modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    alert(\'✅ \' + data.message);
+                    window.location.reload();
+                } else {
+                    errorText.textContent = data.message || \'Không thể gán người phê duyệt\';
+                    errorDiv.style.display = \'block\';
+                }
+            })
+            .catch(error => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                errorText.textContent = \'Có lỗi xảy ra khi kết nối máy chủ\';
+                errorDiv.style.display = \'block\';
+            });
+        }
+        </script>
+        <style>
+            .modal-backdrop { z-index: 99998 !important; }
+            #' . $modalId . ' { z-index: 99999 !important; }
+        </style>
+        ';
+    }
+
     // Scopes
     public function scopeInDepartment($query, $departmentId)
     {
@@ -454,11 +864,15 @@ class EmployeeLeave extends Model
     public function getLeaveTypeTextAttribute()
     {
         $types = [
-            self::TYPE_BUSINESS => 'Công tác',
-            self::TYPE_ATTENDANCE => 'Cơ động',
-            self::TYPE_STUDY => 'Đi học',
-            self::TYPE_LEAVE => 'Nghỉ phép',
-            self::TYPE_OTHER => 'Khác'
+            'business' => 'Công tác - Cơ động',
+            'study' => 'Học',
+            'leave' => 'Phép - Tranh thủ',
+            'hospital' => 'Đi viện',
+            'pending' => 'Chờ hưu',
+            'sick' => 'Ốm tại trại',
+            'maternity' => 'Thai sản',
+            'checkup' => 'Khám bệnh',
+            'other' => 'Khác'
         ];
         return $types[$this->leave_type] ?? 'Không xác định';
     }
@@ -469,103 +883,12 @@ class EmployeeLeave extends Model
     }
 
     /**
-     * Override approveButton to check workflow step and user role
-     * Only show button if user is the correct approver for current step
+     * Generate approve button HTML for reviewer step (no PIN, just approve and forward)
      */
-    public function approveButton()
+    protected function generateReviewerApproveButtonHtml()
     {
-        if (!$this->canBeApproved()) {
-            return '';
-        }
-
-        $user = backpack_user();
-        if (!$user) {
-            return '';
-        }
-
-        // Check if user has permission
-        $modulePermission = $this->getModulePermission();
-        $hasApprovePermission = \App\Helpers\PermissionHelper::can($user, "{$modulePermission}.approve");
-        $hasReviewPermission = \App\Helpers\PermissionHelper::can($user, "{$modulePermission}.review");
-        
-        if (!$hasApprovePermission && !$hasReviewPermission) {
-            return '';
-        }
-
-        // Check if user is the correct approver for current workflow step
-        if (!$this->canUserApproveAtCurrentStep($user)) {
-            return '';
-        }
-
-        // Check if this is reviewer step - use approve-without-pin (no signature needed)
-        $isReviewerStep = $this->workflow_status === self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD && $hasReviewPermission;
-        
-        if ($isReviewerStep) {
-            // Reviewer step: no PIN needed, just approve and forward to BGD
-            return $this->generateReviewerApproveButtonHtml();
-        }
-
-        // Generate button HTML with PIN modal (for department head and director)
         $modelClass = base64_encode(get_class($this));
-        $modalId = 'pinModal_' . $this->id;
-        $approvalUrl = route('approval.approve-with-pin', ['modelClass' => $modelClass, 'id' => $this->id]);
-
-        return $this->generateApproveButtonHtml($modalId, $approvalUrl);
-    }
-
-    /**
-     * Override rejectButton to check workflow step and user role
-     * Only show button if user is the correct approver for current step
-     */
-    public function rejectButton()
-    {
-        if (!$this->canBeRejected()) {
-            return '';
-        }
-
-        $user = backpack_user();
-        if (!$user) {
-            return '';
-        }
-
-        // Check if user has permission
-        $modulePermission = $this->getModulePermission();
-        $hasApprovePermission = \App\Helpers\PermissionHelper::can($user, "{$modulePermission}.approve");
-        $hasReviewPermission = \App\Helpers\PermissionHelper::can($user, "{$modulePermission}.review");
-        
-        if (!$hasApprovePermission && !$hasReviewPermission) {
-            return '';
-        }
-
-        // Check if user is the correct approver for current workflow step
-        if (!$this->canUserApproveAtCurrentStep($user)) {
-            return '';
-        }
-
-        // Generate button HTML (copy from ApprovalButtons trait)
-        $modelClass = base64_encode(get_class($this));
-        $rejectUrl = route('approval.reject', ['modelClass' => $modelClass, 'id' => $this->id]);
-        $modalId = 'rejectModal_' . $this->id;
-
-        return $this->generateRejectButtonHtml($modalId, $rejectUrl);
-    }
-
-    /**
-     * Generate approve button HTML (extracted from ApprovalButtons trait)
-     */
-    protected function generateApproveButtonHtml($modalId, $approvalUrl)
-    {
-        // Use trait method via trait alias if available, otherwise copy code
-        // Since we can't call parent from trait, we'll use the trait's method directly
-        // by calling the trait method name with different approach
-        $traitMethod = \Modules\ApprovalWorkflow\Traits\ApprovalButtons::class . '::approveButton';
-
-        // Actually, we need to copy the HTML generation code
-        // Let's use a simpler approach - call the trait method but it will be overridden
-        // So we need to manually generate the HTML
-
-        // For now, let's use a workaround: call the original trait method via reflection
-        // But simpler: just copy the essential parts we need
+        $approvalUrl = route('approval.approve-without-pin', ['modelClass' => $modelClass, 'id' => $this->id]);
 
         return '
         <button class="btn btn-sm btn-success" onclick="showPinModal_' . $this->id . '()">
@@ -709,146 +1032,6 @@ class EmployeeLeave extends Model
             .modal-backdrop { z-index: 99998 !important; }
             #' . $modalId . ' { z-index: 99999 !important; }
         </style>
-        ';
-    }
-
-    /**
-     * Generate approve button HTML for reviewer step (no PIN, just approve and forward)
-     */
-    protected function generateReviewerApproveButtonHtml()
-    {
-        $modelClass = base64_encode(get_class($this));
-        $approvalUrl = route('approval.approve-without-pin', ['modelClass' => $modelClass, 'id' => $this->id]);
-
-        return '
-        <button class="btn btn-sm btn-success" onclick="submitReviewerApproval_' . $this->id . '()">
-            <i class="la la-paper-plane"></i> Gửi lên BGD
-        </button>
-        <script>
-        function submitReviewerApproval_' . $this->id . '() {
-            var submitBtn = event.target;
-            
-            // Show confirmation dialog using SweetAlert
-            if (typeof swal !== \'undefined\') {
-                swal({
-                    title: \'Xác nhận gửi lên BGD\',
-                    html: \'<i class="la la-question-circle" style="font-size: 48px; color: #17a2b8; margin-bottom: 15px;"></i><p style="margin-top: 10px;">Bạn có chắc chắn muốn gửi đơn này lên Ban Giám đốc?</p>\',
-                    buttons: {
-                        cancel: {
-                            text: \'Hủy\',
-                            value: false,
-                            visible: true,
-                            className: \'btn btn-secondary\',
-                            closeModal: true
-                        },
-                        confirm: {
-                            text: \'Xác nhận\',
-                            value: true,
-                            visible: true,
-                            className: \'btn btn-success\',
-                            closeModal: false
-                        }
-                    },
-                    dangerMode: false,
-                    closeOnClickOutside: true
-                }).then(function(willApprove) {
-                    if (!willApprove) {
-                        return;
-                    }
-
-                    var formData = new FormData();
-                    formData.append(\'_token\', document.querySelector(\'meta[name=csrf-token]\').getAttribute(\'content\'));
-
-                    var originalText = submitBtn.innerHTML;
-                    submitBtn.disabled = true;
-                    submitBtn.innerHTML = \'<i class="la la-spinner la-spin"></i> Đang xử lý...\';
-
-                    fetch(\'' . $approvalUrl . '\', {
-                        method: \'POST\',
-                        body: formData,
-                        headers: { \'X-Requested-With\': \'XMLHttpRequest\' }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = originalText;
-
-                        if (data.success) {
-                            swal({
-                                title: \'Gửi lên BGD thành công\',
-                                text: data.message || \'Đơn xin nghỉ phép đã được gửi lên Ban Giám đốc.\',
-                                icon: \'success\',
-                                timer: 2000,
-                                buttons: false,
-                                closeOnClickOutside: false,
-                                closeOnEsc: false
-                            }).then(function() {
-                                window.location.href = \'' . backpack_url('leave-request') . '\';
-                            });
-                        } else {
-                            swal({
-                                title: \'Lỗi\',
-                                text: data.message || \'Không thể gửi lên BGD\',
-                                icon: \'error\',
-                                button: \'Đóng\'
-                            });
-                        }
-                    })
-                    .catch(error => {
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = originalText;
-                        swal({
-                            title: \'Lỗi kết nối\',
-                            text: \'Có lỗi xảy ra khi kết nối máy chủ\',
-                            icon: \'error\',
-                            button: \'Đóng\'
-                        });
-                    });
-                });
-            } else {
-                // Fallback to Noty if SweetAlert is not available
-                if (!confirm(\'Bạn có chắc chắn muốn gửi đơn này lên Ban Giám đốc?\')) {
-                    return;
-                }
-
-                var formData = new FormData();
-                formData.append(\'_token\', document.querySelector(\'meta[name=csrf-token]\').getAttribute(\'content\'));
-
-                var originalText = submitBtn.innerHTML;
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = \'<i class="la la-spinner la-spin"></i> Đang xử lý...\';
-
-                fetch(\'' . $approvalUrl . '\', {
-                    method: \'POST\',
-                    body: formData,
-                    headers: { \'X-Requested-With\': \'XMLHttpRequest\' }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = originalText;
-
-                    if (data.success) {
-                        new Noty({
-                            type: \'success\',
-                            text: \'<strong>Gửi lên BGD thành công</strong><br>\' + (data.message || \'Đơn xin nghỉ phép đã được gửi lên Ban Giám đốc.\'),
-                            timeout: 2000
-                        }).show();
-                        setTimeout(function() {
-                            window.location.href = \'' . backpack_url('leave-request') . '\';
-                        }, 2000);
-                    } else {
-                        showError(data.message || \'Không thể gửi lên BGD\', \'Lỗi\');
-                    }
-                })
-                .catch(error => {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = originalText;
-                    showError(\'Có lỗi xảy ra khi kết nối máy chủ\', \'Lỗi kết nối\');
-                });
-            }
-        }
-        </script>
         ';
     }
 

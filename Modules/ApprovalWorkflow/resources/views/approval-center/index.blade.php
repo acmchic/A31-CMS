@@ -1,0 +1,1686 @@
+@extends(backpack_view('blank'))
+
+{{-- Removed total requests widget to fix layout --}}
+
+@section('header')
+    <div class="container-fluid mb-4">
+        <div class="approval-center-banner">
+            <div class="banner-content">
+                <div class="banner-text">
+                    <div class="banner-department">{{ $departmentName ?? 'HỆ THỐNG' }}</div>
+                    <h1 class="banner-title">Trung tâm phê duyệt</h1>
+                    <p class="banner-subtitle">Hệ thống quản lý và phê duyệt yêu cầu tập trung</p>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection
+
+@section('content')
+<div class="row" style="height: calc(100vh - 200px);">
+    <!-- Left Column: Request List -->
+    <div class="col-md-5 border-end" style="overflow-y: auto; max-height: 100%;">
+        <!-- Filters -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label small text-muted mb-1">Loại</label>
+                        <select id="filter-type" class="form-select">
+                            <option value="all" {{ $filters['type'] === 'all' ? 'selected' : '' }}>Tất cả loại</option>
+                            <option value="leave" {{ $filters['type'] === 'leave' ? 'selected' : '' }}>Nghỉ phép</option>
+                            <option value="vehicle" {{ $filters['type'] === 'vehicle' ? 'selected' : '' }}>Xe công</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small text-muted mb-1">Trạng thái</label>
+                        <select id="filter-status" class="form-select">
+                            <option value="all" {{ $filters['status'] === 'all' ? 'selected' : '' }}>Tất cả trạng thái</option>
+                            <option value="pending" {{ $filters['status'] === 'pending' ? 'selected' : '' }}>Chỉ huy xác nhận</option>
+                            <option value="approved_by_department_head" {{ $filters['status'] === 'approved_by_department_head' ? 'selected' : '' }}>Thẩm định</option>
+                            <option value="approved_by_reviewer" {{ $filters['status'] === 'approved_by_reviewer' ? 'selected' : '' }}>BGD phê duyệt</option>
+                            <option value="completed" {{ $filters['status'] === 'completed' ? 'selected' : '' }}>Hoàn tất</option>
+                            <option value="rejected" {{ $filters['status'] === 'rejected' ? 'selected' : '' }}>Đã từ chối</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small text-muted mb-1">Thời gian</label>
+                        <select id="filter-time" class="form-select">
+                            <option value="all" {{ $filters['time_range'] === 'all' ? 'selected' : '' }}>Mọi thời điểm</option>
+                            <option value="today" {{ $filters['time_range'] === 'today' ? 'selected' : '' }}>Hôm nay</option>
+                            <option value="week" {{ $filters['time_range'] === 'week' ? 'selected' : '' }}>Tuần này</option>
+                            <option value="month" {{ $filters['time_range'] === 'month' ? 'selected' : '' }}>Tháng này</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Request List -->
+        <div id="request-list">
+            @include('approvalworkflow::approval-center.partials.request-list', ['requests' => $requests, 'selectedId' => $selectedRequest ? $selectedRequest['id'] : null, 'selectedType' => $selectedRequest ? $selectedRequest['model_type'] : null])
+        </div>
+    </div>
+
+    <!-- Right Column: Request Details -->
+    <div class="col-md-7" style="overflow-y: auto; max-height: 100%;">
+        <div id="request-detail">
+            @if($selectedRequest)
+                @include('approvalworkflow::approval-center.partials.request-detail', ['request' => $selectedRequest])
+            @else
+                <div class="card">
+                    <div class="card-body text-center text-muted py-5">
+                        <i class="la la-inbox la-3x mb-3"></i>
+                        <p>Chọn một yêu cầu để xem chi tiết</p>
+                    </div>
+                </div>
+            @endif
+        </div>
+    </div>
+</div>
+@endsection
+
+@push('after_styles')
+<style>
+.placeholder {
+    display: inline-block;
+    min-height: 1em;
+    vertical-align: middle;
+    cursor: wait;
+    background-color: currentColor;
+    opacity: 0.1;
+    border-radius: 0.25rem;
+    animation: placeholder-glow 2s ease-in-out infinite;
+}
+
+@keyframes placeholder-glow {
+    50% {
+        opacity: 0.2;
+    }
+}
+
+.placeholder-xs {
+    min-height: 0.6em;
+}
+
+.placeholder-sm {
+    min-height: 0.8em;
+}
+
+.placeholder-lg {
+    min-height: 1.2em;
+}
+
+.placeholder-glow .placeholder {
+    animation: placeholder-glow 2s ease-in-out infinite;
+}
+
+/* Improve select dropdowns */
+#filter-type, #filter-status, #filter-time {
+    font-size: 0.95rem;
+    padding: 0.5rem 0.75rem;
+    min-height: 38px;
+}
+
+/* Better spacing for detail view */
+.card-body .row {
+    margin-bottom: 0.5rem;
+}
+
+.card-body .row .col-md-6 {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+}
+
+/* Workflow timeline styles - reuse from component */
+.workflow-progress-simple .workflow-steps-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    position: relative;
+    padding: 20px 0;
+    overflow: visible;
+}
+
+.workflow-step-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    overflow: visible;
+}
+
+.step-clock {
+    position: relative;
+    z-index: 2;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 50%;
+}
+
+.step-clock .clock-icon {
+    width: 40px !important;
+    height: 40px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative;
+    background: transparent !important;
+}
+
+.step-clock .clock-icon path,
+.step-clock .clock-icon rect {
+    fill: #007bff !important;
+    stroke: none !important;
+}
+
+.step-dot-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    overflow: visible;
+}
+
+.step-connector {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 100%;
+    height: 3px;
+    z-index: 0;
+    transition: background-color 0.3s ease;
+}
+
+.step-dot {
+    position: relative;
+    z-index: 2;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 3px solid;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    color: #fff !important;
+    font-size: 18px;
+    margin: 0 auto;
+    transition: all 0.3s ease;
+}
+
+.step-dot i {
+    color: inherit !important;
+}
+
+.workflow-step-item.completed .step-dot {
+    background-color: #007bff !important;
+    border-color: #007bff !important;
+    color: #fff !important;
+}
+
+.workflow-step-item.current .step-dot {
+    background-color: #007bff !important;
+    border-color: #007bff !important;
+    color: #fff !important;
+}
+
+.workflow-step-item.completed .step-dot i,
+.workflow-step-item.current .step-dot i {
+    color: #fff !important;
+}
+
+.workflow-step-item.rejected .step-dot {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #fff !important;
+}
+
+.workflow-step-item.rejected .step-dot i {
+    color: #fff !important;
+}
+
+.workflow-step-item.pending .step-dot {
+    background-color: #fff;
+    border-color: #dee2e6;
+    color: #6c757d;
+}
+
+.step-content {
+    width: 100%;
+}
+
+.step-label {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 5px;
+    color: #495057;
+    word-break: break-word;
+}
+
+.workflow-step-item.completed .step-label {
+    color: #007bff;
+    font-weight: 700;
+}
+
+.workflow-step-item.current .step-label {
+    color: #007bff;
+    font-weight: 700;
+    position: relative;
+}
+
+.workflow-step-item.rejected .step-label {
+    color: #dc3545;
+}
+
+.workflow-step-item.pending .step-label {
+    color: #6c757d;
+}
+
+.step-date,
+.step-user {
+    margin-top: 3px;
+    font-size: 11px;
+}
+
+/* Approval Center Banner */
+.approval-center-banner {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 2.5rem 2rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    margin-bottom: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    flex-direction: column;
+    position: relative;
+    z-index: 1;
+}
+
+.banner-text {
+    color: #1f2937;
+}
+
+.banner-department {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #4b5563;
+    letter-spacing: 2px;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.banner-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    color: #111827;
+    letter-spacing: 0.5px;
+}
+
+.banner-subtitle {
+    font-size: 1rem;
+    margin: 0.75rem 0 0 0;
+    color: #6b7280;
+    font-weight: 400;
+}
+
+@media (max-width: 768px) {
+    .approval-center-banner {
+        padding: 2rem 1.5rem;
+    }
+
+    .banner-department {
+        font-size: 0.95rem;
+        letter-spacing: 1.5px;
+        margin-bottom: 0.4rem;
+    }
+
+    .banner-title {
+        font-size: 1.75rem;
+    }
+
+    .banner-subtitle {
+        font-size: 0.9rem;
+    }
+}
+</style>
+@endpush
+
+@push('after_scripts')
+<script>
+$(document).ready(function() {
+    // Filter change handlers
+    $('#filter-type, #filter-status, #filter-time').on('change', function() {
+        applyFilters();
+    });
+
+    // Bulk selection handlers
+    let selectedRequests = new Set();
+
+    // Select All checkbox
+    $('#select-all-requests').on('change', function() {
+        const isChecked = $(this).is(':checked');
+        $('.request-checkbox').each(function() {
+            if (!$(this).prop('disabled')) {
+                $(this).prop('checked', isChecked);
+                updateSelection($(this), isChecked);
+            }
+        });
+        updateBulkActionsBar();
+    });
+
+    // Individual checkbox
+    $(document).on('change', '.request-checkbox', function() {
+        updateSelection($(this), $(this).is(':checked'));
+        updateBulkActionsBar();
+        updateSelectAllCheckbox();
+    });
+
+    // Prevent checkbox click from triggering card click
+    $(document).on('click', '.request-checkbox', function(e) {
+        e.stopPropagation();
+    });
+
+    // Clear selection
+    $('#btn-clear-selection').on('click', function() {
+        $('.request-checkbox').prop('checked', false);
+        $('#select-all-requests').prop('checked', false);
+        selectedRequests.clear();
+        $('.request-item').removeClass('selected');
+        updateBulkActionsBar();
+    });
+
+    // Bulk approve button
+    $('#btn-bulk-approve').on('click', function() {
+        if (selectedRequests.size === 0) {
+            alert('Vui lòng chọn ít nhất một đơn để phê duyệt');
+            return;
+        }
+        showBulkApproveModal();
+    });
+
+    function updateSelection($checkbox, isSelected) {
+        const id = $checkbox.val();
+        const modelType = $checkbox.data('model-type');
+        const key = `${modelType}_${id}`;
+        const $item = $checkbox.closest('.request-item');
+
+        if (isSelected) {
+            selectedRequests.add(key);
+            $item.addClass('selected');
+        } else {
+            selectedRequests.delete(key);
+            $item.removeClass('selected');
+        }
+    }
+
+    function updateBulkActionsBar() {
+        const count = selectedRequests.size;
+        $('#selected-count').text(count);
+        if (count > 0) {
+            $('#bulk-actions-bar').slideDown(200);
+        } else {
+            $('#bulk-actions-bar').slideUp(200);
+        }
+    }
+
+    function updateSelectAllCheckbox() {
+        const totalCheckboxes = $('.request-checkbox:not(:disabled)').length;
+        const checkedCheckboxes = $('.request-checkbox:checked').length;
+        $('#select-all-requests').prop('checked', totalCheckboxes > 0 && checkedCheckboxes === totalCheckboxes);
+    }
+
+    function showBulkApproveModal() {
+        const requests = [];
+        let hasReviewerStep = false;
+        $('.request-checkbox:checked').each(function() {
+            const isReviewerStep = $(this).data('is-reviewer-step') == '1';
+            if (isReviewerStep) {
+                hasReviewerStep = true;
+            }
+            requests.push({
+                id: $(this).val(),
+                model_type: $(this).data('model-type'),
+                title: $(this).data('title'),
+                type: $(this).data('type'),
+                status: $(this).data('status'),
+                initiated_by: $(this).data('initiated-by'),
+                is_reviewer_step: isReviewerStep
+            });
+        });
+
+        // If has reviewer step requests, show approver selection modal instead
+        if (hasReviewerStep) {
+            showBulkAssignApproversModal(requests);
+            return;
+        }
+
+        let modalHtml = `
+            <div class="modal fade" id="bulkApproveModal" tabindex="-1" data-bs-backdrop="static">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title">
+                                <i class="la la-check-double"></i> Xác nhận phê duyệt hàng loạt
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+
+                            <div class="table-responsive" style="max-height: 400px;">
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th style="width: 50px;">#</th>
+                                            <th>Loại</th>
+                                            <th>Tiêu đề</th>
+                                            <th>Người gửi</th>
+                                            <th>Trạng thái</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+        `;
+
+        requests.forEach(function(req, index) {
+            modalHtml += `
+                                        <tr>
+                                            <td>${index + 1}</td>
+                                            <td><span class="badge bg-primary">${req.type}</span></td>
+                                            <td>${req.title}</td>
+                                            <td><i class="la la-user"></i> ${req.initiated_by}</td>
+                                            <td><span class="badge bg-info">${req.status}</span></td>
+                                        </tr>
+            `;
+        });
+
+        modalHtml += `
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-3">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="confirm-bulk-approve">
+                                    <label class="form-check-label" for="confirm-bulk-approve">
+                                        Tôi đã xem xét và xác nhận phê duyệt tất cả các đơn trên
+                                    </label>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="bulk-pin-input" class="form-label">
+                                        <i class="la la-lock"></i> Mã PIN phê duyệt <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="password"
+                                           class="form-control"
+                                           id="bulk-pin-input"
+                                           placeholder="Nhập mã PIN để phê duyệt"
+                                           autocomplete="off">
+                                    <small class="text-muted">Mã PIN sẽ được sử dụng để ký số cho tất cả các đơn</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="la la-times"></i> Hủy
+                            </button>
+                            <button type="button" class="btn btn-success" id="confirm-bulk-approve-btn" disabled>
+                                <i class="la la-check-double"></i> Xác nhận phê duyệt
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing modal if any
+        $('#bulkApproveModal').remove();
+        $('body').append(modalHtml);
+
+        const modal = new bootstrap.Modal(document.getElementById('bulkApproveModal'));
+        modal.show();
+
+        // Enable confirm button when checkbox is checked and PIN is entered
+        function updateConfirmButton() {
+            const isChecked = $('#confirm-bulk-approve').is(':checked');
+            const hasPin = $('#bulk-pin-input').val().trim().length > 0;
+            $('#confirm-bulk-approve-btn').prop('disabled', !(isChecked && hasPin));
+        }
+
+        $('#confirm-bulk-approve').on('change', updateConfirmButton);
+        $('#bulk-pin-input').on('input', updateConfirmButton);
+
+        // Handle confirm - use off() first to prevent duplicate handlers
+        $('#confirm-bulk-approve-btn').off('click').on('click', function() {
+            if (!$('#confirm-bulk-approve').is(':checked')) {
+                alert('Vui lòng xác nhận bằng cách tích vào checkbox');
+                return;
+            }
+            const pin = $('#bulk-pin-input').val().trim();
+            if (!pin) {
+                alert('Vui lòng nhập mã PIN');
+                $('#bulk-pin-input').focus();
+                return;
+            }
+            performBulkApprove(requests, pin, modal);
+        });
+
+        // Clean up on close
+        $('#bulkApproveModal').on('hidden.bs.modal', function() {
+            $(this).remove();
+        });
+    }
+
+    function performBulkApprove(requests, pin, modalInstance) {
+        const $btn = $('#confirm-bulk-approve-btn');
+        const modalElement = document.getElementById('bulkApproveModal');
+        
+        // Get modal instance if not provided
+        if (!modalInstance && modalElement) {
+            modalInstance = bootstrap.Modal.getInstance(modalElement);
+            if (!modalInstance) {
+                modalInstance = new bootstrap.Modal(modalElement);
+            }
+        }
+
+        $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Đang xử lý...');
+
+        $.ajax({
+            url: '{{ route("approval-center.bulk-approve") }}',
+            method: 'POST',
+            data: {
+                requests: requests,
+                pin: pin,
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                try {
+                    if (response && response.success) {
+                        // Show success message with details
+                        const approvedCount = response.approved_count || 0;
+                        const failedCount = response.failed_count || 0;
+                        let message = `Đã phê duyệt thành công ${approvedCount} đơn`;
+                        
+                        if (failedCount > 0) {
+                            message += `. ${failedCount} đơn không thể phê duyệt.`;
+                            if (response.errors && response.errors.length > 0) {
+                                message += '\n\nLỗi:\n' + response.errors.slice(0, 5).join('\n');
+                                if (response.errors.length > 5) {
+                                    message += '\n... và ' + (response.errors.length - 5) + ' lỗi khác';
+                                }
+                            }
+                        }
+
+                        // Show notification
+                        if (typeof new PNotify !== 'undefined') {
+                            new PNotify({
+                                title: failedCount > 0 ? 'Hoàn tất (có lỗi)' : 'Thành công',
+                                text: message,
+                                type: failedCount > 0 ? 'warning' : 'success',
+                                icon: failedCount > 0 ? 'fa fa-exclamation-triangle' : 'fa fa-check',
+                                delay: 3000
+                            });
+                        } else {
+                            alert(message);
+                        }
+
+                        // Close modal using Bootstrap 5 API
+                        if (modalInstance) {
+                            modalInstance.hide();
+                        } else if (modalElement) {
+                            const bsModal = new bootstrap.Modal(modalElement);
+                            bsModal.hide();
+                        } else {
+                            // Fallback: use jQuery if Bootstrap API fails
+                            $('#bulkApproveModal').modal('hide');
+                        }
+
+                        // Reload page after a short delay to allow modal to close
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 300);
+                    } else {
+                        const errorMsg = response?.message || 'Không thể phê duyệt';
+                        alert('Có lỗi xảy ra: ' + errorMsg);
+                        $btn.prop('disabled', false).html('<i class="la la-check-double"></i> Xác nhận phê duyệt');
+                    }
+                } catch (e) {
+                    console.error('Error processing response:', e);
+                    alert('Có lỗi xảy ra khi xử lý kết quả');
+                    $btn.prop('disabled', false).html('<i class="la la-check-double"></i> Xác nhận phê duyệt');
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'Có lỗi xảy ra khi phê duyệt';
+                
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                } else if (xhr.responseText) {
+                    try {
+                        const errorData = JSON.parse(xhr.responseText);
+                        errorMsg = errorData.message || errorMsg;
+                    } catch (e) {
+                        // Keep default error message
+                    }
+                }
+
+                if (typeof new PNotify !== 'undefined') {
+                    new PNotify({
+                        title: 'Lỗi',
+                        text: errorMsg,
+                        type: 'error',
+                        icon: 'fa fa-times',
+                        delay: 3000
+                    });
+                } else {
+                    alert(errorMsg);
+                }
+
+                $btn.prop('disabled', false).html('<i class="la la-check-double"></i> Xác nhận phê duyệt');
+            },
+            complete: function() {
+                // Ensure button is re-enabled if still in loading state
+                // This is a safety net in case of unexpected errors
+            }
+        });
+    }
+
+    // Request item click handler
+    $(document).on('click', '.request-item', function(e) {
+        // Don't trigger if clicking on checkbox
+        if ($(e.target).is('.request-checkbox') || $(e.target).closest('.request-checkbox').length) {
+            return;
+        }
+
+        const id = $(this).data('id');
+        const modelType = $(this).data('model-type');
+
+        // Update active state
+        $('.request-item').removeClass('active');
+        $(this).addClass('active');
+
+        // Load details
+        loadRequestDetails(id, modelType);
+    });
+
+    function applyFilters() {
+        const type = $('#filter-type').val();
+        const status = $('#filter-status').val();
+        const timeRange = $('#filter-time').val();
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('type', type);
+        url.searchParams.set('status', status);
+        url.searchParams.set('time_range', timeRange);
+
+        window.location.href = url.toString();
+    }
+
+    function loadRequestDetails(id, modelType) {
+        // Show loading skeleton
+        showLoadingSkeleton();
+
+        $.ajax({
+            url: '{{ route("approval-center.details") }}',
+            method: 'GET',
+            data: {
+                id: id,
+                model_type: modelType
+            },
+            success: function(response) {
+                // Load detail view via AJAX or update HTML
+                loadDetailView(response);
+                loadApprovalHistory(id, modelType);
+            },
+            error: function() {
+                hideLoadingSkeleton();
+                alert('Không thể tải chi tiết yêu cầu');
+            }
+        });
+    }
+
+    function showLoadingSkeleton() {
+        const skeletonHtml = `
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="placeholder col-6 mb-2"></div>
+                            <div class="placeholder col-4"></div>
+                        </div>
+                        <div>
+                            <div class="placeholder col-3 mb-2"></div>
+                            <div class="placeholder col-3"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <div class="placeholder col-8 mb-2"></div>
+                        <div class="placeholder col-6"></div>
+                    </div>
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item"><div class="placeholder col-4"></div></li>
+                        <li class="nav-item"><div class="placeholder col-4"></div></li>
+                        <li class="nav-item"><div class="placeholder col-4"></div></li>
+                    </ul>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active">
+                            <div class="placeholder col-12 mb-2"></div>
+                            <div class="placeholder col-11 mb-2"></div>
+                            <div class="placeholder col-10 mb-2"></div>
+                            <div class="placeholder col-9 mb-2"></div>
+                            <div class="placeholder col-12 mb-2"></div>
+                            <div class="placeholder col-11 mb-2"></div>
+                            <div class="placeholder col-10"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        $('#request-detail').html(skeletonHtml);
+    }
+
+    function hideLoadingSkeleton() {
+        // Will be replaced by actual content
+    }
+
+    function loadDetailView(request) {
+        // Update URL without reload
+        const url = new URL(window.location.href);
+        url.searchParams.set('id', request.id);
+        url.searchParams.set('model_type', request.model_type);
+        window.history.pushState({}, '', url.toString());
+
+        // Load detail view via AJAX - use the details endpoint
+        $.ajax({
+            url: '{{ route("approval-center.details") }}',
+            method: 'GET',
+            data: {
+                id: request.id,
+                model_type: request.model_type
+            },
+            success: function(response) {
+                hideLoadingSkeleton();
+
+                // Render detail HTML from response
+                renderDetailView(response);
+            },
+            error: function() {
+                hideLoadingSkeleton();
+                $('#request-detail').html('<div class="card"><div class="card-body text-center text-danger py-5">Không thể tải chi tiết</div></div>');
+            }
+        });
+    }
+
+    function renderDetailView(request) {
+        // Build detail HTML from request data
+        let detailHtml = `
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">${request.type_label || request.type}</h5>
+                        <span class="badge bg-${request.status_badge}">${request.status_label}</span>
+                    </div>
+                    <div>
+        `;
+
+        if (request.can_approve) {
+            // Check if this is reviewer step (needs to assign approvers first)
+            // Reviewer step: workflow_status is 'approved_by_department_head' and user has 'leave.review' permission
+            // AND has not selected approvers yet
+            const isReviewerStep = (request.is_reviewer_step === true ||
+                                   (request.model_type === 'leave' &&
+                                    request.status === 'approved_by_department_head')) &&
+                                   (request.has_selected_approvers === false || !request.has_selected_approvers);
+
+            if (isReviewerStep) {
+                // Reviewer step: show "Người phê duyệt" button
+                detailHtml += `
+                    <button id="btn-assign-approvers"
+                            class="btn btn-sm btn-primary"
+                            data-id="${request.id}"
+                            data-model-type="${request.model_type}">
+                        <i class="la la-user-plus"></i> Người phê duyệt
+                    </button>
+                `;
+            } else {
+                // Other steps: show approve button
+                let needsPin = true; // Default to true
+                if (request.needs_pin === false || request.needs_pin === '0') {
+                    needsPin = false;
+                }
+
+                detailHtml += `
+                    <button id="btn-approve"
+                            class="btn btn-sm btn-success"
+                            data-id="${request.id}"
+                            data-model-type="${request.model_type}"
+                            data-needs-pin="${needsPin ? '1' : '0'}">
+                        <i class="la la-check"></i> ${needsPin ? 'Phê duyệt' : 'Gửi lên BGD'}
+                    </button>
+                `;
+            }
+        }
+
+        if (request.can_reject) {
+            detailHtml += `
+                <button id="btn-reject"
+                        class="btn btn-sm btn-danger"
+                        data-id="${request.id}"
+                        data-model-type="${request.model_type}">
+                    <i class="la la-times"></i> Từ chối
+                </button>
+            `;
+        }
+
+        detailHtml += `
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small mb-1 d-block">Người gửi</label>
+                                <div class="fw-semibold">${request.submitted_by}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small mb-1 d-block">Đã gửi</label>
+                                <div class="fw-semibold">${request.submitted_at}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="my-4">
+                    <h6 class="mb-3 fw-semibold">Chi tiết yêu cầu</h6>
+                    <div class="row">
+        `;
+
+        let detailIndex = 0;
+        for (const [label, value] of Object.entries(request.details)) {
+            const isEven = detailIndex % 2 === 0;
+            if (isEven && detailIndex > 0) {
+                detailHtml += `</div><div class="row">`;
+            }
+            detailHtml += `
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small mb-1 d-block">${label}</label>
+                            <div class="fw-normal">${value}</div>
+                        </div>
+            `;
+            detailIndex++;
+        }
+
+        detailHtml += `
+                    </div>
+                    <hr class="my-4">
+                    <div id="approval-history-content">
+                        <div class="text-center py-3">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('#request-detail').html(detailHtml);
+
+        // Render workflow timeline if available (for leave requests)
+        if (request.workflow_data && request.model_type === 'leave') {
+            renderWorkflowTimeline(request.workflow_data);
+        } else {
+            // Load approval history for other types
+            loadApprovalHistory(request.id, request.model_type, request);
+        }
+    }
+
+    function loadApprovalHistory(id, modelType, requestData) {
+        $.ajax({
+            url: '{{ route("approval-center.history") }}',
+            method: 'GET',
+            data: {
+                id: id,
+                model_type: modelType
+            },
+            success: function(history) {
+                renderApprovalHistory(history, requestData);
+            }
+        });
+    }
+
+    function renderApprovalHistory(history, requestData) {
+        // Use workflow timeline component if available
+        if (requestData && requestData.workflow_data && requestData.model_type === 'leave') {
+            renderWorkflowTimeline(requestData.workflow_data);
+        } else {
+            // Fallback to table if no workflow data
+            if (history.length === 0) {
+                $('#approval-history-content').html('<div class="text-muted text-center py-3">Chưa có lịch sử phê duyệt</div>');
+                return;
+            }
+
+            let html = '<div class="table-responsive"><table class="table table-sm table-hover">';
+            html += '<thead class="table-light"><tr><th>Tên bước</th><th>Người phê duyệt</th><th>Kết quả</th><th>Nhận xét</th><th>Thời gian</th></tr></thead>';
+            html += '<tbody>';
+
+            history.forEach(function(item) {
+                html += '<tr>';
+                html += '<td>' + item.step_name + '</td>';
+                html += '<td>' + item.approver + '</td>';
+                html += '<td><span class="badge bg-' + item.result_badge + '">' + item.result + '</span></td>';
+                html += '<td>' + (item.comment || '-') + '</td>';
+                html += '<td><small>' + item.time + '<br><span class="text-muted">' + (item.time_relative || '') + '</span></small></td>';
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            $('#approval-history-content').html(html);
+        }
+    }
+
+    function renderWorkflowTimeline(workflowData) {
+        if (!workflowData || !workflowData.steps) {
+            $('#approval-history-content').html('<div class="text-muted text-center py-3">Chưa có thông tin tiến trình</div>');
+            return;
+        }
+
+        let html = '<div class="workflow-progress-simple mb-4"><div class="card"><div class="card-header"><h5 class="mb-0"><i class="la la-tasks"></i> Tiến trình phê duyệt</h5></div><div class="card-body"><div class="workflow-steps-container">';
+
+        workflowData.steps.forEach(function(step, index) {
+            const hasDate = workflowData.stepDates && workflowData.stepDates[step.key];
+            const isCreatedStep = (step.key === 'created');
+            const isCompletedStep = (step.key === 'completed');
+
+            let isCompleted = false;
+            if (isCreatedStep) {
+                isCompleted = true;
+            } else if (isCompletedStep && hasDate) {
+                isCompleted = true;
+            } else if (index < workflowData.currentStepIndex) {
+                isCompleted = true;
+            }
+
+            const isCurrent = (index === workflowData.currentStepIndex && !workflowData.rejected) && !isCompletedStep;
+            const isRejectedStep = index === workflowData.currentStepIndex && workflowData.rejected;
+            const isPending = !isCompleted && !isCurrent;
+
+            let stepClass, dotColor, connectorColor, iconClass, iconColor;
+            if (isRejectedStep) {
+                stepClass = 'rejected';
+                dotColor = '#dc3545';
+                connectorColor = '#dc3545';
+                iconClass = 'la-times';
+                iconColor = '#fff';
+            } else if (isCompleted) {
+                stepClass = 'completed';
+                dotColor = '#007bff';
+                connectorColor = '#007bff';
+                iconClass = 'la-check';
+                iconColor = '#fff';
+            } else if (isCurrent) {
+                stepClass = 'current';
+                dotColor = '#007bff';
+                connectorColor = '#dee2e6';
+                iconClass = 'la-circle';
+                iconColor = '#fff';
+            } else {
+                stepClass = 'pending';
+                dotColor = '#6c757d';
+                connectorColor = '#dee2e6';
+                iconClass = 'la-circle';
+                iconColor = '#6c757d';
+            }
+
+            const isLast = index === workflowData.steps.length - 1;
+            if (!isLast && isCompleted) {
+                connectorColor = '#007bff';
+            } else if (!isLast) {
+                connectorColor = '#dee2e6';
+            }
+
+            const stepDate = workflowData.stepDates && workflowData.stepDates[step.key];
+            const stepUser = workflowData.stepUsers && workflowData.stepUsers[step.key];
+
+            html += '<div class="workflow-step-item ' + stepClass + '" data-step="' + step.key + '">';
+            html += '<div class="step-dot-wrapper">';
+            if (!isLast) {
+                html += '<div class="step-connector" style="background-color: ' + connectorColor + ';"></div>';
+            }
+            if (stepClass === 'current') {
+                html += '<div class="step-clock"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="40" height="40" fill="#007bff" class="clock-icon"><path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,20a9,9,0,1,1,9-9A9,9,0,0,1,12,21Z" fill="#007bff"/><rect width="2" height="7" x="11" y="6" rx="1" fill="#007bff"><animateTransform attributeName="transform" dur="9s" repeatCount="indefinite" type="rotate" values="0 12 12;360 12 12"/></rect><rect width="2" height="9" x="11" y="11" rx="1" fill="#007bff"><animateTransform attributeName="transform" dur="0.75s" repeatCount="indefinite" type="rotate" values="0 12 12;360 12 12"/></rect></svg></div>';
+            } else {
+                html += '<div class="step-dot ' + stepClass + '" style="border-color: ' + dotColor + ';"><i class="la ' + iconClass + '" style="color: ' + iconColor + ' !important;"></i></div>';
+            }
+            html += '</div>';
+            html += '<div class="step-content">';
+            html += '<div class="step-label">' + step.label + '</div>';
+            if (isCompleted && stepDate) {
+                html += '<div class="step-date text-muted small"><i class="la la-calendar"></i> ' + stepDate + '</div>';
+            }
+            if (isCompleted && stepUser) {
+                html += '<div class="step-user text-muted small"><i class="la la-user"></i> ' + stepUser + '</div>';
+            }
+            html += '</div></div>';
+        });
+
+        html += '</div></div></div></div>';
+        $('#approval-history-content').html(html);
+    }
+
+    // Assign approvers button handler (for reviewer step)
+    $(document).on('click', '#btn-assign-approvers', function() {
+        const id = $(this).data('id');
+        const modelType = $(this).data('model-type');
+        showAssignApproversModal(id, modelType);
+    });
+
+    // Approve button handler
+    $(document).on('click', '#btn-approve', function() {
+        const id = $(this).data('id');
+        const modelType = $(this).data('model-type');
+        const needsPin = $(this).data('needs-pin') == '1' || $(this).data('needs-pin') === '1';
+
+        if (needsPin) {
+            // Show PIN modal for steps that require signature
+            showPinModal(id, modelType);
+        } else {
+            // Reviewer step: just confirm and approve without PIN (forward to BGD)
+            if (confirm('Bạn có chắc chắn muốn gửi đơn này lên Ban Giám đốc?')) {
+                submitApproval(id, modelType, false);
+            }
+        }
+    });
+
+    // Reject button handler
+    $(document).on('click', '#btn-reject', function() {
+        const id = $(this).data('id');
+        const modelType = $(this).data('model-type');
+        showRejectModal(id, modelType);
+    });
+
+    function showPinModal(id, modelType) {
+        // Show PIN input modal
+        const modal = `
+            <div class="modal fade" id="pinModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Xác nhận Phê duyệt</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Mã PIN <span class="text-danger">*</span></label>
+                                <input type="password" class="form-control" id="pin-input" placeholder="Nhập mã PIN">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Ghi chú (tùy chọn)</label>
+                                <textarea class="form-control" id="comment-input" rows="2" placeholder="Nhập ghi chú"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                            <button type="button" class="btn btn-success" onclick="submitApproval(${id}, '${modelType}', true)">Xác nhận</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('body').append(modal);
+        $('#pinModal').modal('show');
+        $('#pinModal').on('hidden.bs.modal', function() {
+            $(this).remove();
+        });
+    }
+
+    function showRejectModal(id, modelType) {
+        const modal = `
+            <div class="modal fade" id="rejectModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Từ chối phê duyệt</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Lý do từ chối <span class="text-danger">*</span></label>
+                                <textarea class="form-control" id="reason-input" rows="3" placeholder="Nhập lý do từ chối" required></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                            <button type="button" class="btn btn-danger" onclick="submitRejection(${id}, '${modelType}')">Xác nhận</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('body').append(modal);
+        $('#rejectModal').modal('show');
+        $('#rejectModal').on('hidden.bs.modal', function() {
+            $(this).remove();
+        });
+    }
+
+    function showBulkAssignApproversModal(requests) {
+        // Load directors list
+        $.ajax({
+            url: '{{ route("approval-center.directors") }}',
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    renderBulkAssignApproversModal(requests, response.data);
+                } else {
+                    alert('Không thể tải danh sách Ban Giám đốc');
+                }
+            },
+            error: function() {
+                alert('Không thể tải danh sách Ban Giám đốc');
+            }
+        });
+    }
+
+    function renderBulkAssignApproversModal(requests, directors) {
+        let directorsHtml = '';
+        directors.forEach(function(director) {
+            const avatar = director.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(director.name) + '&background=random';
+            directorsHtml += `
+                <div class="member-item mb-2 p-2 border rounded" style="cursor: pointer;" data-id="${director.id}">
+                    <div class="form-check d-flex align-items-center">
+                        <input class="form-check-input bulk-approver-checkbox" type="checkbox" value="${director.id}" id="bulk_approver_${director.id}">
+                        <label class="form-check-label d-flex align-items-center ms-2" for="bulk_approver_${director.id}" style="cursor: pointer; width: 100%;">
+                            <img src="${avatar}" alt="${director.name}" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                            <span>${director.name}</span>
+                        </label>
+                    </div>
+                </div>
+            `;
+        });
+
+        let requestsListHtml = '';
+        requests.forEach(function(req, index) {
+            requestsListHtml += `
+                <div class="mb-2 p-2 border rounded">
+                    <strong>${index + 1}. ${req.type}</strong><br>
+                    <small class="text-muted">${req.title}</small><br>
+                    <small class="text-muted"><i class="la la-user"></i> ${req.initiated_by}</small>
+                </div>
+            `;
+        });
+
+        const modal = `
+            <div class="modal fade" id="bulkAssignApproversModal" tabindex="-1" style="z-index: 10000;" data-bs-backdrop="static">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title">
+                                <i class="la la-user-plus"></i> Chọn người phê duyệt cho ${requests.length} đơn
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-info mb-3">
+                                <i class="la la-info-circle"></i> Bạn đang chọn người phê duyệt cho <strong>${requests.length} đơn thẩm định</strong>. 
+                                Tất cả đơn sẽ được gửi đến những người được chọn.
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h6>Danh sách đơn sẽ được gửi:</h6>
+                                <div style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+                                    ${requestsListHtml}
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="la la-search"></i></span>
+                                    <input type="text" class="form-control" id="bulk-search-approvers" placeholder="Tìm kiếm">
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">Danh bạ > Danh bạ tổ chức</small>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-8 border-end" style="max-height: 350px; overflow-y: auto;">
+                                    <div id="bulk-directors-list">
+                                        ${directorsHtml}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-2">
+                                        <strong>Đã chọn: <span id="bulk-selected-count">0</span> thành viên</strong>
+                                    </div>
+                                    <div id="bulk-selected-approvers-list" style="max-height: 300px; overflow-y: auto;">
+                                        <p class="text-muted text-center py-3">Chưa chọn ai</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                            <button type="button" class="btn btn-primary" id="confirm-bulk-assign-approvers" disabled>
+                                Xác nhận và gửi lên BGD
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('#bulkAssignApproversModal').remove();
+        $('body').append(modal);
+        $('#bulkAssignApproversModal').modal('show');
+
+        // Store requests in modal data
+        $('#bulkAssignApproversModal').data('requests', requests);
+
+        // Search functionality
+        $('#bulk-search-approvers').on('input', function() {
+            const searchTerm = $(this).val().toLowerCase();
+            $('.member-item').each(function() {
+                const name = $(this).find('label span').text().toLowerCase();
+                if (name.includes(searchTerm)) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        });
+
+        // Handle checkbox change
+        $(document).off('change', '.bulk-approver-checkbox').on('change', '.bulk-approver-checkbox', function() {
+            updateBulkSelectedApprovers();
+        });
+
+        // Update selected approvers display
+        function updateBulkSelectedApprovers() {
+            const selectedIds = [];
+            const selectedApprovers = [];
+            
+            $('.bulk-approver-checkbox:checked').each(function() {
+                const id = $(this).val();
+                const name = $(this).closest('.member-item').find('label span').text();
+                selectedIds.push(id);
+                selectedApprovers.push({id: id, name: name});
+            });
+
+            $('#bulk-selected-count').text(selectedIds.length);
+            
+            if (selectedIds.length === 0) {
+                $('#bulk-selected-approvers-list').html('<p class="text-muted text-center py-3">Chưa chọn ai</p>');
+                $('#confirm-bulk-assign-approvers').prop('disabled', true);
+            } else {
+                let selectedHtml = '';
+                selectedApprovers.forEach(function(approver) {
+                    const avatar = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(approver.name) + '&background=random';
+                    selectedHtml += `
+                        <div class="mb-2 p-2 border rounded d-flex align-items-center">
+                            <img src="${avatar}" alt="${approver.name}" class="rounded-circle me-2" style="width: 24px; height: 24px; object-fit: cover;">
+                            <span>${approver.name}</span>
+                        </div>
+                    `;
+                });
+                $('#bulk-selected-approvers-list').html(selectedHtml);
+                $('#confirm-bulk-assign-approvers').prop('disabled', false);
+            }
+        }
+
+        // Handle confirm button
+        $('#confirm-bulk-assign-approvers').off('click').on('click', function() {
+            const selectedIds = [];
+            $('.bulk-approver-checkbox:checked').each(function() {
+                selectedIds.push(parseInt($(this).val()));
+            });
+
+            if (selectedIds.length === 0) {
+                alert('Vui lòng chọn ít nhất một người phê duyệt');
+                return;
+            }
+
+            submitBulkAssignApprovers(requests, selectedIds);
+        });
+
+        // Clean up on close
+        $('#bulkAssignApproversModal').on('hidden.bs.modal', function() {
+            $(this).remove();
+        });
+    }
+
+    function submitBulkAssignApprovers(requests, approverIds) {
+        const $btn = $('#confirm-bulk-assign-approvers');
+        $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Đang xử lý...');
+
+        // Only get reviewer step requests
+        const reviewerRequests = requests.filter(req => req.is_reviewer_step);
+
+        $.ajax({
+            url: '{{ route("approval-center.bulk-assign-approvers") }}',
+            method: 'POST',
+            data: {
+                requests: reviewerRequests,
+                approver_ids: approverIds,
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Show success message
+                    if (typeof new PNotify !== 'undefined') {
+                        new PNotify({
+                            title: 'Thành công',
+                            text: response.message,
+                            type: 'success',
+                            icon: 'fa fa-check',
+                            delay: 3000
+                        });
+                    } else {
+                        alert(response.message);
+                    }
+
+                    // Close modal
+                    const modalElement = document.getElementById('bulkAssignApproversModal');
+                    if (modalElement) {
+                        const modal = bootstrap.Modal.getInstance(modalElement);
+                        if (modal) modal.hide();
+                    }
+
+                    // Reload page after delay
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 500);
+                } else {
+                    alert(response.message || 'Không thể gán người phê duyệt');
+                    $btn.prop('disabled', false).html('Xác nhận và gửi lên BGD');
+                }
+            },
+            error: function(xhr) {
+                const errorMsg = xhr.responseJSON?.message || 'Có lỗi xảy ra khi gán người phê duyệt';
+                alert(errorMsg);
+                $btn.prop('disabled', false).html('Xác nhận và gửi lên BGD');
+            }
+        });
+    }
+
+    function showAssignApproversModal(id, modelType) {
+        // Load directors list
+        $.ajax({
+            url: '{{ route("approval-center.directors") }}',
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    renderAssignApproversModal(id, modelType, response.data);
+                } else {
+                    alert('Không thể tải danh sách Ban Giám đốc');
+                }
+            },
+            error: function() {
+                alert('Không thể tải danh sách Ban Giám đốc');
+            }
+        });
+    }
+
+    function renderAssignApproversModal(id, modelType, directors) {
+        let directorsHtml = '';
+        directors.forEach(function(director) {
+            const avatar = director.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(director.name) + '&background=random';
+            directorsHtml += `
+                <div class="member-item mb-2 p-2 border rounded" style="cursor: pointer;" data-id="${director.id}">
+                    <div class="form-check d-flex align-items-center">
+                        <input class="form-check-input approver-checkbox" type="checkbox" value="${director.id}" id="approver_${director.id}">
+                        <label class="form-check-label d-flex align-items-center ms-2" for="approver_${director.id}" style="cursor: pointer; width: 100%;">
+                            <img src="${avatar}" alt="${director.name}" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                            <span>${director.name}</span>
+                        </label>
+                    </div>
+                </div>
+            `;
+        });
+
+        const modal = `
+            <div class="modal fade" id="assignApproversModal" tabindex="-1" style="z-index: 10000;">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Chọn người phê duyệt</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="la la-search"></i></span>
+                                    <input type="text" class="form-control" id="search-approvers" placeholder="Tìm kiếm">
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">Danh bạ > Danh bạ tổ chức</small>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-8 border-end" style="max-height: 400px; overflow-y: auto;">
+                                    <div id="directors-list">
+                                        ${directorsHtml}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-2">
+                                        <strong>Đã chọn: <span id="selected-count">0</span> thành viên</strong>
+                                    </div>
+                                    <div id="selected-approvers-list" style="max-height: 350px; overflow-y: auto;">
+                                        <p class="text-muted text-center py-3">Chưa chọn ai</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                            <button type="button" class="btn btn-primary" id="confirm-assign-approvers" data-id="${id}" data-model-type="${modelType}" disabled>
+                                Xác nhận
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('body').append(modal);
+        $('#assignApproversModal').modal('show');
+
+        // Search functionality
+        $('#search-approvers').on('input', function() {
+            const searchTerm = $(this).val().toLowerCase();
+            $('.member-item').each(function() {
+                const name = $(this).find('label span').text().toLowerCase();
+                if (name.includes(searchTerm)) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        });
+
+        // Checkbox change handler
+        $(document).off('change', '.approver-checkbox').on('change', '.approver-checkbox', function() {
+            updateSelectedApprovers();
+        });
+
+        // Confirm button handler
+        $('#confirm-assign-approvers').on('click', function() {
+            const selectedIds = [];
+            $('.approver-checkbox:checked').each(function() {
+                selectedIds.push($(this).val());
+            });
+
+            if (selectedIds.length === 0) {
+                alert('Vui lòng chọn ít nhất một người phê duyệt');
+                return;
+            }
+
+            submitAssignApprovers(id, modelType, selectedIds);
+        });
+
+        // Cleanup on close
+        $('#assignApproversModal').on('hidden.bs.modal', function() {
+            $(this).remove();
+        });
+    }
+
+    function updateSelectedApprovers() {
+        const selectedIds = [];
+        const selectedNames = [];
+
+        $('.approver-checkbox:checked').each(function() {
+            const id = $(this).val();
+            const name = $(this).closest('.member-item').find('label span').text();
+            selectedIds.push(id);
+            selectedNames.push(name);
+        });
+
+        $('#selected-count').text(selectedIds.length);
+
+        if (selectedIds.length === 0) {
+            $('#selected-approvers-list').html('<p class="text-muted text-center py-3">Chưa chọn ai</p>');
+            $('#confirm-assign-approvers').prop('disabled', true);
+        } else {
+            let selectedHtml = '';
+            selectedNames.forEach(function(name, index) {
+                selectedHtml += `<div class="mb-1"><small>${name}</small></div>`;
+            });
+            $('#selected-approvers-list').html(selectedHtml);
+            $('#confirm-assign-approvers').prop('disabled', false);
+        }
+    }
+
+    function submitAssignApprovers(id, modelType, approverIds) {
+        const btn = $('#confirm-assign-approvers');
+        const originalText = btn.html();
+        btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Đang xử lý...');
+
+        $.ajax({
+            url: '{{ route("approval-center.assign-approvers") }}',
+            method: 'POST',
+            data: {
+                id: id,
+                model_type: modelType,
+                approver_ids: approverIds,
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                btn.prop('disabled', false).html(originalText);
+
+                if (response.success) {
+                    $('#assignApproversModal').modal('hide');
+                    alert(response.message);
+                    // Reload page to show updated status
+                    location.reload();
+                } else {
+                    alert(response.message);
+                }
+            },
+            error: function(xhr) {
+                btn.prop('disabled', false).html(originalText);
+                const message = xhr.responseJSON?.message || 'Có lỗi xảy ra';
+                alert(message);
+            }
+        });
+    }
+
+    window.submitApproval = function(id, modelType, needsPin) {
+        const pin = needsPin ? $('#pin-input').val() : null;
+        const comment = needsPin ? ($('#comment-input').val() || '') : '';
+
+        if (needsPin && !pin) {
+            alert('Vui lòng nhập mã PIN');
+            return;
+        }
+
+        // Show loading
+        const btn = $('#btn-approve');
+        const originalText = btn.html();
+        btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Đang xử lý...');
+
+        $.ajax({
+            url: '{{ route("approval-center.approve") }}',
+            method: 'POST',
+            data: {
+                id: id,
+                model_type: modelType,
+                certificate_pin: pin || null, // Explicitly pass null if no PIN
+                comment: comment,
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                btn.prop('disabled', false).html(originalText);
+
+                if (response.success) {
+                    if (needsPin && $('#pinModal').length) {
+                        $('#pinModal').modal('hide');
+                    }
+                    alert(response.message);
+                    location.reload();
+                } else {
+                    alert(response.message);
+                }
+            },
+            error: function(xhr) {
+                btn.prop('disabled', false).html(originalText);
+                const message = xhr.responseJSON?.message || 'Có lỗi xảy ra';
+                alert(message);
+            }
+        });
+    };
+
+    window.submitRejection = function(id, modelType) {
+        const reason = $('#reason-input').val();
+
+        if (!reason || reason.trim().length < 5) {
+            alert('Vui lòng nhập lý do từ chối (ít nhất 5 ký tự)');
+            return;
+        }
+
+        $.ajax({
+            url: '{{ route("approval-center.reject") }}',
+            method: 'POST',
+            data: {
+                id: id,
+                model_type: modelType,
+                reason: reason,
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#rejectModal').modal('hide');
+                    alert(response.message);
+                    location.reload();
+                } else {
+                    alert(response.message);
+                }
+            },
+            error: function(xhr) {
+                const message = xhr.responseJSON?.message || 'Có lỗi xảy ra';
+                alert(message);
+            }
+        });
+    };
+});
+</script>
+@endpush
+

@@ -251,7 +251,7 @@ trait ApprovalButtons
                                     class="form-control"
                                     id="reject_reason_' . $this->id . '"
                                     rows="3"
-                                    placeholder="Nhập lý do từ chối (ít nhất 5 ký tự)"
+                                    placeholder="Nhập lý do từ chối"
                                     autocomplete="off"
                                     required
                                     autofocus></textarea>
@@ -301,8 +301,8 @@ trait ApprovalButtons
                 return;
             }
 
-            if (reason.trim().length < 5) {
-                errorText.textContent = \'Lý do từ chối phải có ít nhất 5 ký tự!\';
+            if (reason.trim().length < 1) {
+                errorText.textContent = \'Vui lòng nhập lý do từ chối!\';
                 errorDiv.style.display = \'block\';
                 document.getElementById(\'reject_reason_' . $this->id . '\').focus();
                 return;

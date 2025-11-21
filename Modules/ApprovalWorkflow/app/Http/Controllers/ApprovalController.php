@@ -183,7 +183,10 @@ class ApprovalController extends Controller
             $user = backpack_user();
             $modulePermission = $this->getModulePermission($modelClass);
 
-            if (!PermissionHelper::can($user, "{$modulePermission}.reject")) {
+            $hasApprovePermission = PermissionHelper::can($user, "{$modulePermission}.approve");
+            $hasReviewPermission = PermissionHelper::can($user, "{$modulePermission}.review");
+
+            if (!$hasApprovePermission && !$hasReviewPermission) {
                 return response()->json([
                     'success' => false,
                     'message' => getUserTitle($user) . ' không có quyền từ chối'
@@ -192,7 +195,7 @@ class ApprovalController extends Controller
 
             // Validate reason
             $request->validate([
-                'reason' => 'required|string|min:5'
+                'reason' => 'required|string'
             ]);
 
             // Reject
