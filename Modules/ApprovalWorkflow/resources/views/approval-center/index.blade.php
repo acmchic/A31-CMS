@@ -9,7 +9,6 @@
                 <div class="banner-text">
                     <div class="banner-department">{{ $departmentName ?? 'HỆ THỐNG' }}</div>
                     <h1 class="banner-title">Trung tâm phê duyệt</h1>
-                    <p class="banner-subtitle">Hệ thống quản lý và phê duyệt yêu cầu tập trung</p>
                 </div>
             </div>
         </div>
@@ -18,72 +17,61 @@
 
 @section('content')
 <div class="row" style="height: calc(100vh - 200px);">
-    <!-- Left Column: Request List -->
-    <div class="col-md-5 border-end" style="overflow-y: auto; max-height: 100%;">
-        <!-- Type Cards -->
-        <div class="mb-3">
-            <input type="hidden" id="filter-type" value="{{ $filters['type'] }}">
-            <div class="row g-2">
-                <div class="col-md-6">
-                    <div class="card type-card {{ $filters['type'] === 'leave' ? 'active' : '' }}" 
-                         data-type="leave" 
-                         style="cursor: pointer; position: relative; transition: all 0.2s;">
-                        <div class="card-body p-3">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div>
-                                    <h6 class="mb-0 fw-semibold">Nghỉ phép</h6>
-                                </div>
-                                @php
-                                    $user = backpack_user();
-                                    $leaveCount = 0;
-                                    if ($user->hasRole('Admin') || \App\Helpers\PermissionHelper::can($user, 'leave.review')) {
-                                        $leaveCount = $pendingCounts['leave']['review'] ?? 0;
-                                    } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
-                                        $leaveCount = $pendingCounts['leave']['director'] ?? 0;
-                                    } else {
-                                        $leaveCount = $pendingCounts['leave']['pending'] ?? 0;
-                                    }
-                                @endphp
-                                @if($leaveCount > 0)
-                                    <span class="badge bg-danger rounded-pill" style="font-size: 0.75rem; min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;">
-                                        {{ $leaveCount }}
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
+    <!-- First Column: Type Sidebar -->
+    <div class="col-md-2 border-end" style="overflow-y: auto; max-height: 100%; padding: 0;">
+        <input type="hidden" id="filter-type" value="{{ $filters['type'] }}">
+        <div class="type-sidebar">
+            @php
+                $user = backpack_user();
+                $leaveCount = 0;
+                if ($user->hasRole('Admin') || \App\Helpers\PermissionHelper::can($user, 'leave.review')) {
+                    $leaveCount = $pendingCounts['leave']['review'] ?? 0;
+                } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
+                    $leaveCount = $pendingCounts['leave']['director'] ?? 0;
+                } else {
+                    $leaveCount = $pendingCounts['leave']['pending'] ?? 0;
+                }
+                
+                $vehicleCount = 0;
+                if ($user->hasRole('Admin') || \App\Helpers\PermissionHelper::can($user, 'leave.review')) {
+                    $vehicleCount = $pendingCounts['vehicle']['review'] ?? 0;
+                } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
+                    $vehicleCount = $pendingCounts['vehicle']['director'] ?? 0;
+                } else {
+                    $vehicleCount = $pendingCounts['vehicle']['pending'] ?? 0;
+                }
+            @endphp
+            
+            <div class="type-item {{ $filters['type'] === 'leave' ? 'active' : '' }}" 
+                 data-type="leave" 
+                 style="cursor: pointer; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; position: relative;">
+                <div class="d-flex align-items-center justify-content-between">
+                    <span class="fw-semibold">Nghỉ phép</span>
+                    @if($leaveCount > 0)
+                        <span class="badge bg-danger rounded-pill" style="font-size: 0.7rem; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;">
+                            {{ $leaveCount }}
+                        </span>
+                    @endif
                 </div>
-                <div class="col-md-6">
-                    <div class="card type-card {{ $filters['type'] === 'vehicle' ? 'active' : '' }}" 
-                         data-type="vehicle" 
-                         style="cursor: pointer; position: relative; transition: all 0.2s;">
-                        <div class="card-body p-3">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div>
-                                    <h6 class="mb-0 fw-semibold">Xe công</h6>
-                                </div>
-                                @php
-                                    $vehicleCount = 0;
-                                    if ($user->hasRole('Admin') || \App\Helpers\PermissionHelper::can($user, 'leave.review')) {
-                                        $vehicleCount = $pendingCounts['vehicle']['review'] ?? 0;
-                                    } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
-                                        $vehicleCount = $pendingCounts['vehicle']['director'] ?? 0;
-                                    } else {
-                                        $vehicleCount = $pendingCounts['vehicle']['pending'] ?? 0;
-                                    }
-                                @endphp
-                                @if($vehicleCount > 0)
-                                    <span class="badge bg-danger rounded-pill" style="font-size: 0.75rem; min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;">
-                                        {{ $vehicleCount }}
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
+            </div>
+            
+            <div class="type-item {{ $filters['type'] === 'vehicle' ? 'active' : '' }}" 
+                 data-type="vehicle" 
+                 style="cursor: pointer; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; position: relative;">
+                <div class="d-flex align-items-center justify-content-between">
+                    <span class="fw-semibold">Xe công</span>
+                    @if($vehicleCount > 0)
+                        <span class="badge bg-danger rounded-pill" style="font-size: 0.7rem; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;">
+                            {{ $vehicleCount }}
+                        </span>
+                    @endif
                 </div>
             </div>
         </div>
+    </div>
 
+    <!-- Middle Column: Filters and Request List -->
+    <div class="col-md-4 border-end" style="overflow-y: auto; max-height: 100%;">
         <!-- Filters -->
         <div class="card mb-3">
             <div class="card-body">
@@ -119,15 +107,15 @@
     </div>
 
     <!-- Right Column: Request Details -->
-    <div class="col-md-7" style="overflow-y: auto; max-height: 100%;">
+    <div class="col-md-6" style="overflow-y: auto; max-height: 100%;">
         <div id="request-detail">
             @if($selectedRequest)
                 @include('approvalworkflow::approval-center.partials.request-detail', ['request' => $selectedRequest])
             @else
                 <div class="card">
                     <div class="card-body text-center text-muted py-5">
-                        <i class="la la-inbox la-3x mb-3"></i>
-                        <p>Chọn một yêu cầu để xem chi tiết</p>
+                        <i class="la la-folder-open la-3x mb-3" style="opacity: 0.3;"></i>
+                        <p class="mb-0">Không có yêu cầu nào</p>
                     </div>
                 </div>
             @endif
@@ -171,28 +159,27 @@
     animation: placeholder-glow 2s ease-in-out infinite;
 }
 
-/* Type Cards */
-.type-card {
-    border: 2px solid #e5e7eb;
+/* Type Sidebar */
+.type-sidebar {
+    background-color: #fff;
+}
+
+.type-item {
     transition: all 0.2s ease;
     position: relative;
 }
 
-.type-card:hover {
-    border-color: #007bff;
+.type-item:hover {
     background-color: #f8f9fa;
 }
 
-.type-card.active {
-    border-color: #007bff;
+.type-item.active {
     background-color: #f0f7ff;
+    border-left: 3px solid #007bff;
+    font-weight: 600;
 }
 
-.type-card .card-body {
-    position: relative;
-}
-
-.type-card .badge {
+.type-item .badge {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     flex-shrink: 0;
 }
@@ -379,9 +366,9 @@
     background: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 12px;
-    padding: 2.5rem 2rem;
+    padding: 1.5rem 1.5rem;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    margin-bottom: 0;
+    margin-bottom: 0.75rem;
     position: relative;
     overflow: hidden;
 }
@@ -449,28 +436,33 @@
 @push('after_scripts')
 <script>
 $(document).ready(function() {
-    // Initialize type cards based on current filter
+    // Initialize type items based on current filter
     const currentType = $('#filter-type').val() || 'all';
     if (currentType === 'leave') {
-        $('.type-card[data-type="leave"]').addClass('active');
+        $('.type-item[data-type="leave"]').addClass('active');
+        $('.type-item[data-type="vehicle"]').removeClass('active');
     } else if (currentType === 'vehicle') {
-        $('.type-card[data-type="vehicle"]').addClass('active');
+        $('.type-item[data-type="vehicle"]').addClass('active');
+        $('.type-item[data-type="leave"]').removeClass('active');
+    } else {
+        // 'all' - both can be active or none
+        $('.type-item').removeClass('active');
     }
 
-    // Type card click handlers
-    $('.type-card').on('click', function() {
+    // Type item click handlers
+    $('.type-item').on('click', function() {
         const type = $(this).data('type');
         const currentType = $('#filter-type').val() || 'all';
         
-        // If clicking the same active card, do nothing (keep it active)
-        // If clicking different card, switch to that type
+        // If clicking the same active item, do nothing (keep it active)
+        // If clicking different item, switch to that type
         if ($(this).hasClass('active') && currentType === type) {
             // Already active, do nothing
             return;
         }
         
         // Update active state
-        $('.type-card').removeClass('active');
+        $('.type-item').removeClass('active');
         $(this).addClass('active');
         
         // Set filter type
@@ -1092,7 +1084,7 @@ $(document).ready(function() {
             },
             error: function() {
                 hideLoadingSkeleton();
-                $('#request-detail').html('<div class="card"><div class="card-body text-center text-danger py-5">Không thể tải chi tiết</div></div>');
+                $('#request-detail').html('<div class="card"><div class="card-body text-center text-muted py-5"><i class="la la-folder-open la-3x mb-3" style="opacity: 0.3;"></i><p class="mb-0">Không có yêu cầu nào</p></div></div>');
             }
         });
     }
@@ -1936,6 +1928,31 @@ $(document).ready(function() {
             },
             success: function(response) {
                 btn.prop('disabled', false).html(originalText);
+
+                // Handle case backend trả về success=true nhưng message báo sai PIN
+                if (needsPin) {
+                    const msg = (response && response.message) ? String(response.message) : '';
+                    const looksLikePinError = msg.includes('PIN') || msg.includes('pin') || msg.includes('Mã PIN');
+
+                    if (looksLikePinError) {
+                        let errorText = 'Sai mã PIN, vui lòng thử lại';
+                        if (msg && !looksLikePinError) {
+                            errorText = msg;
+                        }
+
+                        if ($('#pin-error').length) {
+                            $('#pin-error-text').text(errorText);
+                            $('#pin-error').removeClass('d-none');
+                        }
+
+                        if ($('#pin-input').length) {
+                            $('#pin-input').val('').focus();
+                        }
+
+                        // Không đóng modal, không hiện Noty, dừng xử lý tại đây
+                        return;
+                    }
+                }
 
                 if (response.success) {
                     if (needsPin && $('#pinModal').length) {
