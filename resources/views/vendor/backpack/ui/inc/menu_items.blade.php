@@ -9,9 +9,16 @@
 
 {{-- Approval Center --}}
 @if(\App\Helpers\PermissionHelper::userCan('approval_center.view') || backpack_user()->hasRole('Admin'))
+@php
+    $approvalService = app(\Modules\ApprovalWorkflow\Services\ApprovalCenterService::class);
+    $pendingCount = $approvalService->getTotalPendingCountForUser(backpack_user());
+@endphp
 <li class="nav-item">
     <a class="nav-link" href="{{ url('approval-center') }}">
         <i class="la la-check-circle nav-icon"></i> Trung tâm phê duyệt
+        @if($pendingCount > 0)
+            <span class="badge bg-danger rounded-pill ms-1">{{ $pendingCount }}</span>
+        @endif
     </a>
 </li>
 @endif

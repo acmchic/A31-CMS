@@ -46,18 +46,23 @@
                         // The "created" step is always completed
                         // The "completed" step is completed if it has a date (workflow finished)
                         // Other steps are completed only if workflow has passed them
+                        // If step has date/user data, it's completed (actual approval happened)
+                        $hasStepData = $hasDate || isset($stepUsers[$step['key']]);
+                        
                         if ($isCreatedStep) {
                             $isCompleted = true; // Created step is always completed
                         } elseif ($isCompletedStep && $hasDate) {
                             $isCompleted = true; // Completed step is done if it has a date
+                        } elseif ($hasStepData && ($index <= $currentStepIndex)) {
+                            $isCompleted = true; // Step with data is completed if it's at or before current step
                         } elseif ($index < $currentStepIndex) {
                             $isCompleted = true; // Steps before current are completed
                         } else {
                             $isCompleted = false; // Current and future steps are not completed yet
                         }
 
-                        // Current step: only if it's the current index AND not the completed step (completed step should show as completed, not current)
-                        $isCurrent = ($index === $currentStepIndex && !$isRejected) && !$isCompletedStep;
+                        // Current step: only if it's the current index AND not completed AND not the completed step
+                        $isCurrent = ($index === $currentStepIndex && !$isRejected && !$isCompleted) && !$isCompletedStep;
                         $isRejectedStep = $index === $currentStepIndex && $isRejected;
                         $isPending = !$isCompleted && !$isCurrent;
 

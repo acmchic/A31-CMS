@@ -34,6 +34,11 @@ class ApprovalService
             return $this->approveEmployeeLeave($model, $approver, $currentStatus, $nextStatus, $options);
         }
 
+        // Special handling for VehicleRegistration with custom fields
+        if ($model instanceof \Modules\VehicleRegistration\Models\VehicleRegistration) {
+            return $this->approveVehicleRegistration($model, $approver, $currentStatus, $nextStatus, $options);
+        }
+
         // Default handling for other models
         $level = $this->getCurrentApprovalLevel($currentStatus);
         
@@ -131,6 +136,68 @@ class ApprovalService
             \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => 2,
             \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER => 3,
             \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR => 4,
+        ];
+
+        return $map[$status] ?? 1;
+    }
+
+    /**
+     * Approve VehicleRegistration with custom field mapping
+     */
+    protected function approveVehicleRegistration($model, $approver, $currentStatus, $nextStatus, $options)
+    {
+        $updateData = [];
+        
+        switch ($currentStatus) {
+            case 'dept_review':
+                $updateData['workflow_status'] = 'director_review';
+                $updateData['department_approved_by'] = $approver->id;
+                $updateData['department_approved_at'] = now();
+                if (isset($options['signature_path'])) {
+                    $updateData['digital_signature_dept'] = $options['signature_path'];
+                }
+                break;
+
+            case 'director_review':
+            case 'approved':
+                if (!$model->director_approved_by) {
+                    $updateData['workflow_status'] = 'approved';
+                    $updateData['status'] = 'approved';
+                    $updateData['director_approved_by'] = $approver->id;
+                    $updateData['director_approved_at'] = now();
+                    if (isset($options['signature_path'])) {
+                        $updateData['digital_signature_director'] = $options['signature_path'];
+                    }
+                }
+                break;
+
+            case 'submitted':
+                $updateData['workflow_status'] = 'dept_review';
+                break;
+        }
+
+        if (empty($updateData)) {
+            $updateData['workflow_status'] = $nextStatus;
+        }
+
+        $model->update($updateData);
+        
+        $level = $this->getCurrentApprovalLevelForVehicleRegistration($currentStatus);
+        $this->createHistory($model, $approver, 'approved', $level, $options);
+
+        return true;
+    }
+
+    /**
+     * Get approval level for VehicleRegistration
+     */
+    protected function getCurrentApprovalLevelForVehicleRegistration(string $status): int
+    {
+        $map = [
+            'submitted' => 1,
+            'dept_review' => 2,
+            'director_review' => 3,
+            'approved' => 4,
         ];
 
         return $map[$status] ?? 1;

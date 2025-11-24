@@ -53,6 +53,7 @@ class VehicleRegistration extends Model
         'rejection_reason',
         'rejection_level',
         'signed_pdf_path',
+        'selected_approvers',
         'created_by',
         'updated_by',
         'deleted_by'
@@ -60,6 +61,7 @@ class VehicleRegistration extends Model
 
     protected $casts = [
         'departure_date' => 'date',
+        'selected_approvers' => 'array',
         'return_date' => 'date',
         'departure_time' => 'datetime:H:i',
         'return_time' => 'datetime:H:i',
@@ -238,36 +240,39 @@ class VehicleRegistration extends Model
         return $workflows[$this->workflow_status] ?? $this->workflow_status;
     }
 
-    // ✅ Override getNextWorkflowStep for VehicleRegistration workflow
     public function getNextWorkflowStep(): ?string
     {
         $currentStep = $this->getCurrentWorkflowStep();
 
-        // VehicleRegistration has 3-step workflow: submitted → dept_review → approved
+        if ($currentStep === 'approved' && !$this->director_approved_by) {
+            return 'approved';
+        }
+
         $workflowMap = [
-            'submitted' => 'dept_review',      // Step 1: Assign vehicle (dept)
-            'dept_review' => 'approved',       // Step 2: Director approve (final)
-            'director_review' => 'approved',   // Legacy support
-            'approved' => null,                // Done
-            'rejected' => null,                // Done
+            'submitted' => 'dept_review',
+            'dept_review' => 'director_review',
+            'director_review' => 'approved',
+            'approved' => null,
+            'rejected' => null,
         ];
 
         return $workflowMap[$currentStep] ?? null;
     }
 
-    // ✅ Override canBeApproved - check if has PDF already
     public function canBeApproved(): bool
     {
-        // Cannot approve if already has PDF
+        if ($this->workflow_status === 'approved' && $this->director_approved_by) {
+            return false;
+        }
+
+        if ($this->workflow_status === 'approved' && !$this->director_approved_by) {
+            return true;
+        }
+
         if ($this->signed_pdf_path) {
             return false;
         }
 
-        if ($this->workflow_status === 'approved') {
-            return false;
-        }
-
-        // Can approve at dept_review or director_review
         return in_array($this->workflow_status, ['dept_review', 'director_review']);
     }
 
@@ -301,6 +306,30 @@ class VehicleRegistration extends Model
     public function isApproved()
     {
         return $this->status === 'approved' || $this->workflow_status === 'approved';
+    }
+
+    public static function getDirectors()
+    {
+        return \App\Models\User::whereHas('roles', function($q) {
+            $q->whereIn('name', ['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+        })->get();
+    }
+
+    public function isUserSelectedApprover($userId)
+    {
+        if (!$this->selected_approvers) {
+            return false;
+        }
+
+        $approverIds = is_array($this->selected_approvers)
+            ? $this->selected_approvers
+            : json_decode($this->selected_approvers, true);
+
+        if (!is_array($approverIds)) {
+            return false;
+        }
+
+        return in_array((int)$userId, array_map('intval', $approverIds));
     }
 
     public function isRejected()

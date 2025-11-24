@@ -217,76 +217,134 @@ class ApprovalCenterController extends Controller
         $modelType = $request->get('model_type');
         $approverIds = $request->get('approver_ids', []);
         
-        if ($modelType !== 'leave') {
+        if ($modelType !== 'leave' && $modelType !== 'vehicle') {
             return response()->json([
                 'success' => false,
-                'message' => 'Chỉ áp dụng cho đơn nghỉ phép',
+                'message' => 'Chỉ áp dụng cho đơn nghỉ phép và đăng ký xe',
             ], 400);
         }
         
         try {
-            $leave = EmployeeLeave::findOrFail($id);
-            
-            // Check if user is reviewer
             $user = backpack_user();
-            $isReviewerStep = $leave->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
-            $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
             
-            if (!$isReviewerStep || !$hasReviewPermission) {
+            if ($modelType === 'leave') {
+                $leave = EmployeeLeave::findOrFail($id);
+                
+                $isReviewerStep = $leave->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
+                $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
+                
+                if (!$isReviewerStep || !$hasReviewPermission) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Bạn không có quyền thực hiện thao tác này',
+                    ], 403);
+                }
+                
+                if (empty($approverIds) || !is_array($approverIds)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Vui lòng chọn ít nhất một người phê duyệt',
+                    ], 400);
+                }
+                
+                $directors = EmployeeLeave::getDirectors();
+                $directorIds = $directors->pluck('id')->toArray();
+                $invalidIds = array_diff($approverIds, $directorIds);
+                
+                if (!empty($invalidIds)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Có người được chọn không phải là Ban Giám đốc',
+                    ], 400);
+                }
+                
+                $approverIds = array_map('intval', $approverIds);
+                $leave->selected_approvers = $approverIds;
+                $leave->workflow_status = EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER;
+                $leave->approved_by_reviewer = $user->id;
+                $leave->approved_at_reviewer = now();
+                $leave->save();
+                
+                \Modules\ApprovalWorkflow\Models\ApprovalHistory::create([
+                    'approvable_type' => get_class($leave),
+                    'approvable_id' => $leave->id,
+                    'user_id' => $user->id,
+                    'action' => 'approved',
+                    'level' => 2,
+                    'workflow_status_before' => EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD,
+                    'workflow_status_after' => EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER,
+                    'comment' => 'Đã chọn người phê duyệt: ' . implode(', ', \App\Models\User::whereIn('id', $approverIds)->pluck('name')->toArray()),
+                ]);
+                
                 return response()->json([
-                    'success' => false,
-                    'message' => 'Bạn không có quyền thực hiện thao tác này',
-                ], 403);
-            }
-            
-            // Validate approver IDs
-            if (empty($approverIds) || !is_array($approverIds)) {
+                    'success' => true,
+                    'message' => 'Đã gán người phê duyệt và chuyển đơn lên Ban Giám đốc thành công',
+                    'data' => [
+                        'selected_approvers' => $approverIds,
+                    ],
+                ]);
+            } elseif ($modelType === 'vehicle') {
+                $vehicle = VehicleRegistration::findOrFail($id);
+                
+                $isDepartmentHeadStep = $vehicle->workflow_status === 'dept_review' && $vehicle->vehicle_id && !$vehicle->department_approved_at;
+                $hasDepartmentHeadPermission = PermissionHelper::can($user, 'vehicle_registration.approve');
+                
+                if (!$isDepartmentHeadStep || !$hasDepartmentHeadPermission) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Bạn không có quyền thực hiện thao tác này',
+                    ], 403);
+                }
+                
+                if (empty($approverIds) || !is_array($approverIds)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Vui lòng chọn ít nhất một người phê duyệt',
+                    ], 400);
+                }
+                
+                $directors = VehicleRegistration::getDirectors();
+                $directorIds = $directors->pluck('id')->toArray();
+                $invalidIds = array_diff($approverIds, $directorIds);
+                
+                if (!empty($invalidIds)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Có người được chọn không phải là Ban Giám đốc',
+                    ], 400);
+                }
+                
+                $approverIds = array_map('intval', $approverIds);
+                $vehicle->selected_approvers = $approverIds;
+                $vehicle->workflow_status = 'director_review';
+                $vehicle->department_approved_by = $user->id;
+                $vehicle->department_approved_at = now();
+                
+                if ($user->signature_path) {
+                    $vehicle->digital_signature_dept = $user->signature_path;
+                }
+                
+                $vehicle->save();
+                
+                \Modules\ApprovalWorkflow\Models\ApprovalHistory::create([
+                    'approvable_type' => get_class($vehicle),
+                    'approvable_id' => $vehicle->id,
+                    'user_id' => $user->id,
+                    'action' => 'approved',
+                    'level' => 2,
+                    'workflow_status_before' => 'dept_review',
+                    'workflow_status_after' => 'director_review',
+                    'comment' => 'Đã chọn người phê duyệt: ' . implode(', ', \App\Models\User::whereIn('id', $approverIds)->pluck('name')->toArray()),
+                ]);
+                
                 return response()->json([
-                    'success' => false,
-                    'message' => 'Vui lòng chọn ít nhất một người phê duyệt',
-                ], 400);
+                    'success' => true,
+                    'message' => 'Đã gán người phê duyệt và chuyển đơn lên Ban Giám đốc thành công',
+                    'data' => [
+                        'selected_approvers' => $approverIds,
+                    ],
+                ]);
             }
-            
-            // Verify all IDs are directors
-            $directors = EmployeeLeave::getDirectors();
-            $directorIds = $directors->pluck('id')->toArray();
-            $invalidIds = array_diff($approverIds, $directorIds);
-            
-            if (!empty($invalidIds)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Có người được chọn không phải là Ban Giám đốc',
-                ], 400);
-            }
-            
-            // Save selected approvers and forward to BGD step
-            // Ensure approver IDs are integers (not strings) for proper JSON storage
-            $approverIds = array_map('intval', $approverIds);
-            $leave->selected_approvers = $approverIds;
-            $leave->workflow_status = EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER;
-            $leave->approved_by_reviewer = $user->id;
-            $leave->approved_at_reviewer = now();
-            $leave->save();
-            
-            // Create approval history entry
-            \Modules\ApprovalWorkflow\Models\ApprovalHistory::create([
-                'approvable_type' => get_class($leave),
-                'approvable_id' => $leave->id,
-                'user_id' => $user->id,
-                'action' => 'approved',
-                'level' => 2,
-                'workflow_status_before' => EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD,
-                'workflow_status_after' => EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER,
-                'comment' => 'Đã chọn người phê duyệt: ' . implode(', ', \App\Models\User::whereIn('id', $approverIds)->pluck('name')->toArray()),
-            ]);
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Đã gán người phê duyệt và chuyển đơn lên Ban Giám đốc thành công',
-                'data' => [
-                    'selected_approvers' => $approverIds,
-                ],
-            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

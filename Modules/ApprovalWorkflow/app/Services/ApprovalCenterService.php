@@ -74,12 +74,19 @@ class ApprovalCenterService
 
         // Get vehicle counts
         $vehicleQuery = VehicleRegistration::query();
-        $this->filterVehicleByUserPermissions($vehicleQuery, $user);
+        $this->filterVehicleByUserPermissions($vehicleQuery, $user, []);
 
-        // Vehicle workflow is simpler - just count pending/review status
-        $counts['vehicle']['pending'] = (clone $vehicleQuery)->whereIn('workflow_status', ['submitted', 'dept_review'])->count();
-        $counts['vehicle']['review'] = 0; // Vehicle doesn't have review step
-        $counts['vehicle']['director'] = 0; // Vehicle doesn't have director step
+        $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+        
+        if ($isDirector) {
+            $counts['vehicle']['pending'] = 0;
+            $counts['vehicle']['review'] = 0;
+            $counts['vehicle']['director'] = (clone $vehicleQuery)->where('workflow_status', 'director_review')->count();
+        } else {
+            $counts['vehicle']['pending'] = (clone $vehicleQuery)->whereIn('workflow_status', ['submitted', 'dept_review'])->count();
+            $counts['vehicle']['review'] = 0;
+            $counts['vehicle']['director'] = 0;
+        }
 
         return $counts;
     }
@@ -102,6 +109,29 @@ class ApprovalCenterService
             // Trưởng phòng/Quản đốc: show pending count
             return $counts[$type]['pending'];
         }
+    }
+
+    /**
+     * Get total pending count for menu badge (leave + vehicle)
+     */
+    public function getTotalPendingCountForUser($user)
+    {
+        $counts = $this->getPendingCountsByType($user);
+        $total = 0;
+
+        // Determine which count to show based on user role
+        if ($user->hasRole('Admin') || PermissionHelper::can($user, 'leave.review')) {
+            // Thẩm định: show review count
+            $total = $counts['leave']['review'] + $counts['vehicle']['review'];
+        } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
+            // Ban giám đốc: show director count
+            $total = $counts['leave']['director'] + $counts['vehicle']['director'];
+        } else {
+            // Trưởng phòng/Quản đốc: show pending count
+            $total = $counts['leave']['pending'] + $counts['vehicle']['pending'];
+        }
+
+        return $total;
     }
 
     /**
@@ -176,10 +206,19 @@ class ApprovalCenterService
     {
         $query = VehicleRegistration::query();
 
-        // Apply status filter
-        if ($filters['status'] !== 'all') {
+        $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+        
+        // Filter by user permissions first (this may add workflow_status conditions for directors)
+        $this->filterVehicleByUserPermissions($query, $user, $filters);
+
+        // Apply status filter (only if not director, or if director but status is not 'all')
+        if ($filters['status'] !== 'all' && !$isDirector) {
             if ($filters['status'] === 'pending') {
                 $query->whereIn('workflow_status', ['submitted', 'dept_review']);
+            } elseif ($filters['status'] === 'director_review') {
+                $query->where('workflow_status', 'director_review');
+            } elseif ($filters['status'] === 'approved') {
+                $query->where('workflow_status', 'approved');
             } else {
                 $query->where('workflow_status', $filters['status']);
             }
@@ -187,9 +226,6 @@ class ApprovalCenterService
 
         // Apply time range filter
         $this->applyTimeRangeFilter($query, $filters['time_range']);
-
-        // Filter by user permissions
-        $this->filterVehicleByUserPermissions($query, $user);
 
         return $query->with(['user', 'vehicle', 'driver'])
             ->orderBy('created_at', 'desc')
@@ -199,7 +235,7 @@ class ApprovalCenterService
                     'id' => $vehicle->id,
                     'model_type' => 'vehicle',
                     'type' => 'Official Cars',
-                    'type_label' => 'Đăng ký xe công',
+                    'type_label' => 'Đăng ký xe',
                     'title' => $this->getVehicleTitle($vehicle),
                     'status' => $vehicle->workflow_status,
                     'status_label' => $this->getVehicleStatusLabel($vehicle->workflow_status),
@@ -294,10 +330,44 @@ class ApprovalCenterService
     /**
      * Filter vehicle requests by user permissions
      */
-    protected function filterVehicleByUserPermissions($query, $user)
+    protected function filterVehicleByUserPermissions($query, $user, $filters = [])
     {
         // Admin sees all
         if ($user->hasRole('Admin')) {
+            return;
+        }
+
+        $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+        
+        if ($isDirector) {
+            $statusFilter = $filters['status'] ?? 'all';
+            $userId = (int)$user->id;
+            
+            $query->where(function($q) use ($user, $statusFilter, $userId) {
+                $jsonCondition = function($jsonQ) use ($userId) {
+                    $jsonQ->whereJsonContains('selected_approvers', $userId)
+                          ->orWhereJsonContains('selected_approvers', (string)$userId)
+                          ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode($userId)])
+                          ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode((string)$userId)]);
+                };
+                
+                if ($statusFilter === 'all' || $statusFilter === 'director_review') {
+                    $q->where(function($directorQ) use ($userId, $jsonCondition) {
+                        $directorQ->where('workflow_status', 'director_review')
+                                  ->where($jsonCondition);
+                    });
+                }
+                
+                if ($statusFilter === 'all' || $statusFilter === 'approved') {
+                    $q->orWhere(function($approvedQ) use ($userId, $jsonCondition) {
+                        $approvedQ->where('workflow_status', 'approved')
+                                  ->where(function($approvedCondition) use ($userId, $jsonCondition) {
+                                      $approvedCondition->where('director_approved_by', $userId)
+                                                        ->orWhere($jsonCondition);
+                                  });
+                    });
+                }
+            });
             return;
         }
 
@@ -359,11 +429,16 @@ class ApprovalCenterService
                 $model = VehicleRegistration::with(['user', 'vehicle', 'driver'])->find($id);
                 if (!$model) return null;
 
+                $user = backpack_user();
+                $isDepartmentHeadStep = $model->workflow_status === 'dept_review' && $model->vehicle_id && !$model->department_approved_at;
+                $hasDepartmentHeadPermission = $this->canUserApproveVehicle($model, $user);
+                $hasSelectedApprovers = !empty($model->selected_approvers);
+
                 return [
                     'id' => $model->id,
                     'model_type' => 'vehicle',
                     'type' => 'Official Cars',
-                    'type_label' => 'Đăng ký xe công',
+                    'type_label' => 'Đăng ký xe',
                     'title' => $this->getVehicleTitle($model),
                     'status' => $model->workflow_status,
                     'status_label' => $this->getVehicleStatusLabel($model->workflow_status),
@@ -371,8 +446,14 @@ class ApprovalCenterService
                     'submitted_by' => $model->user ? $model->user->name : 'N/A',
                     'submitted_at' => $this->formatVietnameseDate($model->created_at),
                     'details' => $this->getVehicleDetails($model),
-                    'can_approve' => $model->canBeApproved() && $this->canUserApproveVehicle($model, backpack_user()),
-                    'can_reject' => $model->canBeRejected() && $this->canUserApproveVehicle($model, backpack_user()),
+                    'can_approve' => $model->canBeApproved() && $this->canUserApproveVehicle($model, $user),
+                    'can_reject' => $model->canBeRejected() && $this->canUserApproveVehicle($model, $user),
+                    'is_department_head_step' => $isDepartmentHeadStep && $hasDepartmentHeadPermission,
+                    'has_selected_approvers' => $hasSelectedApprovers,
+                    'selected_approvers' => $model->selected_approvers ? (is_array($model->selected_approvers) ? $model->selected_approvers : json_decode($model->selected_approvers, true)) : [],
+                    'workflow_data' => $this->getVehicleWorkflowProgressData($model),
+                    'has_signed_pdf' => $model->hasSignedPdf(),
+                    'pdf_url' => $model->hasSignedPdf() ? route('approval.preview-pdf', ['modelClass' => base64_encode(get_class($model)), 'id' => $model->id]) : null,
                 ];
 
             default:
@@ -422,19 +503,25 @@ class ApprovalCenterService
         // Use ApprovalController logic
         $controller = app(\Modules\ApprovalWorkflow\Http\Controllers\ApprovalController::class);
 
-        // Check if this is reviewer step (leave request at approved_by_department_head) - no PIN needed
         $needsPin = true;
         if ($modelType === 'leave' && $model instanceof EmployeeLeave) {
             $isReviewerStep = $model->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
             $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
 
             if ($isReviewerStep && $hasReviewPermission) {
-                // Reviewer step: check if approvers have been assigned
                 if (empty($model->selected_approvers)) {
                     throw new \Exception('Vui lòng chọn người phê duyệt trước khi chuyển đơn lên Ban Giám đốc');
                 }
-                // Reviewer step: no PIN needed, just forward to BGD
                 $needsPin = false;
+            }
+        } elseif ($modelType === 'vehicle' && $model instanceof VehicleRegistration) {
+            $isDepartmentHeadStep = $model->workflow_status === 'dept_review' && $model->vehicle_id && !$model->department_approved_at;
+            $hasDepartmentHeadPermission = PermissionHelper::can($user, 'vehicle_registration.approve');
+
+            if ($isDepartmentHeadStep && $hasDepartmentHeadPermission) {
+                if (empty($model->selected_approvers)) {
+                    throw new \Exception('Vui lòng chọn người phê duyệt trước khi chuyển đơn lên Ban Giám đốc');
+                }
             }
         }
 
@@ -596,17 +683,24 @@ class ApprovalCenterService
 
     protected function getVehiclePeriod($vehicle)
     {
-        $from = $vehicle->departure_date ? Carbon::parse($vehicle->departure_date)->format('d M Y') : 'N/A';
-        $to = $vehicle->return_date ? Carbon::parse($vehicle->return_date)->format('d M Y') : 'N/A';
-        return "{$from} to {$to}";
+        if ($vehicle->departure_datetime && $vehicle->return_datetime) {
+            $from = $this->formatDateWithTimezone($vehicle->departure_datetime, 'd/m/Y');
+            $to = $this->formatDateWithTimezone($vehicle->return_datetime, 'd/m/Y');
+            return "{$from} - {$to}";
+        } elseif ($vehicle->departure_date && $vehicle->return_date) {
+            $from = $this->formatDateWithTimezone($vehicle->departure_date, 'd/m/Y');
+            $to = $this->formatDateWithTimezone($vehicle->return_date, 'd/m/Y');
+            return "{$from} - {$to}";
+        }
+        return 'N/A';
     }
 
     protected function getVehicleDetails($vehicle)
     {
         return [
             'Lý do' => $vehicle->purpose ?? 'N/A',
-            'Thời gian bắt đầu' => $vehicle->departure_datetime ? $this->formatDateWithTimezone($vehicle->departure_datetime, 'Y-m-d H:i') : 'N/A',
-            'Thời gian kết thúc' => $vehicle->return_datetime ? $this->formatDateWithTimezone($vehicle->return_datetime, 'Y-m-d H:i') : 'N/A',
+            'Thời gian bắt đầu' => $vehicle->departure_datetime ? $this->formatDateWithTimezone($vehicle->departure_datetime, 'd/m/Y') : ($vehicle->departure_date ? $this->formatDateWithTimezone($vehicle->departure_date, 'd/m/Y') : 'N/A'),
+            'Thời gian kết thúc' => $vehicle->return_datetime ? $this->formatDateWithTimezone($vehicle->return_datetime, 'd/m/Y') : ($vehicle->return_date ? $this->formatDateWithTimezone($vehicle->return_date, 'd/m/Y') : 'N/A'),
             'Tuyến đường' => $vehicle->route ?? 'N/A',
             'Xe' => $vehicle->vehicle ? $vehicle->vehicle->name : 'N/A',
             'Tài xế' => $vehicle->driver ? $vehicle->driver->name : 'N/A',
@@ -631,6 +725,7 @@ class ApprovalCenterService
         $labels = [
             'submitted' => 'Đã gửi',
             'dept_review' => 'Đang được xét duyệt',
+            'director_review' => 'Chờ BGD phê duyệt',
             'approved' => 'Đã phê duyệt',
             'rejected' => 'Đã từ chối',
         ];
@@ -643,6 +738,7 @@ class ApprovalCenterService
         $badges = [
             'submitted' => 'info',
             'dept_review' => 'primary',
+            'director_review' => 'warning',
             'approved' => 'success',
             'rejected' => 'danger',
         ];
@@ -740,8 +836,43 @@ class ApprovalCenterService
             return true;
         }
 
-        // Add vehicle-specific permission check
-        return PermissionHelper::can($user, 'vehicle_registration.approve');
+        if (!PermissionHelper::can($user, 'vehicle_registration.approve')) {
+            return false;
+        }
+
+        $status = $vehicle->workflow_status;
+        
+        if ($status === 'director_review' || ($status === 'approved' && !$vehicle->director_approved_by)) {
+            $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+            if (!$isDirector) {
+                return false;
+            }
+            
+            if (!$vehicle->selected_approvers) {
+                return false;
+            }
+            
+            if (method_exists($vehicle, 'isUserSelectedApprover')) {
+                return $vehicle->isUserSelectedApprover($user->id);
+            }
+            
+            $approverIds = is_array($vehicle->selected_approvers)
+                ? $vehicle->selected_approvers
+                : json_decode($vehicle->selected_approvers, true);
+            
+            if (!is_array($approverIds)) {
+                return false;
+            }
+            
+            return in_array((int)$user->id, array_map('intval', $approverIds));
+        }
+        
+        if ($status === 'dept_review') {
+            $isDepartmentHead = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban']);
+            return $isDepartmentHead;
+        }
+        
+        return false;
     }
 
     /**
@@ -910,6 +1041,131 @@ class ApprovalCenterService
             'currentStatus' => $currentStatusKey,
             'currentStepIndex' => $currentStepIndex,
             'rejected' => $model->workflow_status === EmployeeLeave::WORKFLOW_REJECTED,
+            'stepDates' => $stepDates,
+            'stepUsers' => $stepUsers
+        ];
+    }
+
+    public function getVehicleWorkflowProgressData($model)
+    {
+        if (!($model instanceof VehicleRegistration)) {
+            return null;
+        }
+
+        $steps = [
+            [
+                'key' => 'created',
+                'label' => 'Tạo đơn'
+            ],
+            [
+                'key' => 'vehicle_assigned',
+                'label' => 'Phân xe'
+            ],
+            [
+                'key' => 'dept_review',
+                'label' => 'Trưởng phòng KH duyệt'
+            ],
+            [
+                'key' => 'approved',
+                'label' => 'BGD duyệt'
+            ]
+        ];
+
+        $stepDates = [];
+        $stepUsers = [];
+
+        if ($model->created_at) {
+            $stepDates['created'] = $this->formatDateWithTimezone($model->created_at, 'd/m/Y H:i');
+        }
+        if ($model->user) {
+            $stepUsers['created'] = $model->user->name ?? 'N/A';
+        }
+
+        if ($model->vehicle_id) {
+            $assignedAt = $model->updated_at;
+            if ($model->vehicle && $model->vehicle->created_at) {
+                $assignedAt = $model->updated_at;
+            }
+            $stepDates['vehicle_assigned'] = $this->formatDateWithTimezone($assignedAt, 'd/m/Y H:i');
+            if ($model->vehicle) {
+                $stepUsers['vehicle_assigned'] = $model->vehicle->name ?? 'N/A';
+            }
+        }
+
+        if ($model->department_approved_at) {
+            $stepDates['dept_review'] = $this->formatDateWithTimezone($model->department_approved_at, 'd/m/Y H:i');
+        }
+        if ($model->department_approved_by) {
+            $deptApprover = \App\Models\User::find($model->department_approved_by);
+            if ($deptApprover) {
+                $stepUsers['dept_review'] = $deptApprover->name ?? 'N/A';
+            }
+        }
+
+        if ($model->director_approved_at) {
+            $stepDates['approved'] = $this->formatDateWithTimezone($model->director_approved_at, 'd/m/Y H:i');
+        } elseif ($model->director_approved_by && $model->workflow_status === 'approved') {
+            $stepDates['approved'] = $this->formatDateWithTimezone(now(), 'd/m/Y H:i');
+        }
+        if ($model->director_approved_by) {
+            $director = \App\Models\User::find($model->director_approved_by);
+            if ($director) {
+                $stepUsers['approved'] = $director->name ?? 'N/A';
+            }
+        }
+
+        $currentStatusKey = $model->workflow_status;
+        $currentStepIndex = 0;
+
+        switch ($currentStatusKey) {
+            case 'approved':
+                $currentStepIndex = 3;
+                break;
+            case 'dept_review':
+                if ($model->vehicle_id && $model->department_approved_at) {
+                    $currentStepIndex = 3;
+                } elseif ($model->vehicle_id) {
+                    $currentStepIndex = 2;
+                } else {
+                    $currentStepIndex = 1;
+                }
+                break;
+            case 'submitted':
+                if ($model->vehicle_id) {
+                    $currentStepIndex = 1;
+                } else {
+                    $currentStepIndex = 0;
+                }
+                break;
+            case 'rejected':
+                if ($model->director_approved_at) {
+                    $currentStepIndex = 3;
+                } elseif ($model->department_approved_at) {
+                    $currentStepIndex = 2;
+                } elseif ($model->vehicle_id) {
+                    $currentStepIndex = 1;
+                } else {
+                    $currentStepIndex = 0;
+                }
+                break;
+            default:
+                if ($model->director_approved_at) {
+                    $currentStepIndex = 3;
+                } elseif ($model->department_approved_at) {
+                    $currentStepIndex = 2;
+                } elseif ($model->vehicle_id) {
+                    $currentStepIndex = 1;
+                } else {
+                    $currentStepIndex = 0;
+                }
+                break;
+        }
+
+        return [
+            'steps' => $steps,
+            'currentStatus' => $currentStatusKey,
+            'currentStepIndex' => $currentStepIndex,
+            'rejected' => $model->workflow_status === 'rejected',
             'stepDates' => $stepDates,
             'stepUsers' => $stepUsers
         ];

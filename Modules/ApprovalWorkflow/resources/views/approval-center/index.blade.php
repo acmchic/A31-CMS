@@ -58,7 +58,7 @@
                  data-type="vehicle"
                  style="cursor: pointer; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; position: relative;">
                 <div class="d-flex align-items-center justify-content-between">
-                    <span class="fw-semibold">Xe công</span>
+                    <span class="fw-semibold">Đăng ký xe</span>
                     @if($vehicleCount > 0)
                         <span class="badge bg-danger rounded-pill" style="font-size: 0.7rem; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;">
                             {{ $vehicleCount }}
@@ -972,23 +972,24 @@ $(document).ready(function() {
         }
 
         if (request.can_approve) {
-            // Check if this is reviewer step (needs to assign approvers first)
-            // Reviewer step: workflow_status is 'approved_by_department_head' and user has 'leave.review' permission
-            // AND has not selected approvers yet
             const isReviewerStep = (request.is_reviewer_step === true ||
                                    (request.model_type === 'leave' &&
                                     request.status === 'approved_by_department_head')) &&
                                    (request.has_selected_approvers === false || !request.has_selected_approvers);
 
-            if (isReviewerStep) {
-                // Reviewer step: show "Người phê duyệt" button
-                const reviewerButtonText = (request.is_reviewer_role === true) ? 'Gửi lên BGD' : 'Người phê duyệt';
+            const isDepartmentHeadStep = (request.is_department_head_step === true ||
+                                         (request.model_type === 'vehicle' &&
+                                          request.status === 'dept_review')) &&
+                                         (request.has_selected_approvers === false || !request.has_selected_approvers);
+
+            if (isReviewerStep || isDepartmentHeadStep) {
+                const buttonText = 'Người phê duyệt';
                 detailHtml += `
                     <button id="btn-assign-approvers"
                             class="btn btn-sm btn-primary"
                             data-id="${request.id}"
                             data-model-type="${request.model_type}">
-                        <i class="la la-user-plus"></i> ${reviewerButtonText}
+                        <i class="la la-user-plus"></i> ${buttonText}
                     </button>
                 `;
             } else {
@@ -1064,7 +1065,7 @@ $(document).ready(function() {
                     </div>
                     <hr class="my-4">
                     <div id="approval-history-content">
-                        ${request.workflow_data && request.model_type === 'leave' ? renderWorkflowProgressFromData(request.workflow_data) : ''}
+                        ${request.workflow_data && (request.model_type === 'leave' || request.model_type === 'vehicle') ? renderWorkflowProgressFromData(request.workflow_data) : ''}
                     </div>
                 </div>
             </div>
@@ -1073,26 +1074,26 @@ $(document).ready(function() {
         $('#request-detail').html(detailHtml);
 
         // Render workflow progress if available
-        if (request.workflow_data && request.model_type === 'leave') {
+        if (request.workflow_data && (request.model_type === 'leave' || request.model_type === 'vehicle')) {
             renderWorkflowProgressFromData(request.workflow_data);
         }
 
         // Print button handler is already set up at document level
     }
-    
+
     function renderWorkflowProgressFromData(workflowData) {
         if (!workflowData || !workflowData.steps) {
             return;
         }
-        
+
         const clockIconPath = '{{ asset("assets/icon/clock.svg") }}';
         let html = '<div class="workflow-progress-simple mb-4"><div class="card"><div class="card-header"><h5 class="mb-0"><i class="la la-tasks"></i> Tiến trình phê duyệt</h5></div><div class="card-body"><div class="workflow-steps-container">';
-        
+
         workflowData.steps.forEach(function(step, index) {
             const stepUser = workflowData.stepUsers && workflowData.stepUsers[step.key];
             const stepDate = workflowData.stepDates && workflowData.stepDates[step.key];
             const hasStepData = stepUser || stepDate;
-            
+
             const isCreatedStep = (step.key === 'created');
             let isCompleted = false;
             if (isCreatedStep) {
@@ -1100,10 +1101,10 @@ $(document).ready(function() {
             } else if (hasStepData) {
                 isCompleted = true;
             }
-            
+
             const isCurrent = (index === workflowData.currentStepIndex && !workflowData.rejected && !isCompleted);
             const isRejectedStep = index === workflowData.currentStepIndex && workflowData.rejected;
-            
+
             let stepClass, dotColor, connectorColor, iconClass, iconColor;
             if (isRejectedStep) {
                 stepClass = 'rejected';
@@ -1130,14 +1131,14 @@ $(document).ready(function() {
                 iconClass = 'la-circle';
                 iconColor = '#6c757d';
             }
-            
+
             const isLast = index === workflowData.steps.length - 1;
             if (!isLast && isCompleted) {
                 connectorColor = '#007bff';
             } else if (!isLast) {
                 connectorColor = '#dee2e6';
             }
-            
+
             html += '<div class="workflow-step-item ' + stepClass + '" data-step="' + step.key + '">';
             html += '<div class="step-dot-wrapper">';
             if (!isLast) {
@@ -1159,7 +1160,7 @@ $(document).ready(function() {
             }
             html += '</div></div>';
         });
-        
+
         html += '</div></div></div></div>';
         $('#approval-history-content').html(html);
     }
@@ -1416,7 +1417,7 @@ $(document).ready(function() {
                                 </div>
                                 <div class="col-md-4">
                                     <div class="mb-2">
-                                        <strong>Đã chọn: <span id="bulk-selected-count">0</span> thành viên</strong>
+                                        <strong>Đã chọn:
                                     </div>
                                     <div id="bulk-selected-approvers-list" style="max-height: 300px; overflow-y: auto;">
                                         <p class="text-muted text-center py-3">Chưa chọn ai</p>
@@ -1630,7 +1631,7 @@ $(document).ready(function() {
                                 </div>
                                 <div class="col-md-4">
                                     <div class="mb-2">
-                                        <strong>Đã chọn: <span id="selected-count">0</span> thành viên</strong>
+                                        <strong>Đã chọn:
                                     </div>
                                     <div id="selected-approvers-list" style="max-height: 350px; overflow-y: auto;">
                                         <p class="text-muted text-center py-3">Chưa chọn ai</p>

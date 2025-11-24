@@ -19,17 +19,19 @@
                     $isReviewerStep = (isset($request['is_reviewer_step']) && $request['is_reviewer_step']) ||
                                       ($request['model_type'] === 'leave' &&
                                        $request['status'] === 'approved_by_department_head');
+                    $isDepartmentHeadStep = (isset($request['is_department_head_step']) && $request['is_department_head_step']) ||
+                                            ($request['model_type'] === 'vehicle' &&
+                                             $request['status'] === 'dept_review');
                     $hasSelectedApprovers = isset($request['has_selected_approvers']) && $request['has_selected_approvers'];
-                    $showAssignButton = $isReviewerStep && !$hasSelectedApprovers;
+                    $showAssignButton = ($isReviewerStep || $isDepartmentHeadStep) && !$hasSelectedApprovers;
                 @endphp
 
                 @if($showAssignButton)
-                    {{-- Reviewer step: show "Người phê duyệt" button --}}
                     <button id="btn-assign-approvers"
                             class="btn btn-sm btn-primary"
                             data-id="{{ $request['id'] }}"
                             data-model-type="{{ $request['model_type'] }}">
-                        <i class="la la-user-plus"></i> {{ (isset($request['is_reviewer_role']) && $request['is_reviewer_role']) ? 'Gửi lên BGD' : 'Người phê duyệt' }}
+                        <i class="la la-user-plus"></i> Người phê duyệt
                     </button>
                 @else
                     {{-- Other steps: show approve button --}}
@@ -87,7 +89,7 @@
 
         <!-- Approval Workflow Timeline -->
         <div id="approval-history-content">
-            @if(isset($request['workflow_data']) && $request['model_type'] === 'leave')
+            @if(isset($request['workflow_data']) && ($request['model_type'] === 'leave' || $request['model_type'] === 'vehicle'))
                 @include('components.workflow-progress', [
                     'steps' => $request['workflow_data']['steps'] ?? [],
                     'currentStatus' => $request['workflow_data']['currentStatus'] ?? '',
