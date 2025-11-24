@@ -8,25 +8,25 @@
             @if($request['can_approve'])
                 @php
                     $isReviewerStep = (isset($request['is_reviewer_step']) && $request['is_reviewer_step']) ||
-                                      ($request['model_type'] === 'leave' && 
+                                      ($request['model_type'] === 'leave' &&
                                        $request['status'] === 'approved_by_department_head');
                     $hasSelectedApprovers = isset($request['has_selected_approvers']) && $request['has_selected_approvers'];
                     $showAssignButton = $isReviewerStep && !$hasSelectedApprovers;
                 @endphp
-                
+
                 @if($showAssignButton)
                     {{-- Reviewer step: show "Người phê duyệt" button --}}
-                    <button id="btn-assign-approvers" 
-                            class="btn btn-sm btn-primary" 
-                            data-id="{{ $request['id'] }}" 
+                    <button id="btn-assign-approvers"
+                            class="btn btn-sm btn-primary"
+                            data-id="{{ $request['id'] }}"
                             data-model-type="{{ $request['model_type'] }}">
                         <i class="la la-user-plus"></i> Người phê duyệt
                     </button>
                 @else
                     {{-- Other steps: show approve button --}}
-                    <button id="btn-approve" 
-                            class="btn btn-sm btn-success" 
-                            data-id="{{ $request['id'] }}" 
+                    <button id="btn-approve"
+                            class="btn btn-sm btn-success"
+                            data-id="{{ $request['id'] }}"
                             data-model-type="{{ $request['model_type'] }}"
                             data-needs-pin="{{ isset($request['needs_pin']) && $request['needs_pin'] === false ? '0' : '1' }}">
                         <i class="la la-check"></i> Phê duyệt
@@ -34,16 +34,16 @@
                 @endif
             @endif
             @if($request['can_reject'])
-                <button id="btn-reject" 
-                        class="btn btn-sm btn-danger" 
-                        data-id="{{ $request['id'] }}" 
+                <button id="btn-reject"
+                        class="btn btn-sm btn-danger"
+                        data-id="{{ $request['id'] }}"
                         data-model-type="{{ $request['model_type'] }}">
                     <i class="la la-times"></i> Từ chối
                 </button>
             @endif
         </div>
     </div>
-    
+
     <div class="card-body">
         <!-- Request Info -->
         <div class="row mb-4">
@@ -60,11 +60,11 @@
                 </div>
             </div>
         </div>
-        
+
         <hr class="my-4">
-        
+
         <!-- Details -->
-        <h6 class="mb-3 fw-semibold">Chi tiết yêu cầu</h6>
+        <h6 class="mb-3 fw-semibold">Chi tiết</h6>
         <div class="row">
             @foreach($request['details'] as $label => $value)
                 <div class="col-md-6 mb-3">
@@ -73,9 +73,9 @@
                 </div>
             @endforeach
         </div>
-        
+
         <hr class="my-4">
-        
+
         <!-- Approval Workflow Timeline -->
         <div id="approval-history-content">
             @if(isset($request['workflow_data']) && $request['model_type'] === 'leave')

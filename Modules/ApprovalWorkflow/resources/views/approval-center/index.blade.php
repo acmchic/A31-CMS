@@ -849,7 +849,7 @@ $(document).ready(function() {
             },
             error: function() {
                 hideLoadingSkeleton();
-                alert('Không thể tải chi tiết yêu cầu');
+                alert('Không thể tải chi tiết');
             }
         });
     }
@@ -1008,7 +1008,7 @@ $(document).ready(function() {
                         </div>
                     </div>
                     <hr class="my-4">
-                    <h6 class="mb-3 fw-semibold">Chi tiết yêu cầu</h6>
+                    <h6 class="mb-3 fw-semibold">Chi tiết</h6>
                     <div class="row">
         `;
 
