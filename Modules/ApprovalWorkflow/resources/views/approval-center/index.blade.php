@@ -7,7 +7,6 @@
         <div class="approval-center-banner">
             <div class="banner-content">
                 <div class="banner-text">
-                    <div class="banner-department">{{ $departmentName ?? 'HỆ THỐNG' }}</div>
                     <h1 class="banner-title">Trung tâm phê duyệt</h1>
                 </div>
             </div>
@@ -31,7 +30,7 @@
                 } else {
                     $leaveCount = $pendingCounts['leave']['pending'] ?? 0;
                 }
-                
+
                 $vehicleCount = 0;
                 if ($user->hasRole('Admin') || \App\Helpers\PermissionHelper::can($user, 'leave.review')) {
                     $vehicleCount = $pendingCounts['vehicle']['review'] ?? 0;
@@ -41,9 +40,9 @@
                     $vehicleCount = $pendingCounts['vehicle']['pending'] ?? 0;
                 }
             @endphp
-            
-            <div class="type-item {{ $filters['type'] === 'leave' ? 'active' : '' }}" 
-                 data-type="leave" 
+
+            <div class="type-item {{ $filters['type'] === 'leave' ? 'active' : '' }}"
+                 data-type="leave"
                  style="cursor: pointer; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; position: relative;">
                 <div class="d-flex align-items-center justify-content-between">
                     <span class="fw-semibold">Nghỉ phép</span>
@@ -54,9 +53,9 @@
                     @endif
                 </div>
             </div>
-            
-            <div class="type-item {{ $filters['type'] === 'vehicle' ? 'active' : '' }}" 
-                 data-type="vehicle" 
+
+            <div class="type-item {{ $filters['type'] === 'vehicle' ? 'active' : '' }}"
+                 data-type="vehicle"
                  style="cursor: pointer; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; position: relative;">
                 <div class="d-flex align-items-center justify-content-between">
                     <span class="fw-semibold">Xe công</span>
@@ -453,21 +452,21 @@ $(document).ready(function() {
     $('.type-item').on('click', function() {
         const type = $(this).data('type');
         const currentType = $('#filter-type').val() || 'all';
-        
+
         // If clicking the same active item, do nothing (keep it active)
         // If clicking different item, switch to that type
         if ($(this).hasClass('active') && currentType === type) {
             // Already active, do nothing
             return;
         }
-        
+
         // Update active state
         $('.type-item').removeClass('active');
         $(this).addClass('active');
-        
+
         // Set filter type
         $('#filter-type').val(type);
-        
+
         // Apply filters
         applyFilters();
     });
@@ -701,7 +700,7 @@ $(document).ready(function() {
     function performBulkApprove(requests, pin, modalInstance) {
         const $btn = $('#confirm-bulk-approve-btn');
         const modalElement = document.getElementById('bulkApproveModal');
-        
+
         // Get modal instance if not provided
         if (!modalInstance && modalElement) {
             modalInstance = bootstrap.Modal.getInstance(modalElement);
@@ -724,7 +723,7 @@ $(document).ready(function() {
             success: function(response) {
                 // Log response for debugging
                 console.log('Bulk approve response:', response);
-                
+
                 try {
                     // Ensure response is an object
                     if (typeof response === 'string') {
@@ -734,13 +733,13 @@ $(document).ready(function() {
                             console.error('Failed to parse response:', e);
                         }
                     }
-                    
+
                     if (response && response.success) {
                         // Show success message with details
                         const approvedCount = response.approved_count || 0;
                         const failedCount = response.failed_count || 0;
                         const errors = response.errors || [];
-                        
+
                         // Determine action type (phê duyệt or thẩm định) based on requests
                         let actionType = 'phê duyệt';
                         const hasReviewerStep = requests.some(function(req) {
@@ -749,13 +748,13 @@ $(document).ready(function() {
                         if (hasReviewerStep) {
                             actionType = 'thẩm định';
                         }
-                        
+
                         // Build message with clear error display
                         let message = '';
                         let notificationType = 'success';
                         let notificationTitle = 'Thành công';
                         let notificationIcon = 'fa fa-check-circle';
-                        
+
                         if (approvedCount > 0 && failedCount === 0) {
                             // All successful - show clear success message
                             if (approvedCount === 1) {
@@ -815,7 +814,7 @@ $(document).ready(function() {
                                     closeWith: ['click', 'button']
                                 }).show();
                             }
-                            
+
                             // Close modal and reload
                             if (modalInstance) {
                                 modalInstance.hide();
@@ -834,7 +833,7 @@ $(document).ready(function() {
                         } else {
                             // Has errors - show error message in modal, keep modal open
                             let errorText = 'Sai mã PIN, vui lòng thử lại';
-                            
+
                             // Check if error message contains PIN-related error
                             if (errors.length > 0) {
                                 const firstError = errors[0];
@@ -846,11 +845,11 @@ $(document).ready(function() {
                             } else if (message && (message.includes('PIN') || message.includes('pin') || message.includes('Mã PIN'))) {
                                 errorText = 'Sai mã PIN, vui lòng thử lại';
                             }
-                            
+
                             // Show error message in modal
                             $('#bulk-pin-error-text').text(errorText);
                             $('#bulk-pin-error').removeClass('d-none');
-                            
+
                             // Re-enable button
                             $btn.prop('disabled', false).html('<i class="la la-check-double"></i> Xác nhận phê duyệt');
                             // Clear PIN input to allow retry
@@ -860,10 +859,10 @@ $(document).ready(function() {
                         // Request failed completely - keep modal open, show error in modal
                         const errorMsg = response?.message || 'Không thể phê duyệt';
                         const errors = response?.errors || [];
-                        
+
                         // Determine error text to show
                         let errorText = 'Sai mã PIN, vui lòng thử lại';
-                        
+
                         if (errors.length > 0) {
                             const firstError = errors[0];
                             if (firstError.includes('PIN') || firstError.includes('pin') || firstError.includes('Mã PIN')) {
@@ -876,11 +875,11 @@ $(document).ready(function() {
                         } else if (errorMsg) {
                             errorText = errorMsg;
                         }
-                        
+
                         // Show error message in modal
                         $('#bulk-pin-error-text').text(errorText);
                         $('#bulk-pin-error').removeClass('d-none');
-                        
+
                         // Keep modal open, re-enable button, clear PIN for retry
                         $btn.prop('disabled', false).html('<i class="la la-check-double"></i> Xác nhận phê duyệt');
                         $('#bulk-pin-input').val('').focus();
@@ -909,7 +908,7 @@ $(document).ready(function() {
             error: function(xhr) {
                 let errorMsg = 'Có lỗi xảy ra khi phê duyệt';
                 let errors = [];
-                
+
                 if (xhr.responseJSON) {
                     if (xhr.responseJSON.message) {
                         errorMsg = xhr.responseJSON.message;
@@ -928,10 +927,10 @@ $(document).ready(function() {
                         // Keep default error message
                     }
                 }
-                
+
                 // Determine error text to show
                 let errorText = 'Sai mã PIN, vui lòng thử lại';
-                
+
                 if (errors.length > 0) {
                     const firstError = errors[0];
                     if (firstError.includes('PIN') || firstError.includes('pin') || firstError.includes('Mã PIN')) {
@@ -944,7 +943,7 @@ $(document).ready(function() {
                 } else if (errorMsg) {
                     errorText = errorMsg;
                 }
-                
+
                 // Show error message in modal
                 $('#bulk-pin-error-text').text(errorText);
                 $('#bulk-pin-error').removeClass('d-none');
@@ -1411,12 +1410,12 @@ $(document).ready(function() {
 
         $('body').append(modal);
         $('#pinModal').modal('show');
-        
+
         // Hide error message when user starts typing
         $('#pin-input').on('input', function() {
             $('#pin-error').addClass('d-none');
         });
-        
+
         $('#pinModal').on('hidden.bs.modal', function() {
             $(this).remove();
         });
@@ -1511,10 +1510,10 @@ $(document).ready(function() {
                         </div>
                         <div class="modal-body">
                             <div class="alert alert-info mb-3">
-                                <i class="la la-info-circle"></i> Bạn đang chọn người phê duyệt cho <strong>${requests.length} đơn thẩm định</strong>. 
+                                <i class="la la-info-circle"></i> Bạn đang chọn người phê duyệt cho <strong>${requests.length} đơn thẩm định</strong>.
                                 Tất cả đơn sẽ được gửi đến những người được chọn.
                             </div>
-                            
+
                             <div class="mb-3">
                                 <h6>Danh sách đơn sẽ được gửi:</h6>
                                 <div style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
@@ -1587,7 +1586,7 @@ $(document).ready(function() {
         function updateBulkSelectedApprovers() {
             const selectedIds = [];
             const selectedApprovers = [];
-            
+
             $('.bulk-approver-checkbox:checked').each(function() {
                 const id = $(this).val();
                 const name = $(this).closest('.member-item').find('label span').text();
@@ -1596,7 +1595,7 @@ $(document).ready(function() {
             });
 
             $('#bulk-selected-count').text(selectedIds.length);
-            
+
             if (selectedIds.length === 0) {
                 $('#bulk-selected-approvers-list').html('<p class="text-muted text-center py-3">Chưa chọn ai</p>');
                 $('#confirm-bulk-assign-approvers').prop('disabled', true);
@@ -1859,7 +1858,7 @@ $(document).ready(function() {
 
                 if (response.success) {
                     $('#assignApproversModal').modal('hide');
-                    
+
                     // Show success notification for thẩm định
                     if (typeof Noty !== 'undefined') {
                         new Noty({
@@ -1873,7 +1872,7 @@ $(document).ready(function() {
                     } else {
                         alert('Thẩm định thành công\n\n' + (response.message || 'Đã thẩm định và gửi lên Ban Giám đốc thành công'));
                     }
-                    
+
                     // Reload page after a short delay to show notification
                     setTimeout(function() {
                         location.reload();
@@ -1958,7 +1957,7 @@ $(document).ready(function() {
                     if (needsPin && $('#pinModal').length) {
                         $('#pinModal').modal('hide');
                     }
-                    
+
                     // Show success notification
                     if (typeof Noty !== 'undefined') {
                         new Noty({
@@ -1972,7 +1971,7 @@ $(document).ready(function() {
                     } else {
                         alert('Phê duyệt thành công\n\n' + (response.message || 'Đã phê duyệt thành công'));
                     }
-                    
+
                     // Reload after a short delay to show notification
                     setTimeout(function() {
                         location.reload();
@@ -1981,19 +1980,19 @@ $(document).ready(function() {
                     // Show error message in modal - keep modal open
                     let errorText = 'Sai mã PIN, vui lòng thử lại';
                     const errorMsg = response?.message || 'Không thể phê duyệt';
-                    
+
                     if (errorMsg.includes('PIN') || errorMsg.includes('pin') || errorMsg.includes('Mã PIN')) {
                         errorText = 'Sai mã PIN, vui lòng thử lại';
                     } else {
                         errorText = errorMsg;
                     }
-                    
+
                     // Show error message in modal
                     if (needsPin && $('#pin-error').length) {
                         $('#pin-error-text').text(errorText);
                         $('#pin-error').removeClass('d-none');
                     }
-                    
+
                     // Keep modal open, clear PIN for retry
                     if (needsPin && $('#pin-input').length) {
                         $('#pin-input').val('').focus();
@@ -2002,7 +2001,7 @@ $(document).ready(function() {
             },
             error: function(xhr) {
                 btn.prop('disabled', false).html(originalText);
-                
+
                 // Get error message from response
                 let errorText = 'Sai mã PIN, vui lòng thử lại';
                 if (xhr.responseJSON) {
@@ -2013,13 +2012,13 @@ $(document).ready(function() {
                         errorText = errorMsg;
                     }
                 }
-                
+
                 // Show error message in modal
                 if (needsPin && $('#pin-error').length) {
                     $('#pin-error-text').text(errorText);
                     $('#pin-error').removeClass('d-none');
                 }
-                
+
                 // Keep modal open, clear PIN for retry
                 if (needsPin && $('#pin-input').length) {
                     $('#pin-input').val('').focus();
@@ -2031,7 +2030,7 @@ $(document).ready(function() {
     window.submitRejection = function(id, modelType) {
         const reason = $('#reason-input').val();
 
-        
+
         $.ajax({
             url: '{{ route("approval-center.reject") }}',
             method: 'POST',
