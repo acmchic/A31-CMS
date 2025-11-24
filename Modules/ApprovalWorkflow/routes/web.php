@@ -60,6 +60,10 @@ Route::group([
         Route::get('download-pdf/{modelClass}/{id}', [ApprovalController::class, 'downloadPdf'])
             ->name('download-pdf');
         
+        // Preview PDF (for print)
+        Route::get('preview-pdf/{modelClass}/{id}', [ApprovalController::class, 'previewPdf'])
+            ->name('preview-pdf');
+        
         // Get approval history
         Route::get('history/{modelClass}/{id}', [ApprovalController::class, 'history'])
             ->name('history');

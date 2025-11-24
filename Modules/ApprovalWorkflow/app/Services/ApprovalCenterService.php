@@ -350,6 +350,8 @@ class ApprovalCenterService
                     'has_selected_approvers' => $hasSelectedApprovers,
                     'selected_approvers' => $model->selected_approvers ? (is_array($model->selected_approvers) ? $model->selected_approvers : json_decode($model->selected_approvers, true)) : [],
                     'workflow_data' => $this->getWorkflowProgressData($model),
+                    'has_signed_pdf' => $model->hasSignedPdf(),
+                    'pdf_url' => $model->hasSignedPdf() ? route('approval.preview-pdf', ['modelClass' => base64_encode(get_class($model)), 'id' => $model->id]) : null,
                 ];
 
             case 'vehicle':

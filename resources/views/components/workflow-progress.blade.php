@@ -34,7 +34,6 @@
                 <i class="la la-tasks"></i> Tiến trình phê duyệt
             </h5>
         </div>
-        <div class="card-body">
             <div class="workflow-steps-container">
                 @foreach ($steps as $index => $step)
                     @php
@@ -139,7 +138,6 @@
                     </div>
                 @endforeach
             </div>
-        </div>
     </div>
 </div>
 

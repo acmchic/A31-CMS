@@ -200,6 +200,9 @@
     padding-right: 0.75rem;
 }
 
+/* Font sizes are handled via inline styles in request-detail.blade.php */
+/* No global CSS rules needed to avoid affecting workflow progress */
+
 /* Approval Center Banner */
 .approval-center-banner {
     background: #ffffff;
@@ -275,6 +278,22 @@
 @push('after_scripts')
 <script>
 $(document).ready(function() {
+    // Setup print button handler at document level (event delegation)
+    $(document).off('click', '#btn-print-pdf').on('click', '#btn-print-pdf', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const pdfUrl = $(this).data('pdf-url');
+        if (!pdfUrl) {
+            alert('Không tìm thấy PDF');
+            return;
+        }
+        if (typeof window.showPrintPreviewModal === 'function') {
+            window.showPrintPreviewModal(pdfUrl);
+        } else {
+            // Fallback: open in new window
+            window.open(pdfUrl, '_blank');
+        }
+    });
     // Initialize type items based on current filter
     const currentType = $('#filter-type').val() || 'all';
     if (currentType === 'leave') {
@@ -937,8 +956,21 @@ $(document).ready(function() {
                         <h5 class="mb-0">${request.type_label || request.type}</h5>
                         <span class="badge bg-${request.status_badge}">${request.status_label}</span>
                     </div>
-                    <div>
+                    <div class="d-flex align-items-center gap-2">
         `;
+
+        // Add print button if PDF is available
+        if (request.has_signed_pdf && request.pdf_url) {
+            detailHtml += `
+                <button id="btn-print-pdf"
+                        class="btn btn-sm btn-outline-secondary"
+                        data-pdf-url="${request.pdf_url}"
+                        title="In PDF"
+                        style="border: none; background: transparent; padding: 4px 8px;">
+                    <i class="la la-print" style="font-size: 1.2rem; color: #6b7280;"></i>
+                </button>
+            `;
+        }
 
         if (request.can_approve) {
             // Check if this is reviewer step (needs to assign approvers first)
@@ -996,19 +1028,19 @@ $(document).ready(function() {
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="text-muted small mb-1 d-block">Người gửi</label>
-                                <div class="fw-semibold">${request.submitted_by}</div>
+                                <label class="text-muted mb-1 d-block" style="font-size: 0.95rem; font-weight: 500;">Người gửi</label>
+                                <div class="fw-semibold" style="font-size: 0.95rem;">${request.submitted_by}</div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="text-muted small mb-1 d-block">Đã gửi</label>
-                                <div class="fw-semibold">${request.submitted_at}</div>
+                                <label class="text-muted mb-1 d-block" style="font-size: 0.95rem; font-weight: 500;">Đã gửi</label>
+                                <div class="fw-semibold" style="font-size: 0.95rem;">${request.submitted_at}</div>
                             </div>
                         </div>
                     </div>
                     <hr class="my-4">
-                    <h6 class="mb-3 fw-semibold">Chi tiết</h6>
+                    <h6 class="mb-3 fw-semibold" style="font-size: 1rem;">Chi tiết</h6>
                     <div class="row">
         `;
 
@@ -1020,8 +1052,8 @@ $(document).ready(function() {
             }
             detailHtml += `
                         <div class="col-md-6 mb-3">
-                            <label class="text-muted small mb-1 d-block">${label}</label>
-                            <div class="fw-normal">${value}</div>
+                            <label class="text-muted mb-1 d-block" style="font-size: 0.95rem; font-weight: 500;">${label}</label>
+                            <div class="fw-normal" style="font-size: 0.95rem;">${value}</div>
                         </div>
             `;
             detailIndex++;
@@ -1045,6 +1077,62 @@ $(document).ready(function() {
 
         // Load approval history
         loadApprovalHistory(request.id, request.model_type, request);
+
+        // Print button handler is already set up at document level
+    }
+
+    // Global function for print preview modal
+    window.showPrintPreviewModal = function(pdfUrl) {
+        const modalHtml = `
+            <div class="modal fade" id="printPreviewModal" tabindex="-1" style="z-index: 10000;">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="la la-print"></i> Xem trước và In PDF
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-0" style="height: 80vh;">
+                            <iframe id="pdf-preview-iframe"
+                                    src="${pdfUrl}"
+                                    style="width: 100%; height: 100%; border: none;">
+                            </iframe>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="la la-times"></i> Đóng
+                            </button>
+                            <button type="button" class="btn btn-primary" id="btn-print-from-preview">
+                                <i class="la la-print"></i> In
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('#printPreviewModal').remove();
+        $('body').append(modalHtml);
+
+        const modal = new bootstrap.Modal(document.getElementById('printPreviewModal'));
+        modal.show();
+
+        // Handle print button
+        $('#btn-print-from-preview').off('click').on('click', function() {
+            const iframe = document.getElementById('pdf-preview-iframe');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.print();
+            } else {
+                // Fallback: open PDF in new window and print
+                window.open(pdfUrl, '_blank').print();
+            }
+        });
+
+        // Clean up on close
+        $('#printPreviewModal').on('hidden.bs.modal', function() {
+            $(this).remove();
+        });
     }
 
     function loadApprovalHistory(id, modelType, requestData) {

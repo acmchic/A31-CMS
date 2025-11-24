@@ -300,6 +300,53 @@ class ApprovalController extends Controller
     }
 
     /**
+     * Preview PDF in browser (for iframe/print)
+     *
+     * GET /approval/preview-pdf/{modelClass}/{id}
+     */
+    public function previewPdf(string $modelClass, int $id)
+    {
+        try {
+            // Decode model class
+            $modelClass = base64_decode($modelClass);
+
+            if (!class_exists($modelClass)) {
+                abort(404, 'Invalid model class');
+            }
+
+            // Find model
+            $model = $modelClass::findOrFail($id);
+
+            // Check if has signed PDF
+            if (!$model->signed_pdf_path) {
+                abort(404, 'PDF chưa được tạo');
+            }
+
+            // Get PDF file path
+            $filePath = \Storage::disk('public')->path($model->signed_pdf_path);
+
+            if (!file_exists($filePath)) {
+                abort(404, 'File PDF không tồn tại');
+            }
+
+            // Return PDF with inline disposition for preview
+            return response()->file($filePath, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="' . (method_exists($model, 'getPdfFilename') ? $model->getPdfFilename() : 'document_' . $model->id . '.pdf') . '"'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('PDF Preview Error:', [
+                'error' => $e->getMessage(),
+                'modelClass' => $modelClass ?? 'unknown',
+                'id' => $id
+            ]);
+
+            abort(404, 'Không thể xem PDF: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Get approval history for a model
      *
      * GET /approval/history/{modelClass}/{id}
