@@ -16,7 +16,7 @@
                 </div>
                 <div>
                     <button id="btn-bulk-approve" class="btn btn-sm btn-success me-2">
-                        <i class="la la-check-double"></i> Phê duyệt hàng loạt
+                        <i class="la la-check-double"></i> Phê duyệt
                     </button>
                     <button id="btn-clear-selection" class="btn btn-sm btn-outline-secondary">
                         <i class="la la-times"></i> Bỏ chọn
@@ -46,8 +46,8 @@
             // Allow bulk approve for all approvable requests, including reviewer step
             $canBulkApprove = $request['can_approve'];
         @endphp
-        <div class="card mb-2 request-item {{ $selectedId == $request['id'] && $selectedType == $request['model_type'] ? 'active border-primary' : '' }}" 
-             data-id="{{ $request['id'] }}" 
+        <div class="card mb-2 request-item {{ $selectedId == $request['id'] && $selectedType == $request['model_type'] ? 'active border-primary' : '' }}"
+             data-id="{{ $request['id'] }}"
              data-model-type="{{ $request['model_type'] }}"
              data-can-approve="{{ $request['can_approve'] ? '1' : '0' }}"
              data-is-reviewer-step="{{ $isReviewerStep ? '1' : '0' }}"
@@ -57,8 +57,8 @@
                     {{-- Checkbox --}}
                     <div class="me-3 mt-1">
                         @if($canBulkApprove)
-                            <input type="checkbox" 
-                                   class="form-check-input request-checkbox" 
+                            <input type="checkbox"
+                                   class="form-check-input request-checkbox"
                                    value="{{ $request['id'] }}"
                                    data-model-type="{{ $request['model_type'] }}"
                                    data-title="{{ $request['title'] }}"
@@ -67,14 +67,14 @@
                                    data-initiated-by="{{ $request['initiated_by'] }}"
                                    data-is-reviewer-step="{{ $isReviewerStep ? '1' : '0' }}">
                         @else
-                            <input type="checkbox" 
-                                   class="form-check-input" 
-                                   disabled 
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   disabled
                                    style="opacity: 0.3;"
-                                   title="Không thể phê duyệt hàng loạt">
+                                   title="Không thể phê duyệt">
                         @endif
                     </div>
-                    
+
                     {{-- Content --}}
                     <div class="flex-grow-1" style="min-width: 0;">
                         <div class="d-flex justify-content-between align-items-start mb-2">
@@ -84,12 +84,12 @@
                             </div>
                             <small class="text-muted">{{ $request['created_at_formatted'] }}</small>
                         </div>
-                        
+
                         <div class="mb-2">
                             <small class="text-muted d-block">{{ $request['title'] }}</small>
                             <small class="text-muted d-block">{{ $request['period'] }}</small>
                         </div>
-                        
+
                         <div class="d-flex justify-content-between align-items-center">
                             <small class="text-muted">
                                 <i class="la la-user"></i> {{ $request['initiated_by'] }}

@@ -442,7 +442,7 @@ $(document).ready(function() {
                     <div class="modal-content">
                         <div class="modal-header bg-success text-white">
                             <h5 class="modal-title">
-                                <i class="la la-check-double"></i> Xác nhận phê duyệt hàng loạt
+                                <i class="la la-check-double"></i> Xác nhận phê duyệt
                             </h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>

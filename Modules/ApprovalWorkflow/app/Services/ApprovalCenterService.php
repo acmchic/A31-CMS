@@ -158,7 +158,7 @@ class ApprovalCenterService
                     'initiated_by' => $leave->employee ? $leave->employee->name : 'N/A',
                     'initiated_by_username' => $leave->employee && $leave->employee->user ? $leave->employee->user->username : 'N/A',
                     'created_at' => $leave->created_at,
-                    'created_at_formatted' => $leave->created_at->format('d/m/Y H:i'),
+                    'created_at_formatted' => $this->formatDateWithTimezone($leave->created_at, 'd/m/Y H:i'),
                     'period' => $this->getLeavePeriod($leave),
                     'can_approve' => $leave->canBeApproved() && $this->canUserApprove($leave, $user),
                     'can_reject' => $leave->canBeRejected() && $this->canUserApprove($leave, $user),
@@ -207,7 +207,7 @@ class ApprovalCenterService
                     'initiated_by' => $vehicle->user ? $vehicle->user->name : 'N/A',
                     'initiated_by_username' => $vehicle->user ? $vehicle->user->username : 'N/A',
                     'created_at' => $vehicle->created_at,
-                    'created_at_formatted' => $vehicle->created_at->format('d/m/Y H:i'),
+                    'created_at_formatted' => $this->formatDateWithTimezone($vehicle->created_at, 'd/m/Y H:i'),
                     'period' => $this->getVehiclePeriod($vehicle),
                     'can_approve' => $vehicle->canBeApproved() && $this->canUserApproveVehicle($vehicle, backpack_user()),
                     'can_reject' => $vehicle->canBeRejected() && $this->canUserApproveVehicle($vehicle, backpack_user()),
@@ -402,7 +402,7 @@ class ApprovalCenterService
                     'result' => $history->action_display,
                     'result_badge' => $this->getActionBadge($history->action),
                     'comment' => $history->comment,
-                    'time' => $history->created_at->format('d M, H:i'),
+                    'time' => $this->formatDateWithTimezone($history->created_at, 'd M, H:i'),
                     'time_relative' => $history->created_at->diffForHumans(),
                 ];
             });
@@ -604,8 +604,8 @@ class ApprovalCenterService
     {
         return [
             'Lý do' => $vehicle->purpose ?? 'N/A',
-            'Thời gian bắt đầu' => $vehicle->departure_datetime ? Carbon::parse($vehicle->departure_datetime)->format('Y-m-d H:i') : 'N/A',
-            'Thời gian kết thúc' => $vehicle->return_datetime ? Carbon::parse($vehicle->return_datetime)->format('Y-m-d H:i') : 'N/A',
+            'Thời gian bắt đầu' => $vehicle->departure_datetime ? $this->formatDateWithTimezone($vehicle->departure_datetime, 'Y-m-d H:i') : 'N/A',
+            'Thời gian kết thúc' => $vehicle->return_datetime ? $this->formatDateWithTimezone($vehicle->return_datetime, 'Y-m-d H:i') : 'N/A',
             'Tuyến đường' => $vehicle->route ?? 'N/A',
             'Xe' => $vehicle->vehicle ? $vehicle->vehicle->name : 'N/A',
             'Tài xế' => $vehicle->driver ? $vehicle->driver->name : 'N/A',
@@ -756,8 +756,30 @@ class ApprovalCenterService
             $date = \Carbon\Carbon::parse($date);
         }
 
+        // Convert to Vietnam timezone (UTC+7)
+        $date->setTimezone('Asia/Ho_Chi_Minh');
+
         // Format: dd/mm/yyyy, HH:mm
         return $date->format('d/m/Y, H:i');
+    }
+
+    /**
+     * Format date with timezone conversion to Asia/Ho_Chi_Minh
+     */
+    protected function formatDateWithTimezone($date, $format = 'd/m/Y H:i')
+    {
+        if (!$date) {
+            return 'N/A';
+        }
+
+        if (!$date instanceof \Carbon\Carbon) {
+            $date = \Carbon\Carbon::parse($date);
+        }
+
+        // Convert to Vietnam timezone (UTC+7)
+        $date->setTimezone('Asia/Ho_Chi_Minh');
+
+        return $date->format($format);
     }
 
     /**
@@ -793,18 +815,14 @@ class ApprovalCenterService
         $stepUsers = [];
 
         if ($model->created_at) {
-            $stepDates['created'] = $model->created_at->format('d/m/Y H:i');
+            $stepDates['created'] = $this->formatDateWithTimezone($model->created_at, 'd/m/Y H:i');
         }
         if ($model->employee) {
             $stepUsers['created'] = $model->employee->name ?? 'N/A';
         }
 
         if ($model->approved_at_department_head && $model->workflow_status !== EmployeeLeave::WORKFLOW_PENDING) {
-            $date = $model->approved_at_department_head;
-            if (!$date instanceof \Carbon\Carbon) {
-                $date = \Carbon\Carbon::parse($date);
-            }
-            $stepDates[EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD] = $date->format('d/m/Y H:i');
+            $stepDates[EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD] = $this->formatDateWithTimezone($model->approved_at_department_head, 'd/m/Y H:i');
         }
         if ($model->approved_by_department_head && $model->workflow_status !== EmployeeLeave::WORKFLOW_PENDING) {
             $deptHead = \App\Models\User::find($model->approved_by_department_head);
@@ -817,11 +835,7 @@ class ApprovalCenterService
             EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER,
             EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR
         ])) {
-            $date = $model->approved_at_reviewer;
-            if (!$date instanceof \Carbon\Carbon) {
-                $date = \Carbon\Carbon::parse($date);
-            }
-            $stepDates[EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER] = $date->format('d/m/Y H:i');
+            $stepDates[EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER] = $this->formatDateWithTimezone($model->approved_at_reviewer, 'd/m/Y H:i');
         }
         if ($model->approved_by_reviewer && in_array($model->workflow_status, [
             EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER,
@@ -834,11 +848,7 @@ class ApprovalCenterService
         }
 
         if ($model->approved_at_director && $model->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR) {
-            $date = $model->approved_at_director;
-            if (!$date instanceof \Carbon\Carbon) {
-                $date = \Carbon\Carbon::parse($date);
-            }
-            $stepDates[EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR] = $date->format('d/m/Y H:i');
+            $stepDates[EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR] = $this->formatDateWithTimezone($model->approved_at_director, 'd/m/Y H:i');
         }
         if ($model->approved_by_director && $model->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR) {
             $director = \App\Models\User::find($model->approved_by_director);
@@ -854,11 +864,7 @@ class ApprovalCenterService
             case EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR:
                 $currentStepIndex = 4;
                 if ($model->approved_at_director) {
-                    $date = $model->approved_at_director;
-                    if (!$date instanceof \Carbon\Carbon) {
-                        $date = \Carbon\Carbon::parse($date);
-                    }
-                    $stepDates['completed'] = $date->format('d/m/Y H:i');
+                    $stepDates['completed'] = $this->formatDateWithTimezone($model->approved_at_director, 'd/m/Y H:i');
                     if ($model->approved_by_director) {
                         $director = \App\Models\User::find($model->approved_by_director);
                         if ($director) {
