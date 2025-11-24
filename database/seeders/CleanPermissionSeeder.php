@@ -123,6 +123,18 @@ class CleanPermissionSeeder extends Seeder
         $this->command->line("  {$permissionId}: {$leaveReviewPermission} (Thẩm định Đơn nghỉ phép)");
         $permissionId++;
 
+        // Add approval center permission
+        $this->command->line("Module: Trung tâm phê duyệt");
+        $approvalCenterPermission = "approval_center.view";
+        Permission::create([
+            'id' => $permissionId,
+            'name' => $approvalCenterPermission,
+            'guard_name' => 'web'
+        ]);
+        $allPermissions[] = $approvalCenterPermission;
+        $this->command->line("  {$permissionId}: {$approvalCenterPermission} (Trung tâm phê duyệt)");
+        $permissionId++;
+
         // Create 4 standard roles
         $roles = [
             'Admin' => [
@@ -140,6 +152,7 @@ class CleanPermissionSeeder extends Seeder
                     'report.view.company', 'report.approve',
                     'leave.view.company', 'leave.approve',
                     'record_management.view.company', 'record_management.create', 'record_management.edit', 'record_management.approve',
+                    'approval_center.view',
                     'profile.view', 'profile.edit'
                 ]
             ],
@@ -153,6 +166,7 @@ class CleanPermissionSeeder extends Seeder
                     'report.view.department', 'report.create', 'report.edit',
                     'leave.view.department', 'leave.approve',
                     'record_management.view.department', 'record_management.create', 'record_management.edit',
+                    'approval_center.view',
                     'profile.view', 'profile.edit'
                 ]
             ],

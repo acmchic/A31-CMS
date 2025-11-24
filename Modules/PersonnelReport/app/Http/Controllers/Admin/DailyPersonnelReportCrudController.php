@@ -551,13 +551,18 @@ class DailyPersonnelReportCrudController extends CrudController
             })->toArray()
         ]);
         
-        // Map leave type to reason
+        // Map leave type to reason (matching EmployeeLeave leave types)
         $leaveTypeMap = [
-            'business' => 'cong_tac',    // Công tác
-            'attendance' => 'co_dong',   // Cơ động
-            'study' => 'hoc',            // Học
-            'leave' => 'phep',           // Phép
-            'other' => 'khac'            // Khác
+            'business' => 'cong_tac_co_dong',    // Công tác - Cơ động
+            'attendance' => 'cong_tac_co_dong',  // Legacy: Cơ động -> Công tác - Cơ động
+            'study' => 'hoc',                    // Học
+            'leave' => 'phep',                   // Phép - Tranh thủ
+            'hospital' => 'di_vien',             // Đi viện
+            'pending' => 'cho_huu',               // Chờ hưu
+            'sick' => 'om_tai_trai',             // Ốm tại trại
+            'maternity' => 'thai_san',            // Thai sản
+            'checkup' => 'kham_benh',             // Khám bệnh
+            'other' => 'khac'                     // Khác
         ];
         
         // Add approved leaves to absent employees (if not already added manually)

@@ -25,6 +25,14 @@ class ApprovalCenterController extends Controller
     {
         $user = backpack_user();
         
+        // Check if user has permission to access approval center
+        $hasApprovalCenterAccess = PermissionHelper::can($user, 'approval_center.view');
+        $isAdmin = $user->hasRole('Admin');
+        
+        if (!$hasApprovalCenterAccess && !$isAdmin) {
+            abort(403, 'Bạn không có quyền truy cập Trung tâm phê duyệt');
+        }
+        
         // Get filter parameters - default status to 'all'
         $type = $request->get('type', 'all'); // all, leave, vehicle
         $status = $request->get('status', 'all'); // default: all (Tất cả trạng thái)
@@ -83,6 +91,16 @@ class ApprovalCenterController extends Controller
      */
     public function getDetails(Request $request)
     {
+        $user = backpack_user();
+        
+        // Check if user has permission to access approval center
+        $hasApprovalCenterAccess = PermissionHelper::can($user, 'approval_center.view');
+        $isAdmin = $user->hasRole('Admin');
+        
+        if (!$hasApprovalCenterAccess && !$isAdmin) {
+            return response()->json(['error' => 'Bạn không có quyền truy cập'], 403);
+        }
+        
         $id = $request->get('id');
         $modelType = $request->get('model_type');
         

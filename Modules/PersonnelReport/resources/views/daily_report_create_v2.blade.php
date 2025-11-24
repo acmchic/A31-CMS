@@ -91,12 +91,7 @@
                     <div class="row text-center">
                         <div class="col">
                             <div class="badge badge-info badge-lg p-2">
-                                Công tác: <strong id="reason-cong-tac">0</strong>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="badge badge-primary badge-lg p-2">
-                                Cơ động: <strong id="reason-co-dong">0</strong>
+                                Công tác - Cơ động: <strong id="reason-cong-tac-co-dong">0</strong>
                             </div>
                         </div>
                         <div class="col">
@@ -106,7 +101,32 @@
                         </div>
                         <div class="col">
                             <div class="badge badge-warning badge-lg p-2">
-                                Phép: <strong id="reason-phep">0</strong>
+                                Phép - Tranh thủ: <strong id="reason-phep">0</strong>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="badge badge-danger badge-lg p-2">
+                                Đi viện: <strong id="reason-di-vien">0</strong>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="badge badge-secondary badge-lg p-2">
+                                Chờ hưu: <strong id="reason-cho-huu">0</strong>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="badge badge-dark badge-lg p-2">
+                                Ốm tại trại: <strong id="reason-om-tai-trai">0</strong>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="badge badge-primary badge-lg p-2">
+                                Thai sản: <strong id="reason-thai-san">0</strong>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="badge badge-info badge-lg p-2">
+                                Khám bệnh: <strong id="reason-kham-benh">0</strong>
                             </div>
                         </div>
                         <div class="col">
@@ -150,10 +170,14 @@
                                 <label><strong>Lý do vắng mặt</strong></label>
                                 <select id="select-reason" class="form-control">
                                     <option value="">-- Chọn lý do --</option>
-                                    <option value="cong_tac">Công tác</option>
-                                    <option value="co_dong">Cơ động</option>
+                                    <option value="cong_tac_co_dong">Công tác - Cơ động</option>
                                     <option value="hoc">Học</option>
-                                    <option value="phep">Phép</option>
+                                    <option value="phep">Phép - Tranh thủ</option>
+                                    <option value="di_vien">Đi viện</option>
+                                    <option value="cho_huu">Chờ hưu</option>
+                                    <option value="om_tai_trai">Ốm tại trại</option>
+                                    <option value="thai_san">Thai sản</option>
+                                    <option value="kham_benh">Khám bệnh</option>
                                     <option value="khac">Khác</option>
                                 </select>
                             </div>
@@ -215,10 +239,16 @@
                                             if (!$employee) continue;
 
                                             $reasonMap = [
-                                                'cong_tac' => 'Công tác',
-                                                'co_dong' => 'Cơ động',
+                                                'cong_tac_co_dong' => 'Công tác - Cơ động',
+                                                'cong_tac' => 'Công tác - Cơ động', // Legacy support
+                                                'co_dong' => 'Công tác - Cơ động', // Legacy support
                                                 'hoc' => 'Học',
-                                                'phep' => 'Phép',
+                                                'phep' => 'Phép - Tranh thủ',
+                                                'di_vien' => 'Đi viện',
+                                                'cho_huu' => 'Chờ hưu',
+                                                'om_tai_trai' => 'Ốm tại trại',
+                                                'thai_san' => 'Thai sản',
+                                                'kham_benh' => 'Khám bệnh',
                                                 'khac' => 'Khác'
                                             ];
                                             $reasonText = $reasonMap[$absent['reason']] ?? 'Không rõ';
@@ -805,10 +835,16 @@ function addRowToTable(employee, reason, note) {
 
     // Reason map
     const reasonMap = {
-        'cong_tac': 'Công tác',
-        'co_dong': 'Cơ động',
+        'cong_tac_co_dong': 'Công tác - Cơ động',
+        'cong_tac': 'Công tác - Cơ động', // Legacy support
+        'co_dong': 'Công tác - Cơ động', // Legacy support
         'hoc': 'Học',
-        'phep': 'Phép',
+        'phep': 'Phép - Tranh thủ',
+        'di_vien': 'Đi viện',
+        'cho_huu': 'Chờ hưu',
+        'om_tai_trai': 'Ốm tại trại',
+        'thai_san': 'Thai sản',
+        'kham_benh': 'Khám bệnh',
         'khac': 'Khác'
     };
 
@@ -899,23 +935,42 @@ function updateStatistics() {
 
 function updateReasonBreakdown() {
     const counts = {
-        'cong_tac': 0,
-        'co_dong': 0,
+        'cong_tac_co_dong': 0,
+        'cong_tac': 0, // Legacy support
+        'co_dong': 0, // Legacy support
         'hoc': 0,
         'phep': 0,
+        'di_vien': 0,
+        'cho_huu': 0,
+        'om_tai_trai': 0,
+        'thai_san': 0,
+        'kham_benh': 0,
         'khac': 0
     };
 
     absentEmployees.forEach(emp => {
-        if (counts.hasOwnProperty(emp.reason)) {
-            counts[emp.reason]++;
+        // Map legacy reasons to new format
+        let reason = emp.reason;
+        if (reason === 'cong_tac' || reason === 'co_dong') {
+            reason = 'cong_tac_co_dong';
+        }
+        
+        if (counts.hasOwnProperty(reason)) {
+            counts[reason]++;
         }
     });
 
-    document.getElementById('reason-cong-tac').textContent = counts['cong_tac'];
-    document.getElementById('reason-co-dong').textContent = counts['co_dong'];
+    // Calculate total for "Công tác - Cơ động" (including legacy)
+    const congTacCoDongTotal = counts['cong_tac_co_dong'] + counts['cong_tac'] + counts['co_dong'];
+    
+    document.getElementById('reason-cong-tac-co-dong').textContent = congTacCoDongTotal;
     document.getElementById('reason-hoc').textContent = counts['hoc'];
     document.getElementById('reason-phep').textContent = counts['phep'];
+    document.getElementById('reason-di-vien').textContent = counts['di_vien'];
+    document.getElementById('reason-cho-huu').textContent = counts['cho_huu'];
+    document.getElementById('reason-om-tai-trai').textContent = counts['om_tai_trai'];
+    document.getElementById('reason-thai-san').textContent = counts['thai_san'];
+    document.getElementById('reason-kham-benh').textContent = counts['kham_benh'];
     document.getElementById('reason-khac').textContent = counts['khac'];
 }
 

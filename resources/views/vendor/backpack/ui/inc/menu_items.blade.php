@@ -8,7 +8,7 @@
 </li>
 
 {{-- Approval Center --}}
-@if(\App\Helpers\PermissionHelper::userCan('leave.approve') || \App\Helpers\PermissionHelper::userCan('leave.review') || \App\Helpers\PermissionHelper::userCan('vehicle_registration.approve') || backpack_user()->hasRole('Admin'))
+@if(\App\Helpers\PermissionHelper::userCan('approval_center.view') || backpack_user()->hasRole('Admin'))
 <li class="nav-item">
     <a class="nav-link" href="{{ url('approval-center') }}">
         <i class="la la-check-circle nav-icon"></i> Trung tâm phê duyệt

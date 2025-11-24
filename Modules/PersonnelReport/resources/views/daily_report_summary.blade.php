@@ -1,7 +1,76 @@
 @extends(backpack_view('blank'))
 
 @section('content')
-<div class="container-fluid">
+<style>
+    .daily-report-container {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+    
+    .daily-report-table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
+    }
+    
+    .daily-report-table-wrapper table {
+        width: 100%;
+        table-layout: auto;
+        min-width: 1800px;
+    }
+    
+    .daily-report-table-wrapper th {
+        white-space: normal;
+        word-wrap: break-word;
+        line-height: 1.3;
+        padding: 10px 6px;
+        vertical-align: middle;
+        text-align: center;
+        font-size: 0.8rem;
+        min-width: 80px;
+    }
+    
+    .daily-report-table-wrapper td {
+        white-space: nowrap;
+        padding: 8px 6px;
+        text-align: center;
+        font-size: 0.9rem;
+    }
+    
+    /* Specific column widths for better fit */
+    .daily-report-table-wrapper th:nth-child(1),
+    .daily-report-table-wrapper td:nth-child(1) {
+        min-width: 180px;
+        width: 180px;
+    }
+    
+    .daily-report-table-wrapper th:nth-child(2),
+    .daily-report-table-wrapper td:nth-child(2) {
+        min-width: 80px;
+        width: 80px;
+    }
+    
+    .daily-report-table-wrapper th:nth-child(3),
+    .daily-report-table-wrapper td:nth-child(3),
+    .daily-report-table-wrapper th:nth-child(4),
+    .daily-report-table-wrapper td:nth-child(4),
+    .daily-report-table-wrapper th:nth-child(5),
+    .daily-report-table-wrapper td:nth-child(5) {
+        min-width: 90px;
+        width: 90px;
+    }
+    
+    /* Leave type columns */
+    .daily-report-table-wrapper th:nth-child(n+6),
+    .daily-report-table-wrapper td:nth-child(n+6) {
+        min-width: 110px;
+        width: 110px;
+    }
+</style>
+
+<div class="daily-report-container">
     <!-- Modern Header -->
     <div class="row mb-4">
         <div class="col-12">
@@ -53,7 +122,7 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-body p-0">
-                    <div class="table-responsive">
+                    <div class="daily-report-table-wrapper">
                         <table class="table table-bordered table-hover mb-0">
                             <thead class="thead-light">
                                 <tr class="text-center">
@@ -62,10 +131,14 @@
                                     <th style="background-color: #f5e6d3;">TỔNG QS</th>
                                     <th style="background-color: #c8e6c9;">CÓ MẶT</th>
                                     <th style="background-color: #ffccbc;">VẮNG MẶT</th>
-                                    <th style="background-color: #d4e6f1;">CÔNG TÁC</th>
-                                    <th style="background-color: #d4e6f1;">CƠ ĐỘNG</th>
+                                    <th style="background-color: #d4e6f1; white-space: normal; line-height: 1.3;">CÔNG TÁC<br>-<br>CƠ ĐỘNG</th>
                                     <th style="background-color: #d4e6f1;">HỌC</th>
-                                    <th style="background-color: #d4e6f1;">PHÉP</th>
+                                    <th style="background-color: #d4e6f1; white-space: normal; line-height: 1.3;">PHÉP<br>-<br>TRANH THỦ</th>
+                                    <th style="background-color: #d4e6f1;">ĐI VIỆN</th>
+                                    <th style="background-color: #d4e6f1;">CHỜ HƯU</th>
+                                    <th style="background-color: #d4e6f1;">ỐM TẠI TRẠI</th>
+                                    <th style="background-color: #d4e6f1;">THAI SẢN</th>
+                                    <th style="background-color: #d4e6f1;">KHÁM BỆNH</th>
                                     <th style="background-color: #d4e6f1;">KHÁC</th>
                                 </tr>
                             </thead>
@@ -73,7 +146,9 @@
                                 @php
                                     $grandTotal = [
                                         'total' => 0, 'present' => 0, 'absent' => 0,
-                                        'cong_tac' => 0, 'co_dong' => 0, 'hoc' => 0, 'phep' => 0, 'khac' => 0
+                                        'cong_tac_co_dong' => 0, 'hoc' => 0, 'phep' => 0,
+                                        'di_vien' => 0, 'cho_huu' => 0, 'om_tai_trai' => 0,
+                                        'thai_san' => 0, 'kham_benh' => 0, 'khac' => 0
                                     ];
                                 @endphp
 
@@ -84,12 +159,16 @@
                                         // Get approved leaves for this department on this date
                                         $deptLeaves = $approvedLeaves->where('employee.department_id', $dept->id);
                                         
-                                        // Map leave types to reason counts
+                                        // Map leave types to reason counts (matching EmployeeLeave leave types)
                                         $leaveTypeCounts = [
-                                            'cong_tac' => $deptLeaves->where('leave_type', 'business')->count(),
-                                            'co_dong' => $deptLeaves->where('leave_type', 'attendance')->count(),
+                                            'cong_tac_co_dong' => $deptLeaves->where('leave_type', 'business')->count() + $deptLeaves->where('leave_type', 'attendance')->count(),
                                             'hoc' => $deptLeaves->where('leave_type', 'study')->count(),
                                             'phep' => $deptLeaves->where('leave_type', 'leave')->count(),
+                                            'di_vien' => $deptLeaves->where('leave_type', 'hospital')->count(),
+                                            'cho_huu' => $deptLeaves->where('leave_type', 'pending')->count(),
+                                            'om_tai_trai' => $deptLeaves->where('leave_type', 'sick')->count(),
+                                            'thai_san' => $deptLeaves->where('leave_type', 'maternity')->count(),
+                                            'kham_benh' => $deptLeaves->where('leave_type', 'checkup')->count(),
                                             'khac' => $deptLeaves->where('leave_type', 'other')->count(),
                                         ];
                                         
@@ -100,11 +179,16 @@
                                             $total = $report->total_employees;
                                             
                                             // Merge counts: report data + approved leaves
-                                            $congTac = $report->sick_count + $leaveTypeCounts['cong_tac'];
-                                            $coDong = $report->annual_leave_count + $leaveTypeCounts['co_dong'];
-                                            $hoc = $report->personal_leave_count + $leaveTypeCounts['hoc'];
-                                            $phep = $report->military_leave_count + $leaveTypeCounts['phep'];
-                                            $khac = $report->other_leave_count + $leaveTypeCounts['khac'];
+                                            // Note: Legacy report fields may not match new leave types exactly
+                                            $congTacCoDong = ($report->sick_count ?? 0) + ($report->annual_leave_count ?? 0) + $leaveTypeCounts['cong_tac_co_dong'];
+                                            $hoc = ($report->personal_leave_count ?? 0) + $leaveTypeCounts['hoc'];
+                                            $phep = ($report->military_leave_count ?? 0) + $leaveTypeCounts['phep'];
+                                            $diVien = $leaveTypeCounts['di_vien'];
+                                            $choHuu = $leaveTypeCounts['cho_huu'];
+                                            $omTaiTrai = $leaveTypeCounts['om_tai_trai'];
+                                            $thaiSan = $leaveTypeCounts['thai_san'];
+                                            $khamBenh = $leaveTypeCounts['kham_benh'];
+                                            $khac = ($report->other_leave_count ?? 0) + $leaveTypeCounts['khac'];
                                             
                                             $absent = $report->absent_count + $totalLeaveAbsent;
                                             $present = $total - $absent;
@@ -115,10 +199,14 @@
                                             $absent = $totalLeaveAbsent;
                                             $present = $activeEmployeeCount - $absent;
                                             
-                                            $congTac = $leaveTypeCounts['cong_tac'];
-                                            $coDong = $leaveTypeCounts['co_dong'];
+                                            $congTacCoDong = $leaveTypeCounts['cong_tac_co_dong'];
                                             $hoc = $leaveTypeCounts['hoc'];
                                             $phep = $leaveTypeCounts['phep'];
+                                            $diVien = $leaveTypeCounts['di_vien'];
+                                            $choHuu = $leaveTypeCounts['cho_huu'];
+                                            $omTaiTrai = $leaveTypeCounts['om_tai_trai'];
+                                            $thaiSan = $leaveTypeCounts['thai_san'];
+                                            $khamBenh = $leaveTypeCounts['kham_benh'];
                                             $khac = $leaveTypeCounts['khac'];
                                         }
                                         
@@ -126,10 +214,14 @@
                                         $grandTotal['total'] += $total;
                                         $grandTotal['present'] += $present;
                                         $grandTotal['absent'] += $absent;
-                                        $grandTotal['cong_tac'] += $congTac;
-                                        $grandTotal['co_dong'] += $coDong;
+                                        $grandTotal['cong_tac_co_dong'] += $congTacCoDong;
                                         $grandTotal['hoc'] += $hoc;
                                         $grandTotal['phep'] += $phep;
+                                        $grandTotal['di_vien'] += $diVien;
+                                        $grandTotal['cho_huu'] += $choHuu;
+                                        $grandTotal['om_tai_trai'] += $omTaiTrai;
+                                        $grandTotal['thai_san'] += $thaiSan;
+                                        $grandTotal['kham_benh'] += $khamBenh;
                                         $grandTotal['khac'] += $khac;
                                     @endphp
                                     
@@ -139,10 +231,14 @@
                                         <td class="text-center">{{ $total }}</td>
                                         <td class="text-center bg-light-success">{{ $present }}</td>
                                         <td class="text-center bg-light-danger">{{ $absent }}</td>
-                                        <td class="text-center">{{ $congTac }}</td>
-                                        <td class="text-center">{{ $coDong }}</td>
+                                        <td class="text-center">{{ $congTacCoDong }}</td>
                                         <td class="text-center">{{ $hoc }}</td>
                                         <td class="text-center">{{ $phep }}</td>
+                                        <td class="text-center">{{ $diVien }}</td>
+                                        <td class="text-center">{{ $choHuu }}</td>
+                                        <td class="text-center">{{ $omTaiTrai }}</td>
+                                        <td class="text-center">{{ $thaiSan }}</td>
+                                        <td class="text-center">{{ $khamBenh }}</td>
                                         <td class="text-center">{{ $khac }}</td>
                                     </tr>
                                 @endforeach
@@ -154,10 +250,14 @@
                                     <td class="text-center"><strong>{{ $grandTotal['total'] }}</strong></td>
                                     <td class="text-center"><strong>{{ $grandTotal['present'] }}</strong></td>
                                     <td class="text-center"><strong>{{ $grandTotal['absent'] }}</strong></td>
-                                    <td class="text-center"><strong>{{ $grandTotal['cong_tac'] }}</strong></td>
-                                    <td class="text-center"><strong>{{ $grandTotal['co_dong'] }}</strong></td>
+                                    <td class="text-center"><strong>{{ $grandTotal['cong_tac_co_dong'] }}</strong></td>
                                     <td class="text-center"><strong>{{ $grandTotal['hoc'] }}</strong></td>
                                     <td class="text-center"><strong>{{ $grandTotal['phep'] }}</strong></td>
+                                    <td class="text-center"><strong>{{ $grandTotal['di_vien'] }}</strong></td>
+                                    <td class="text-center"><strong>{{ $grandTotal['cho_huu'] }}</strong></td>
+                                    <td class="text-center"><strong>{{ $grandTotal['om_tai_trai'] }}</strong></td>
+                                    <td class="text-center"><strong>{{ $grandTotal['thai_san'] }}</strong></td>
+                                    <td class="text-center"><strong>{{ $grandTotal['kham_benh'] }}</strong></td>
                                     <td class="text-center"><strong>{{ $grandTotal['khac'] }}</strong></td>
                                 </tr>
                             </tbody>
@@ -179,10 +279,16 @@
                     @php
                         $hasAbsentEmployees = false;
                         $reasonMap = [
-                            'cong_tac' => 'Công tác',
-                            'co_dong' => 'Cơ động',
+                            'cong_tac_co_dong' => 'Công tác - Cơ động',
+                            'cong_tac' => 'Công tác - Cơ động', // Legacy support
+                            'co_dong' => 'Công tác - Cơ động', // Legacy support
                             'hoc' => 'Học',
-                            'phep' => 'Phép',
+                            'phep' => 'Phép - Tranh thủ',
+                            'di_vien' => 'Đi viện',
+                            'cho_huu' => 'Chờ hưu',
+                            'om_tai_trai' => 'Ốm tại trại',
+                            'thai_san' => 'Thai sản',
+                            'kham_benh' => 'Khám bệnh',
                             'khac' => 'Khác'
                         ];
                     @endphp
@@ -217,11 +323,16 @@
                             
                             // Map leave type to reason
                             $leaveTypeMap = [
-                                'business' => 'cong_tac',
-                                'attendance' => 'co_dong',
-                                'study' => 'hoc',
-                                'leave' => 'phep',
-                                'other' => 'khac'
+                                'business' => 'cong_tac_co_dong',    // Công tác - Cơ động
+                                'attendance' => 'cong_tac_co_dong',  // Legacy: Cơ động -> Công tác - Cơ động
+                                'study' => 'hoc',                    // Học
+                                'leave' => 'phep',                   // Phép - Tranh thủ
+                                'hospital' => 'di_vien',             // Đi viện
+                                'pending' => 'cho_huu',               // Chờ hưu
+                                'sick' => 'om_tai_trai',             // Ốm tại trại
+                                'maternity' => 'thai_san',            // Thai sản
+                                'checkup' => 'kham_benh',             // Khám bệnh
+                                'other' => 'khac'                     // Khác
                             ];
                             
                             foreach ($deptLeaves as $leave) {
@@ -261,13 +372,24 @@
                                 
                                 // Color coding for reasons
                                 $reasonColors = [
-                                    'cong_tac' => 'primary',
-                                    'co_dong' => 'success',
-                                    'hoc' => 'info',
+                                    'cong_tac_co_dong' => 'primary',
+                                    'cong_tac' => 'primary', // Legacy support
+                                    'co_dong' => 'primary', // Legacy support
+                                    'hoc' => 'success',
                                     'phep' => 'warning',
+                                    'di_vien' => 'danger',
+                                    'cho_huu' => 'secondary',
+                                    'om_tai_trai' => 'dark',
+                                    'thai_san' => 'info',
+                                    'kham_benh' => 'primary',
                                     'khac' => 'secondary'
                                 ];
-                                $colorClass = $reasonColors[$absent['reason']] ?? 'secondary';
+                                // Map legacy reasons to new format for color
+                                $reasonForColor = $absent['reason'];
+                                if ($reasonForColor === 'cong_tac' || $reasonForColor === 'co_dong') {
+                                    $reasonForColor = 'cong_tac_co_dong';
+                                }
+                                $colorClass = $reasonColors[$reasonForColor] ?? 'secondary';
                             @endphp
                             <tr>
                                 @if($index == 0)

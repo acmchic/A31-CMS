@@ -89,6 +89,10 @@ $(document).ready(function() {
             title: '📊 Báo cáo quân số',
             permissions: ['report.view.company', 'report.view', 'report.create', 'report.edit', 'report.delete', 'report.approve', 'leave.view', 'leave.create', 'leave.edit', 'leave.delete', 'leave.approve', 'leave.review']
         },
+        'approval_center': {
+            title: '✅ Trung tâm phê duyệt',
+            permissions: ['approval_center.view']
+        },
         'record_management': {
             title: '📚 Quản lý sổ sách',
             permissions: ['record_management.view', 'record_management.view.own', 'record_management.view.department', 'record_management.view.company', 'record_management.view.all', 'record_management.create', 'record_management.edit', 'record_management.delete', 'record_management.approve']
@@ -144,6 +148,7 @@ $(document).ready(function() {
         'leave.delete': 'Xóa đơn nghỉ phép',
         'leave.approve': 'Phê duyệt đơn nghỉ phép',
         'leave.review': 'Thẩm định nghỉ phép',
+        'approval_center.view': 'Trung tâm phê duyệt',
         'record_management.view': 'Xem quản lý sổ sách',
         'record_management.view.own': 'Xem sổ sách cá nhân',
         'record_management.view.department': 'Xem sổ sách phòng ban',
