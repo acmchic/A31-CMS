@@ -32,7 +32,7 @@ return [
             'steps' => [
                 'pending' => ['label' => 'Chờ duyệt', 'next' => 'level1_approved'],
                 'level1_approved' => ['label' => 'Cấp 1 đã duyệt', 'next' => 'approved'],
-                'approved' => ['label' => 'Đã phê duyệt hoàn tất', 'next' => null],
+                'approved' => ['label' => 'Đã phê duyệt', 'next' => null],
                 'rejected' => ['label' => 'Đã từ chối', 'next' => null],
             ]
         ],
@@ -41,7 +41,7 @@ return [
                 'pending' => ['label' => 'Chờ duyệt', 'next' => 'level1_approved'],
                 'level1_approved' => ['label' => 'Cấp 1 đã duyệt', 'next' => 'level2_approved'],
                 'level2_approved' => ['label' => 'Cấp 2 đã duyệt', 'next' => 'approved'],
-                'approved' => ['label' => 'Đã phê duyệt hoàn tất', 'next' => null],
+                'approved' => ['label' => 'Đã phê duyệt', 'next' => null],
                 'rejected' => ['label' => 'Đã từ chối', 'next' => null],
             ]
         ],

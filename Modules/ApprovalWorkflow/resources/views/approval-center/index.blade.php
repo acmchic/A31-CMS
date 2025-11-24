@@ -200,166 +200,6 @@
     padding-right: 0.75rem;
 }
 
-/* Workflow timeline styles - reuse from component */
-.workflow-progress-simple .workflow-steps-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    position: relative;
-    padding: 20px 0;
-    overflow: visible;
-}
-
-.workflow-step-item {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    position: relative;
-    overflow: visible;
-}
-
-.step-clock {
-    position: relative;
-    z-index: 2;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto;
-    background: #fff;
-    border-radius: 50%;
-}
-
-.step-clock .clock-icon {
-    width: 40px !important;
-    height: 40px !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: relative;
-    background: transparent !important;
-}
-
-.step-clock .clock-icon path,
-.step-clock .clock-icon rect {
-    fill: #007bff !important;
-    stroke: none !important;
-}
-
-.step-dot-wrapper {
-    position: relative;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-    overflow: visible;
-}
-
-.step-connector {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 100%;
-    height: 3px;
-    z-index: 0;
-    transition: background-color 0.3s ease;
-}
-
-.step-dot {
-    position: relative;
-    z-index: 2;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: 3px solid;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #fff;
-    color: #fff !important;
-    font-size: 18px;
-    margin: 0 auto;
-    transition: all 0.3s ease;
-}
-
-.step-dot i {
-    color: inherit !important;
-}
-
-.workflow-step-item.completed .step-dot {
-    background-color: #007bff !important;
-    border-color: #007bff !important;
-    color: #fff !important;
-}
-
-.workflow-step-item.current .step-dot {
-    background-color: #007bff !important;
-    border-color: #007bff !important;
-    color: #fff !important;
-}
-
-.workflow-step-item.completed .step-dot i,
-.workflow-step-item.current .step-dot i {
-    color: #fff !important;
-}
-
-.workflow-step-item.rejected .step-dot {
-    background-color: #dc3545;
-    border-color: #dc3545;
-    color: #fff !important;
-}
-
-.workflow-step-item.rejected .step-dot i {
-    color: #fff !important;
-}
-
-.workflow-step-item.pending .step-dot {
-    background-color: #fff;
-    border-color: #dee2e6;
-    color: #6c757d;
-}
-
-.step-content {
-    width: 100%;
-}
-
-.step-label {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 5px;
-    color: #495057;
-    word-break: break-word;
-}
-
-.workflow-step-item.completed .step-label {
-    color: #007bff;
-    font-weight: 700;
-}
-
-.workflow-step-item.current .step-label {
-    color: #007bff;
-    font-weight: 700;
-    position: relative;
-}
-
-.workflow-step-item.rejected .step-label {
-    color: #dc3545;
-}
-
-.workflow-step-item.pending .step-label {
-    color: #6c757d;
-}
-
-.step-date,
-.step-user {
-    margin-top: 3px;
-    font-size: 11px;
-}
-
 /* Approval Center Banner */
 .approval-center-banner {
     background: #ffffff;
@@ -1203,13 +1043,8 @@ $(document).ready(function() {
 
         $('#request-detail').html(detailHtml);
 
-        // Render workflow timeline if available (for leave requests)
-        if (request.workflow_data && request.model_type === 'leave') {
-            renderWorkflowTimeline(request.workflow_data);
-        } else {
-            // Load approval history for other types
-            loadApprovalHistory(request.id, request.model_type, request);
-        }
+        // Load approval history
+        loadApprovalHistory(request.id, request.model_type, request);
     }
 
     function loadApprovalHistory(id, modelType, requestData) {
@@ -1227,123 +1062,31 @@ $(document).ready(function() {
     }
 
     function renderApprovalHistory(history, requestData) {
-        // Use workflow timeline component if available
-        if (requestData && requestData.workflow_data && requestData.model_type === 'leave') {
-            renderWorkflowTimeline(requestData.workflow_data);
-        } else {
-            // Fallback to table if no workflow data
-            if (history.length === 0) {
-                $('#approval-history-content').html('<div class="text-muted text-center py-3">Chưa có lịch sử phê duyệt</div>');
-                return;
-            }
-
-            let html = '<div class="table-responsive"><table class="table table-sm table-hover">';
-            html += '<thead class="table-light"><tr><th>Tên bước</th><th>Người phê duyệt</th><th>Kết quả</th><th>Nhận xét</th><th>Thời gian</th></tr></thead>';
-            html += '<tbody>';
-
-            history.forEach(function(item) {
-                html += '<tr>';
-                html += '<td>' + item.step_name + '</td>';
-                html += '<td>' + item.approver + '</td>';
-                html += '<td><span class="badge bg-' + item.result_badge + '">' + item.result + '</span></td>';
-                html += '<td>' + (item.comment || '-') + '</td>';
-                html += '<td><small>' + item.time + '<br><span class="text-muted">' + (item.time_relative || '') + '</span></small></td>';
-                html += '</tr>';
-            });
-
-            html += '</tbody></table></div>';
-            $('#approval-history-content').html(html);
-        }
-    }
-
-    function renderWorkflowTimeline(workflowData) {
-        if (!workflowData || !workflowData.steps) {
-            $('#approval-history-content').html('<div class="text-muted text-center py-3">Chưa có thông tin tiến trình</div>');
+        // Fallback to table if no workflow data
+        if (history.length === 0) {
+            $('#approval-history-content').html('<div class="text-muted text-center py-3">Chưa có lịch sử phê duyệt</div>');
             return;
         }
 
-        let html = '<div class="workflow-progress-simple mb-4"><div class="card"><div class="card-header"><h5 class="mb-0"><i class="la la-tasks"></i> Tiến trình phê duyệt</h5></div><div class="card-body"><div class="workflow-steps-container">';
+        let html = '<div class="table-responsive"><table class="table table-sm table-hover">';
+        html += '<thead class="table-light"><tr><th>Tên bước</th><th>Người phê duyệt</th><th>Kết quả</th><th>Nhận xét</th><th>Thời gian</th></tr></thead>';
+        html += '<tbody>';
 
-        workflowData.steps.forEach(function(step, index) {
-            const hasDate = workflowData.stepDates && workflowData.stepDates[step.key];
-            const isCreatedStep = (step.key === 'created');
-            const isCompletedStep = (step.key === 'completed');
-
-            let isCompleted = false;
-            if (isCreatedStep) {
-                isCompleted = true;
-            } else if (isCompletedStep && hasDate) {
-                isCompleted = true;
-            } else if (index < workflowData.currentStepIndex) {
-                isCompleted = true;
-            }
-
-            const isCurrent = (index === workflowData.currentStepIndex && !workflowData.rejected) && !isCompletedStep;
-            const isRejectedStep = index === workflowData.currentStepIndex && workflowData.rejected;
-            const isPending = !isCompleted && !isCurrent;
-
-            let stepClass, dotColor, connectorColor, iconClass, iconColor;
-            if (isRejectedStep) {
-                stepClass = 'rejected';
-                dotColor = '#dc3545';
-                connectorColor = '#dc3545';
-                iconClass = 'la-times';
-                iconColor = '#fff';
-            } else if (isCompleted) {
-                stepClass = 'completed';
-                dotColor = '#007bff';
-                connectorColor = '#007bff';
-                iconClass = 'la-check';
-                iconColor = '#fff';
-            } else if (isCurrent) {
-                stepClass = 'current';
-                dotColor = '#007bff';
-                connectorColor = '#dee2e6';
-                iconClass = 'la-circle';
-                iconColor = '#fff';
-            } else {
-                stepClass = 'pending';
-                dotColor = '#6c757d';
-                connectorColor = '#dee2e6';
-                iconClass = 'la-circle';
-                iconColor = '#6c757d';
-            }
-
-            const isLast = index === workflowData.steps.length - 1;
-            if (!isLast && isCompleted) {
-                connectorColor = '#007bff';
-            } else if (!isLast) {
-                connectorColor = '#dee2e6';
-            }
-
-            const stepDate = workflowData.stepDates && workflowData.stepDates[step.key];
-            const stepUser = workflowData.stepUsers && workflowData.stepUsers[step.key];
-
-            html += '<div class="workflow-step-item ' + stepClass + '" data-step="' + step.key + '">';
-            html += '<div class="step-dot-wrapper">';
-            if (!isLast) {
-                html += '<div class="step-connector" style="background-color: ' + connectorColor + ';"></div>';
-            }
-            if (stepClass === 'current') {
-                html += '<div class="step-clock"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="40" height="40" fill="#007bff" class="clock-icon"><path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,20a9,9,0,1,1,9-9A9,9,0,0,1,12,21Z" fill="#007bff"/><rect width="2" height="7" x="11" y="6" rx="1" fill="#007bff"><animateTransform attributeName="transform" dur="9s" repeatCount="indefinite" type="rotate" values="0 12 12;360 12 12"/></rect><rect width="2" height="9" x="11" y="11" rx="1" fill="#007bff"><animateTransform attributeName="transform" dur="0.75s" repeatCount="indefinite" type="rotate" values="0 12 12;360 12 12"/></rect></svg></div>';
-            } else {
-                html += '<div class="step-dot ' + stepClass + '" style="border-color: ' + dotColor + ';"><i class="la ' + iconClass + '" style="color: ' + iconColor + ' !important;"></i></div>';
-            }
-            html += '</div>';
-            html += '<div class="step-content">';
-            html += '<div class="step-label">' + step.label + '</div>';
-            if (isCompleted && stepDate) {
-                html += '<div class="step-date text-muted small"><i class="la la-calendar"></i> ' + stepDate + '</div>';
-            }
-            if (isCompleted && stepUser) {
-                html += '<div class="step-user text-muted small"><i class="la la-user"></i> ' + stepUser + '</div>';
-            }
-            html += '</div></div>';
+        history.forEach(function(item) {
+            html += '<tr>';
+            html += '<td>' + item.step_name + '</td>';
+            html += '<td>' + item.approver + '</td>';
+            html += '<td><span class="badge bg-' + item.result_badge + '">' + item.result + '</span></td>';
+            html += '<td>' + (item.comment || '-') + '</td>';
+            html += '<td><small>' + item.time + '<br><span class="text-muted">' + (item.time_relative || '') + '</span></small></td>';
+            html += '</tr>';
         });
 
-        html += '</div></div></div></div>';
+        html += '</tbody></table></div>';
         $('#approval-history-content').html(html);
     }
+
+
 
     // Assign approvers button handler (for reviewer step)
     $(document).on('click', '#btn-assign-approvers', function() {

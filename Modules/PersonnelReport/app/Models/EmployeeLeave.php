@@ -312,7 +312,7 @@ class EmployeeLeave extends Model
     public function getCurrentLevelApprover()
     {
         $status = $this->workflow_status;
-        
+
         switch ($status) {
             case self::WORKFLOW_PENDING:
                 return $this->getDepartmentHead();
@@ -389,15 +389,15 @@ class EmployeeLeave extends Model
         if (!$this->selected_approvers) {
             return collect([]);
         }
-        
-        $approverIds = is_array($this->selected_approvers) 
-            ? $this->selected_approvers 
+
+        $approverIds = is_array($this->selected_approvers)
+            ? $this->selected_approvers
             : json_decode($this->selected_approvers, true);
-            
+
         if (!is_array($approverIds)) {
             return collect([]);
         }
-        
+
         return \App\Models\User::whereIn('id', $approverIds)->get();
     }
 
@@ -409,19 +409,19 @@ class EmployeeLeave extends Model
         if (!$this->selected_approvers) {
             return false;
         }
-        
-        $approverIds = is_array($this->selected_approvers) 
-            ? $this->selected_approvers 
+
+        $approverIds = is_array($this->selected_approvers)
+            ? $this->selected_approvers
             : json_decode($this->selected_approvers, true);
-            
+
         if (!is_array($approverIds)) {
             return false;
         }
-        
+
         // Convert all IDs to integers for comparison (handle both string and int in JSON)
         $approverIds = array_map('intval', $approverIds);
         $userId = (int)$userId;
-        
+
         return in_array($userId, $approverIds);
     }
 
@@ -641,7 +641,7 @@ class EmployeeLeave extends Model
             // Fetch directors
             fetch(\'' . $getDirectorsUrl . '\', {
                 method: \'GET\',
-                headers: { 
+                headers: {
                     \'X-Requested-With\': \'XMLHttpRequest\',
                     \'Accept\': \'application/json\'
                 }
@@ -666,7 +666,7 @@ class EmployeeLeave extends Model
                 var checkboxId = "director_" + director.id + "_' . $this->id . '";
                 var checkboxClass = "director-checkbox-' . $this->id . '";
                 var deptText = director.department || "N/A";
-                
+
                 directorsList += "<div class=\"form-check mb-2\">";
                 directorsList += "<input class=\"form-check-input " + checkboxClass + "\" type=\"checkbox\" value=\"" + director.id + "\" id=\"" + checkboxId + "\">";
                 directorsList += "<label class=\"form-check-label\" for=\"" + checkboxId + "\">";
@@ -819,7 +819,7 @@ class EmployeeLeave extends Model
             self::WORKFLOW_PENDING => 'Chờ chỉ huy xác nhận',
             self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => 'Chờ thẩm định',
             self::WORKFLOW_APPROVED_BY_REVIEWER => 'Chờ BGD ký',
-            self::WORKFLOW_APPROVED_BY_DIRECTOR => 'Đã phê duyệt hoàn tất',
+            self::WORKFLOW_APPROVED_BY_DIRECTOR => 'Đã phê duyệt',
             self::WORKFLOW_REJECTED => 'Đã từ chối',
             // Legacy
             self::WORKFLOW_IN_REVIEW => 'Đang xem xét',

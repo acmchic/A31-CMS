@@ -113,17 +113,9 @@
                                 <div class="step-connector" style="background-color: {{ $connectorColor }};"></div>
                             @endif
                             @if($stepClass === 'current')
-                                <div class="step-clock">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="40" height="40" fill="#007bff" class="clock-icon">
-                                        <path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,20a9,9,0,1,1,9-9A9,9,0,0,1,12,21Z" fill="#007bff"/>
-                                        <rect width="2" height="7" x="11" y="6" rx="1" fill="#007bff">
-                                            <animateTransform attributeName="transform" dur="9s" repeatCount="indefinite" type="rotate" values="0 12 12;360 12 12"/>
-                                        </rect>
-                                        <rect width="2" height="9" x="11" y="11" rx="1" fill="#007bff">
-                                            <animateTransform attributeName="transform" dur="0.75s" repeatCount="indefinite" type="rotate" values="0 12 12;360 12 12"/>
-                                        </rect>
-                                    </svg>
-                                </div>
+                                 <div class="step-clock">
+                                                    <img src="{{ asset('assets/icon/clock.svg') }}" alt="clock" />
+                                                </div>
                             @else
                                 <div class="step-dot {{ $stepClass }}" style="border-color: {{ $dotColor }};">
                                     <i class="la {{ $iconClass }}" style="color: {{ $iconColor }} !important;"></i>
@@ -185,21 +177,6 @@
     border-radius: 50%;
 }
 
-.step-clock .clock-icon {
-    width: 40px !important;
-    height: 40px !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: relative;
-    background: transparent !important;
-}
-
-.step-clock .clock-icon path,
-.step-clock .clock-icon rect {
-    fill: #007bff !important;
-    stroke: none !important;
-}
 
 .step-dot-wrapper {
     position: relative;

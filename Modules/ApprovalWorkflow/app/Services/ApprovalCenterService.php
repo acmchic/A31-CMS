@@ -16,19 +16,19 @@ class ApprovalCenterService
     public function getApprovalRequests($user, $filters = [])
     {
         $requests = collect([]);
-        
+
         // Get leave requests
         if ($filters['type'] === 'all' || $filters['type'] === 'leave') {
             $leaveRequests = $this->getLeaveRequests($user, $filters);
             $requests = $requests->merge($leaveRequests);
         }
-        
+
         // Get vehicle registration requests
         if ($filters['type'] === 'all' || $filters['type'] === 'vehicle') {
             $vehicleRequests = $this->getVehicleRequests($user, $filters);
             $requests = $requests->merge($vehicleRequests);
         }
-        
+
         // Sort by created_at desc
         return $requests->sortByDesc('created_at')->values();
     }
@@ -54,11 +54,11 @@ class ApprovalCenterService
         // Get leave counts
         $leaveQuery = EmployeeLeave::query();
         $this->filterLeaveByUserPermissions($leaveQuery, $user, ['status' => 'all']);
-        
+
         // Count by status
         $counts['leave']['pending'] = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_PENDING)->count();
         $counts['leave']['review'] = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD)->count();
-        
+
         // For director count, only count requests where user is in selected_approvers
         $directorQuery = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER);
         if ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
@@ -75,7 +75,7 @@ class ApprovalCenterService
         // Get vehicle counts
         $vehicleQuery = VehicleRegistration::query();
         $this->filterVehicleByUserPermissions($vehicleQuery, $user);
-        
+
         // Vehicle workflow is simpler - just count pending/review status
         $counts['vehicle']['pending'] = (clone $vehicleQuery)->whereIn('workflow_status', ['submitted', 'dept_review'])->count();
         $counts['vehicle']['review'] = 0; // Vehicle doesn't have review step
@@ -90,7 +90,7 @@ class ApprovalCenterService
     public function getPendingCountForUser($user, $type = 'leave')
     {
         $counts = $this->getPendingCountsByType($user);
-        
+
         // Determine which count to show based on user role
         if ($user->hasRole('Admin') || PermissionHelper::can($user, 'leave.review')) {
             // Thẩm định: show review count
@@ -110,7 +110,7 @@ class ApprovalCenterService
     protected function getLeaveRequests($user, $filters)
     {
         $query = EmployeeLeave::query();
-        
+
         // Apply status filter FIRST - use simple where() to ensure it's not overridden
         if ($filters['status'] !== 'all') {
             $statusValue = null;
@@ -122,22 +122,22 @@ class ApprovalCenterService
                 // Direct status match (approved_by_department_head, approved_by_reviewer, etc.)
                 $statusValue = $filters['status'];
             }
-            
+
             if ($statusValue) {
                 // Apply status filter directly - this will be respected by subsequent filters
                 $query->where('workflow_status', $statusValue);
             }
         }
-        
+
         // Apply time range filter
         $this->applyTimeRangeFilter($query, $filters['time_range']);
-        
+
         // Filter by user permissions (includes selected_approvers filter for directors)
         // This respects the status filter already applied above
         $this->filterLeaveByUserPermissions($query, $user, $filters);
-        
+
         $user = backpack_user();
-        
+
         return $query->with(['employee.department'])
             ->orderBy('created_at', 'desc')
             ->get()
@@ -145,7 +145,7 @@ class ApprovalCenterService
                 $isReviewerStep = $leave->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
                 $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
                 $needsPin = !($isReviewerStep && $hasReviewPermission);
-                
+
                 return [
                     'id' => $leave->id,
                     'model_type' => 'leave',
@@ -175,7 +175,7 @@ class ApprovalCenterService
     protected function getVehicleRequests($user, $filters)
     {
         $query = VehicleRegistration::query();
-        
+
         // Apply status filter
         if ($filters['status'] !== 'all') {
             if ($filters['status'] === 'pending') {
@@ -184,13 +184,13 @@ class ApprovalCenterService
                 $query->where('workflow_status', $filters['status']);
             }
         }
-        
+
         // Apply time range filter
         $this->applyTimeRangeFilter($query, $filters['time_range']);
-        
+
         // Filter by user permissions
         $this->filterVehicleByUserPermissions($query, $user);
-        
+
         return $query->with(['user', 'vehicle', 'driver'])
             ->orderBy('created_at', 'desc')
             ->get()
@@ -244,12 +244,12 @@ class ApprovalCenterService
             // Status filter already applied, no additional permission filtering needed
             return;
         }
-        
+
         // Director (BGD): only see requests where they are in selected_approvers list (for approved_by_reviewer step)
         $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
         if ($isDirector) {
             $statusFilter = $filters['status'] ?? 'all';
-            
+
             // For director, add additional permission check BUT keep the status filter intact
             $query->where(function($q) use ($user, $statusFilter) {
                 // Show requests at approved_by_reviewer step where user is in selected_approvers
@@ -264,7 +264,7 @@ class ApprovalCenterService
                               ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode((string)$userId)]);
                     });
                 }
-                
+
                 // Also show requests already approved by this user (for history)
                 if ($statusFilter === 'all' || $statusFilter === 'completed' || $statusFilter === 'approved_by_director') {
                     $q->orWhere('approved_by_director', $user->id);
@@ -272,7 +272,7 @@ class ApprovalCenterService
             });
             return;
         }
-        
+
         // Apply workflow step filtering for other users (status filter already applied)
         // This is just additional permission check - status filter ensures correct status
         $query->where(function($q) use ($user) {
@@ -280,7 +280,7 @@ class ApprovalCenterService
             if ($user->employee_id) {
                 $q->where('employee_id', $user->employee_id);
             }
-            
+
             // Department head can see their department
             $isDepartmentHead = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban']);
             if ($isDepartmentHead && $user->department_id) {
@@ -300,12 +300,12 @@ class ApprovalCenterService
         if ($user->hasRole('Admin')) {
             return;
         }
-        
+
         // Apply filtering based on permissions
         $query->where(function($q) use ($user) {
             // User can see their own requests
             $q->where('user_id', $user->id);
-            
+
             // Department head can see their department
             if ($user->department_id) {
                 $q->orWhereHas('user', function($subQ) use ($user) {
@@ -324,13 +324,13 @@ class ApprovalCenterService
             case 'leave':
                 $model = EmployeeLeave::with(['employee.department'])->find($id);
                 if (!$model) return null;
-                
+
                 $user = backpack_user();
                 $isReviewerStep = $model->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
                 $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
                 $needsPin = !($isReviewerStep && $hasReviewPermission);
                 $hasSelectedApprovers = !empty($model->selected_approvers);
-                
+
                 return [
                     'id' => $model->id,
                     'model_type' => 'leave',
@@ -351,11 +351,11 @@ class ApprovalCenterService
                     'selected_approvers' => $model->selected_approvers ? (is_array($model->selected_approvers) ? $model->selected_approvers : json_decode($model->selected_approvers, true)) : [],
                     'workflow_data' => $this->getWorkflowProgressData($model),
                 ];
-                
+
             case 'vehicle':
                 $model = VehicleRegistration::with(['user', 'vehicle', 'driver'])->find($id);
                 if (!$model) return null;
-                
+
                 return [
                     'id' => $model->id,
                     'model_type' => 'vehicle',
@@ -371,7 +371,7 @@ class ApprovalCenterService
                     'can_approve' => $model->canBeApproved() && $this->canUserApproveVehicle($model, backpack_user()),
                     'can_reject' => $model->canBeRejected() && $this->canUserApproveVehicle($model, backpack_user()),
                 ];
-                
+
             default:
                 return null;
         }
@@ -384,10 +384,10 @@ class ApprovalCenterService
     {
         $modelClass = $this->getModelClass($modelType);
         if (!$modelClass) return [];
-        
+
         $model = $modelClass::find($id);
         if (!$model) return [];
-        
+
         return ApprovalHistory::where('approvable_type', get_class($model))
             ->where('approvable_id', $id)
             ->with('user')
@@ -415,16 +415,16 @@ class ApprovalCenterService
         if (!$model) {
             throw new \Exception('Request not found');
         }
-        
+
         // Use ApprovalController logic
         $controller = app(\Modules\ApprovalWorkflow\Http\Controllers\ApprovalController::class);
-        
+
         // Check if this is reviewer step (leave request at approved_by_department_head) - no PIN needed
         $needsPin = true;
         if ($modelType === 'leave' && $model instanceof EmployeeLeave) {
             $isReviewerStep = $model->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
             $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
-            
+
             if ($isReviewerStep && $hasReviewPermission) {
                 // Reviewer step: check if approvers have been assigned
                 if (empty($model->selected_approvers)) {
@@ -434,16 +434,16 @@ class ApprovalCenterService
                 $needsPin = false;
             }
         }
-        
+
         // If reviewer step, always use approveWithoutPin (no PIN needed)
         if (!$needsPin) {
             // Approve without PIN (for reviewer step - just forward to BGD)
             $request = new \Illuminate\Http\Request();
             $request->merge(['comment' => $comment]);
-            
+
             $modelClass = base64_encode(get_class($model));
             $response = $controller->approveWithoutPin($request, $modelClass, $id);
-            
+
             // Convert response to array format
             if ($response instanceof \Illuminate\Http\JsonResponse) {
                 $data = $response->getData(true);
@@ -453,29 +453,29 @@ class ApprovalCenterService
                     'data' => $data['data'] ?? null,
                 ];
             }
-            
+
             return [
                 'success' => true,
                 'message' => 'Đã chuyển lên BGD',
                 'data' => null,
             ];
         }
-        
+
         // For other steps, require PIN
         if (!$certificatePin) {
             throw new \Exception('Vui lòng nhập mã PIN để phê duyệt');
         }
-        
+
         // Approve with PIN
         $request = new \Illuminate\Http\Request();
         $request->merge([
             'certificate_pin' => $certificatePin,
             'comment' => $comment,
         ]);
-        
+
         $modelClass = base64_encode(get_class($model));
         $response = $controller->approveWithPin($request, $modelClass, $id);
-        
+
         // Convert response to array format
         if ($response instanceof \Illuminate\Http\JsonResponse) {
             $data = $response->getData(true);
@@ -485,7 +485,7 @@ class ApprovalCenterService
                 'data' => $data['data'] ?? null,
             ];
         }
-        
+
         return [
             'success' => true,
             'message' => 'Phê duyệt thành công',
@@ -502,14 +502,14 @@ class ApprovalCenterService
         if (!$model) {
             throw new \Exception('Request not found');
         }
-        
+
         $controller = app(\Modules\ApprovalWorkflow\Http\Controllers\ApprovalController::class);
         $request = new \Illuminate\Http\Request();
         $request->merge(['reason' => $reason]);
-        
+
         $modelClass = base64_encode(get_class($model));
         $response = $controller->reject($request, $modelClass, $id);
-        
+
         // Convert response to array format
         if ($response instanceof \Illuminate\Http\JsonResponse) {
             $data = $response->getData(true);
@@ -519,7 +519,7 @@ class ApprovalCenterService
                 'data' => $data['data'] ?? null,
             ];
         }
-        
+
         return [
             'success' => true,
             'message' => 'Từ chối thành công',
@@ -561,7 +561,7 @@ class ApprovalCenterService
     {
         $from = $leave->from_date ? $leave->from_date->format('d/m/Y') : 'N/A';
         $to = $leave->to_date ? $leave->to_date->format('d/m/Y') : 'N/A';
-        
+
         return "{$from} đến {$to}";
     }
 
@@ -581,7 +581,7 @@ class ApprovalCenterService
         if (!$leave->from_date || !$leave->to_date) {
             return 'N/A';
         }
-        
+
         $days = $leave->from_date->diffInDays($leave->to_date) + 1;
         return "{$days} ngày";
     }
@@ -619,7 +619,7 @@ class ApprovalCenterService
             EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR => 'success',
             EmployeeLeave::WORKFLOW_REJECTED => 'danger',
         ];
-        
+
         return $badges[$status] ?? 'secondary';
     }
 
@@ -631,7 +631,7 @@ class ApprovalCenterService
             'approved' => 'Đã phê duyệt',
             'rejected' => 'Đã từ chối',
         ];
-        
+
         return $labels[$status] ?? $status;
     }
 
@@ -643,7 +643,7 @@ class ApprovalCenterService
             'approved' => 'success',
             'rejected' => 'danger',
         ];
-        
+
         return $badges[$status] ?? 'secondary';
     }
 
@@ -655,7 +655,7 @@ class ApprovalCenterService
             'cancelled' => 'secondary',
             'returned' => 'warning',
         ];
-        
+
         return $badges[$action] ?? 'secondary';
     }
 
@@ -664,7 +664,7 @@ class ApprovalCenterService
         if ($action === 'submitted') {
             return 'Gửi';
         }
-        
+
         return "Phê duyệt cấp {$level}";
     }
 
@@ -674,7 +674,7 @@ class ApprovalCenterService
         if ($user->hasRole('Admin')) {
             return true;
         }
-        
+
         $status = $leave->workflow_status;
 
         // Step 1: Only department head of the employee's department can approve
@@ -718,7 +718,7 @@ class ApprovalCenterService
             if (!$hasDirectorRole) {
                 return false;
             }
-            
+
             // Check if user is in selected_approvers list
             return $leave->isUserSelectedApprover($user->id);
         }
@@ -736,7 +736,7 @@ class ApprovalCenterService
         if ($user->hasRole('Admin')) {
             return true;
         }
-        
+
         // Add vehicle-specific permission check
         return PermissionHelper::can($user, 'vehicle_registration.approve');
     }
@@ -749,11 +749,11 @@ class ApprovalCenterService
         if (!$date) {
             return 'N/A';
         }
-        
+
         if (!$date instanceof \Carbon\Carbon) {
             $date = \Carbon\Carbon::parse($date);
         }
-        
+
         // Format: dd/mm/yyyy, HH:mm
         return $date->format('d/m/Y, H:i');
     }
@@ -783,11 +783,8 @@ class ApprovalCenterService
             [
                 'key' => EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR,
                 'label' => 'BGD phê duyệt'
-            ],
-            [
-                'key' => 'completed',
-                'label' => 'Hoàn tất'
             ]
+
         ];
 
         $stepDates = [];

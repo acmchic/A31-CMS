@@ -237,7 +237,7 @@ class LeaveRequestCrudController extends CrudController
                         })
                         // Also show requests already approved by this user (for history)
                         ->orWhere('approved_by_director', $user->id);
-                        
+
                         // Apply status filter if specified
                         if ($statusFilter && $statusFilter !== 'all') {
                             $subQ->where(function($statusQ) use ($statusFilter, $user) {
@@ -275,7 +275,7 @@ class LeaveRequestCrudController extends CrudController
                         })
                         // Also show requests already approved by this user (for history)
                         ->orWhere('approved_by_director', $user->id);
-                        
+
                         // Apply status filter if specified
                         if ($statusFilter && $statusFilter !== 'all') {
                             $subQ->where(function($statusQ) use ($statusFilter, $user) {
@@ -610,7 +610,7 @@ class LeaveRequestCrudController extends CrudController
             ->default(null) // Always start with empty selection - let user choose
             ->tab('Thông tin cơ bản');
 
-        // If there's only 1 option and user is not admin/manager, 
+        // If there's only 1 option and user is not admin/manager,
         // field is still required in validation, but don't pre-select it
         // User still needs to manually choose
 
@@ -974,7 +974,7 @@ class LeaveRequestCrudController extends CrudController
     private function addDepartmentFilter()
     {
         $user = backpack_user();
-        
+
         // Show all departments (not just those with leave requests)
         // Respecting user permissions
         if ($user->hasRole('Admin') || PermissionHelper::can($user, 'leave.review')) {
@@ -989,15 +989,15 @@ class LeaveRequestCrudController extends CrudController
                     $userDepartmentId = $emp->department_id;
                 }
             }
-            
+
             // Check if user is department head - they can see their department
             $isDepartmentHead = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban']);
-            
+
             $departmentIds = [];
             if ($userDepartmentId && ($isDepartmentHead || $user->employee_id)) {
                 $departmentIds[] = $userDepartmentId;
             }
-            
+
             // Get departments user can access
             if (!empty($departmentIds)) {
                 $departments = Department::whereIn('id', $departmentIds)
@@ -1055,10 +1055,6 @@ class LeaveRequestCrudController extends CrudController
             [
                 'key' => EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR,
                 'label' => 'BGD phê duyệt'
-            ],
-            [
-                'key' => 'completed',
-                'label' => 'Hoàn tất'
             ]
         ];
 

@@ -105,7 +105,7 @@ class VehicleRegistrationCrudController extends CrudController
     {
         CRUD::column('id')->label('ID');
         CRUD::column('user_id')->label('Người đăng ký')->type('select')->entity('user')->attribute('name');
-        
+
         // Gộp Ngày đi và Ngày về thành 1 column hiển thị 2 dòng
         CRUD::column('date_range')
             ->label('Ngày đi / Ngày về')
@@ -124,7 +124,7 @@ class VehicleRegistrationCrudController extends CrudController
                 $query->orWhere('departure_datetime', 'like', '%'.$searchTerm.'%')
                       ->orWhere('return_datetime', 'like', '%'.$searchTerm.'%');
             });
-        
+
         CRUD::column('route')->label('Tuyến đường')->limit(50);
         CRUD::column('purpose')->label('Mục đích')->limit(50);
         CRUD::column('passenger_count')->label('Số người');
@@ -150,7 +150,7 @@ class VehicleRegistrationCrudController extends CrudController
 
         // Add modal to the view - inject via JavaScript
         CRUD::addClause('whereRaw', '1=1'); // Dummy clause to ensure setup runs
-        
+
         // Set custom list view để load CSS/JS riêng cho module
         CRUD::setListView('vehicleregistration::list');
     }
@@ -393,7 +393,7 @@ class VehicleRegistrationCrudController extends CrudController
         // Generate PDF with digital signature here using lsnepomuceno/laravel-a1-pdf-sign
         // TODO: Implement PDF generation with signatures
 
-        return redirect()->back()->with('success', 'Đã phê duyệt hoàn tất! PDF đang được tạo.');
+        return redirect()->back()->with('success', 'Đã phê duyệt! PDF đang được tạo.');
     }
 
     /**
