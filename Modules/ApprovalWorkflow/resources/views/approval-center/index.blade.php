@@ -864,7 +864,6 @@ $(document).ready(function() {
             success: function(response) {
                 // Load detail view via AJAX or update HTML
                 loadDetailView(response);
-                loadApprovalHistory(id, modelType);
             },
             error: function() {
                 hideLoadingSkeleton();
@@ -983,12 +982,13 @@ $(document).ready(function() {
 
             if (isReviewerStep) {
                 // Reviewer step: show "Người phê duyệt" button
+                const reviewerButtonText = (request.is_reviewer_role === true) ? 'Gửi lên BGD' : 'Người phê duyệt';
                 detailHtml += `
                     <button id="btn-assign-approvers"
                             class="btn btn-sm btn-primary"
                             data-id="${request.id}"
                             data-model-type="${request.model_type}">
-                        <i class="la la-user-plus"></i> Người phê duyệt
+                        <i class="la la-user-plus"></i> ${reviewerButtonText}
                     </button>
                 `;
             } else {
@@ -998,13 +998,14 @@ $(document).ready(function() {
                     needsPin = false;
                 }
 
+                const approveButtonText = (request.is_reviewer_role === true) ? 'Gửi lên BGD' : (needsPin ? 'Phê duyệt' : 'Gửi lên BGD');
                 detailHtml += `
                     <button id="btn-approve"
                             class="btn btn-sm btn-success"
                             data-id="${request.id}"
                             data-model-type="${request.model_type}"
                             data-needs-pin="${needsPin ? '1' : '0'}">
-                        <i class="la la-check"></i> ${needsPin ? 'Phê duyệt' : 'Gửi lên BGD'}
+                        <i class="la la-check"></i> ${approveButtonText}
                     </button>
                 `;
             }
@@ -1028,14 +1029,14 @@ $(document).ready(function() {
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="text-muted mb-1 d-block" style="font-size: 0.95rem; font-weight: 500;">Người gửi</label>
-                                <div class="fw-semibold" style="font-size: 0.95rem;">${request.submitted_by}</div>
+                                <label class="mb-1 d-block" style="font-size: 0.95rem; font-weight: 500; color: #6b7280;">Người gửi</label>
+                                <div class="fw-semibold" style="font-size: 0.95rem; color: #1f2937;">${request.submitted_by}</div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="text-muted mb-1 d-block" style="font-size: 0.95rem; font-weight: 500;">Đã gửi</label>
-                                <div class="fw-semibold" style="font-size: 0.95rem;">${request.submitted_at}</div>
+                                <label class="mb-1 d-block" style="font-size: 0.95rem; font-weight: 500; color: #6b7280;">Đã gửi</label>
+                                <div class="fw-semibold" style="font-size: 0.95rem; color: #1f2937;">${request.submitted_at}</div>
                             </div>
                         </div>
                     </div>
@@ -1052,8 +1053,8 @@ $(document).ready(function() {
             }
             detailHtml += `
                         <div class="col-md-6 mb-3">
-                            <label class="text-muted mb-1 d-block" style="font-size: 0.95rem; font-weight: 500;">${label}</label>
-                            <div class="fw-normal" style="font-size: 0.95rem;">${value}</div>
+                            <label class="mb-1 d-block" style="font-size: 0.95rem; font-weight: 500; color: #6b7280;">${label}</label>
+                            <div class="fw-normal" style="font-size: 0.95rem; color: #1f2937;">${value}</div>
                         </div>
             `;
             detailIndex++;
@@ -1063,11 +1064,7 @@ $(document).ready(function() {
                     </div>
                     <hr class="my-4">
                     <div id="approval-history-content">
-                        <div class="text-center py-3">
-                            <div class="spinner-border spinner-border-sm" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </div>
+                        ${request.workflow_data && request.model_type === 'leave' ? renderWorkflowProgressFromData(request.workflow_data) : ''}
                     </div>
                 </div>
             </div>
@@ -1075,10 +1072,96 @@ $(document).ready(function() {
 
         $('#request-detail').html(detailHtml);
 
-        // Load approval history
-        loadApprovalHistory(request.id, request.model_type, request);
+        // Render workflow progress if available
+        if (request.workflow_data && request.model_type === 'leave') {
+            renderWorkflowProgressFromData(request.workflow_data);
+        }
 
         // Print button handler is already set up at document level
+    }
+    
+    function renderWorkflowProgressFromData(workflowData) {
+        if (!workflowData || !workflowData.steps) {
+            return;
+        }
+        
+        const clockIconPath = '{{ asset("assets/icon/clock.svg") }}';
+        let html = '<div class="workflow-progress-simple mb-4"><div class="card"><div class="card-header"><h5 class="mb-0"><i class="la la-tasks"></i> Tiến trình phê duyệt</h5></div><div class="card-body"><div class="workflow-steps-container">';
+        
+        workflowData.steps.forEach(function(step, index) {
+            const stepUser = workflowData.stepUsers && workflowData.stepUsers[step.key];
+            const stepDate = workflowData.stepDates && workflowData.stepDates[step.key];
+            const hasStepData = stepUser || stepDate;
+            
+            const isCreatedStep = (step.key === 'created');
+            let isCompleted = false;
+            if (isCreatedStep) {
+                isCompleted = true;
+            } else if (hasStepData) {
+                isCompleted = true;
+            }
+            
+            const isCurrent = (index === workflowData.currentStepIndex && !workflowData.rejected && !isCompleted);
+            const isRejectedStep = index === workflowData.currentStepIndex && workflowData.rejected;
+            
+            let stepClass, dotColor, connectorColor, iconClass, iconColor;
+            if (isRejectedStep) {
+                stepClass = 'rejected';
+                dotColor = '#dc3545';
+                connectorColor = '#dc3545';
+                iconClass = 'la-times';
+                iconColor = '#fff';
+            } else if (isCompleted) {
+                stepClass = 'completed';
+                dotColor = '#007bff';
+                connectorColor = '#007bff';
+                iconClass = 'la-check';
+                iconColor = '#fff';
+            } else if (isCurrent) {
+                stepClass = 'current';
+                dotColor = '#007bff';
+                connectorColor = '#dee2e6';
+                iconClass = 'la-clock';
+                iconColor = '#fff';
+            } else {
+                stepClass = 'pending';
+                dotColor = '#6c757d';
+                connectorColor = '#dee2e6';
+                iconClass = 'la-circle';
+                iconColor = '#6c757d';
+            }
+            
+            const isLast = index === workflowData.steps.length - 1;
+            if (!isLast && isCompleted) {
+                connectorColor = '#007bff';
+            } else if (!isLast) {
+                connectorColor = '#dee2e6';
+            }
+            
+            html += '<div class="workflow-step-item ' + stepClass + '" data-step="' + step.key + '">';
+            html += '<div class="step-dot-wrapper">';
+            if (!isLast) {
+                html += '<div class="step-connector" style="background-color: ' + connectorColor + ';"></div>';
+            }
+            if (stepClass === 'current') {
+                html += '<div class="step-clock"><img src="' + clockIconPath + '" alt="clock" style="width: 40px; height: 40px;" /></div>';
+            } else {
+                html += '<div class="step-dot ' + stepClass + '" style="border-color: ' + dotColor + ';"><i class="la ' + iconClass + '" style="color: ' + iconColor + ' !important;"></i></div>';
+            }
+            html += '</div>';
+            html += '<div class="step-content">';
+            html += '<div class="step-label">' + step.label + '</div>';
+            if (stepDate && isCompleted) {
+                html += '<div class="step-date text-muted small"><i class="la la-calendar"></i> ' + stepDate + '</div>';
+            }
+            if (stepUser && isCompleted) {
+                html += '<div class="step-user text-muted small"><i class="la la-user"></i> ' + stepUser + '</div>';
+            }
+            html += '</div></div>';
+        });
+        
+        html += '</div></div></div></div>';
+        $('#approval-history-content').html(html);
     }
 
     // Global function for print preview modal
@@ -1135,44 +1218,8 @@ $(document).ready(function() {
         });
     }
 
-    function loadApprovalHistory(id, modelType, requestData) {
-        $.ajax({
-            url: '{{ route("approval-center.history") }}',
-            method: 'GET',
-            data: {
-                id: id,
-                model_type: modelType
-            },
-            success: function(history) {
-                renderApprovalHistory(history, requestData);
-            }
-        });
-    }
 
-    function renderApprovalHistory(history, requestData) {
-        // Fallback to table if no workflow data
-        if (history.length === 0) {
-            $('#approval-history-content').html('<div class="text-muted text-center py-3">Chưa có lịch sử phê duyệt</div>');
-            return;
-        }
 
-        let html = '<div class="table-responsive"><table class="table table-sm table-hover">';
-        html += '<thead class="table-light"><tr><th>Tên bước</th><th>Người phê duyệt</th><th>Kết quả</th><th>Nhận xét</th><th>Thời gian</th></tr></thead>';
-        html += '<tbody>';
-
-        history.forEach(function(item) {
-            html += '<tr>';
-            html += '<td>' + item.step_name + '</td>';
-            html += '<td>' + item.approver + '</td>';
-            html += '<td><span class="badge bg-' + item.result_badge + '">' + item.result + '</span></td>';
-            html += '<td>' + (item.comment || '-') + '</td>';
-            html += '<td><small>' + item.time + '<br><span class="text-muted">' + (item.time_relative || '') + '</span></small></td>';
-            html += '</tr>';
-        });
-
-        html += '</tbody></table></div>';
-        $('#approval-history-content').html(html);
-    }
 
 
 

@@ -347,6 +347,7 @@ class ApprovalCenterService
                     'can_reject' => $model->canBeRejected() && $this->canUserApprove($model, $user),
                     'needs_pin' => $needsPin,
                     'is_reviewer_step' => $isReviewerStep && $hasReviewPermission,
+                    'is_reviewer_role' => $hasReviewPermission || $user->hasRole('Thẩm định'),
                     'has_selected_approvers' => $hasSelectedApprovers,
                     'selected_approvers' => $model->selected_approvers ? (is_array($model->selected_approvers) ? $model->selected_approvers : json_decode($model->selected_approvers, true)) : [],
                     'workflow_data' => $this->getWorkflowProgressData($model),

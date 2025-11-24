@@ -29,7 +29,7 @@
                             class="btn btn-sm btn-primary"
                             data-id="{{ $request['id'] }}"
                             data-model-type="{{ $request['model_type'] }}">
-                        <i class="la la-user-plus"></i> Người phê duyệt
+                        <i class="la la-user-plus"></i> {{ (isset($request['is_reviewer_role']) && $request['is_reviewer_role']) ? 'Gửi lên BGD' : 'Người phê duyệt' }}
                     </button>
                 @else
                     {{-- Other steps: show approve button --}}
@@ -38,7 +38,7 @@
                             data-id="{{ $request['id'] }}"
                             data-model-type="{{ $request['model_type'] }}"
                             data-needs-pin="{{ isset($request['needs_pin']) && $request['needs_pin'] === false ? '0' : '1' }}">
-                        <i class="la la-check"></i> Phê duyệt
+                        <i class="la la-check"></i> {{ (isset($request['is_reviewer_role']) && $request['is_reviewer_role']) ? 'Gửi lên BGD' : 'Phê duyệt' }}
                     </button>
                 @endif
             @endif
@@ -58,14 +58,14 @@
         <div class="row mb-4">
             <div class="col-md-6">
                 <div class="mb-3">
-                    <label class="text-muted mb-1 d-block" style="font-size: 0.95rem; font-weight: 500;">Người gửi</label>
-                    <div class="fw-semibold" style="font-size: 0.95rem;">{{ $request['submitted_by'] }}</div>
+                    <label class="mb-1 d-block" style="font-size: 0.95rem; font-weight: 500; color: #6b7280;">Người gửi</label>
+                    <div class="fw-semibold" style="font-size: 0.95rem; color: #1f2937;">{{ $request['submitted_by'] }}</div>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="mb-3">
-                    <label class="text-muted mb-1 d-block" style="font-size: 0.95rem; font-weight: 500;">Đã gửi</label>
-                    <div class="fw-semibold" style="font-size: 0.95rem;">{{ $request['submitted_at'] }}</div>
+                    <label class="mb-1 d-block" style="font-size: 0.95rem; font-weight: 500; color: #6b7280;">Đã gửi</label>
+                    <div class="fw-semibold" style="font-size: 0.95rem; color: #1f2937;">{{ $request['submitted_at'] }}</div>
                 </div>
             </div>
         </div>
@@ -77,8 +77,8 @@
         <div class="row">
             @foreach($request['details'] as $label => $value)
                 <div class="col-md-6 mb-3">
-                    <label class="text-muted mb-1 d-block" style="font-size: 0.95rem; font-weight: 500;">{{ $label }}</label>
-                    <div class="fw-normal" style="font-size: 0.95rem;">{{ $value }}</div>
+                    <label class="mb-1 d-block" style="font-size: 0.95rem; font-weight: 500; color: #6b7280;">{{ $label }}</label>
+                    <div class="fw-normal" style="font-size: 0.95rem; color: #1f2937;">{{ $value }}</div>
                 </div>
             @endforeach
         </div>
