@@ -569,10 +569,10 @@ class ApprovalCenterService
     {
         return [
             'Hình thức nghỉ phép' => $leave->leave_type_text ?? 'N/A',
+            'Lý do nghỉ phép' => $leave->note ?? 'N/A',
             'Thời gian bắt đầu' => $leave->from_date ? $leave->from_date->format('d/m/Y') : 'N/A',
             'Thời gian kết thúc' => $leave->to_date ? $leave->to_date->format('d/m/Y') : 'N/A',
             'Khoảng thời gian' => $this->calculateLeaveDuration($leave),
-            'Lý do nghỉ phép' => $leave->note ?? 'N/A',
         ];
     }
 
