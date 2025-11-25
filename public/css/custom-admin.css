@@ -35,7 +35,7 @@ nav.navbar {
 }
 */
 
-/* THEME 3: Xanh lam đậm (Blue) - Cân bằng 
+/* THEME 3: Xanh lam đậm (Blue) - Cân bằng
 .navbar-header,
 .app-header,
 header.navbar,
@@ -613,3 +613,13 @@ table.table .badge-light {
 
 
 
+.form-check-input {
+    vertical-align: middle !important;
+    margin-top: 0.2em !important; /* Bootstrap default */
+    position: relative !important;
+    top: 0 !important;
+    transform: none !important;
+}
+.form-check-label {
+    vertical-align: middle !important;
+}

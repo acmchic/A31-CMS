@@ -20,14 +20,17 @@
             @endif
             @if($request['can_approve'])
                 @php
-                    $isReviewerStep = (isset($request['is_reviewer_step']) && $request['is_reviewer_step']) ||
-                                      ($request['model_type'] === 'leave' &&
-                                       $request['status'] === 'approved_by_department_head');
+                    $isReviewerStep = isset($request['is_reviewer_step']) && $request['is_reviewer_step'];
                     $isDepartmentHeadStep = (isset($request['is_department_head_step']) && $request['is_department_head_step']) ||
                                             ($request['model_type'] === 'vehicle' &&
                                              $request['status'] === 'dept_review');
                     $hasSelectedApprovers = isset($request['has_selected_approvers']) && $request['has_selected_approvers'];
-                    $showAssignButton = ($isReviewerStep || $isDepartmentHeadStep) && !$hasSelectedApprovers;
+                    $canApproveReviewerStep = isset($request['can_approve_reviewer_step']) ? $request['can_approve_reviewer_step'] : true;
+                    
+                    // Show assign button if at reviewer/department head step and no selected approvers yet
+                    // OR if at reviewer step and cannot approve (missing selected approvers)
+                    $showAssignButton = (($isReviewerStep || $isDepartmentHeadStep) && !$hasSelectedApprovers) ||
+                                       ($isReviewerStep && !$canApproveReviewerStep);
                 @endphp
 
                 @if($showAssignButton)
@@ -38,14 +41,16 @@
                         <i class="la la-user-plus"></i> Người phê duyệt
                     </button>
                 @else
-                    {{-- Other steps: show approve button --}}
-                    <button id="btn-approve"
-                            class="btn btn-sm btn-success"
-                            data-id="{{ $request['id'] }}"
-                            data-model-type="{{ $request['model_type'] }}"
-                            data-needs-pin="{{ isset($request['needs_pin']) && $request['needs_pin'] === false ? '0' : '1' }}">
-                        <i class="la la-check"></i> {{ (isset($request['is_reviewer_role']) && $request['is_reviewer_role']) ? 'Gửi lên BGD' : 'Phê duyệt' }}
-                    </button>
+                    {{-- Show approve button only if can proceed --}}
+                    @if(!$isReviewerStep || ($isReviewerStep && $canApproveReviewerStep))
+                        <button id="btn-approve"
+                                class="btn btn-sm btn-success"
+                                data-id="{{ $request['id'] }}"
+                                data-model-type="{{ $request['model_type'] }}"
+                                data-needs-pin="{{ isset($request['needs_pin']) && $request['needs_pin'] === false ? '0' : '1' }}">
+                            <i class="la la-check"></i> {{ (isset($request['is_reviewer_role']) && $request['is_reviewer_role']) ? 'Gửi lên BGD' : 'Phê duyệt' }}
+                        </button>
+                    @endif
                 @endif
             @endif
             @if($request['can_reject'])

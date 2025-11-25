@@ -275,8 +275,31 @@ class ApprovalCenterService
             })
             ->map(function($leave) use ($user) {
                 $isReviewerStep = $leave->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
-                $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
+                
+                // Check review permission based on employee rank
+                $rankCode = $leave->employee ? $leave->employee->rank_code : null;
+                $isOfficer = $this->isOfficerRank($rankCode);
+                $hasReviewPermission = false;
+                if ($isReviewerStep) {
+                    // At reviewer step, check permission based on rank
+                    $hasReviewPermission = $isOfficer 
+                        ? PermissionHelper::can($user, 'leave.review.officer')
+                        : PermissionHelper::can($user, 'leave.review');
+                }
+                
                 $needsPin = !($isReviewerStep && $hasReviewPermission);
+                $hasSelectedApprovers = !empty($leave->selected_approvers);
+                
+                // At reviewer step: can_approve = true if user has permission (regardless of selected_approvers)
+                // The UI will show appropriate button based on has_selected_approvers
+                // For other steps: normal can_approve logic
+                if ($isReviewerStep && $hasReviewPermission) {
+                    // At reviewer step with permission: always allow approve (UI will handle button type)
+                    $canApprove = $leave->canBeApproved();
+                } else {
+                    // Normal approval logic for other steps
+                    $canApprove = $leave->canBeApproved() && $this->canUserApprove($leave, $user);
+                }
 
                 return [
                     'id' => $leave->id,
@@ -292,11 +315,12 @@ class ApprovalCenterService
                     'created_at' => $leave->created_at,
                     'created_at_formatted' => $this->formatDateWithTimezone($leave->created_at, 'd/m/Y H:i'),
                     'period' => $this->getLeavePeriod($leave),
-                    'can_approve' => $leave->canBeApproved() && $this->canUserApprove($leave, $user),
+                    'can_approve' => $canApprove,
                     'can_reject' => $leave->canBeRejected() && $this->canUserApprove($leave, $user),
                     'needs_pin' => $needsPin,
                     'is_reviewer_step' => $isReviewerStep && $hasReviewPermission,
-                    'has_selected_approvers' => !empty($leave->selected_approvers),
+                    'has_selected_approvers' => $hasSelectedApprovers,
+                    'can_approve_reviewer_step' => ($isReviewerStep && $hasReviewPermission) ? $hasSelectedApprovers : true,
                 ];
             });
     }
@@ -543,9 +567,31 @@ class ApprovalCenterService
 
                 $user = backpack_user();
                 $isReviewerStep = $model->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
-                $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
+                
+                // Check review permission based on employee rank
+                $rankCode = $model->employee ? $model->employee->rank_code : null;
+                $isOfficer = $this->isOfficerRank($rankCode);
+                $hasReviewPermission = false;
+                if ($isReviewerStep) {
+                    // At reviewer step, check permission based on rank
+                    $hasReviewPermission = $isOfficer 
+                        ? PermissionHelper::can($user, 'leave.review.officer')
+                        : PermissionHelper::can($user, 'leave.review');
+                }
+                
                 $needsPin = !($isReviewerStep && $hasReviewPermission);
                 $hasSelectedApprovers = !empty($model->selected_approvers);
+                
+                // At reviewer step: can_approve = true if user has permission (regardless of selected_approvers)
+                // The UI will show "Người phê duyệt" button if no selected_approvers, or "Gửi lên BGD" if has selected_approvers
+                // For other steps: normal can_approve logic
+                if ($isReviewerStep && $hasReviewPermission) {
+                    // At reviewer step with permission: always allow approve (UI will handle button type)
+                    $canApprove = $model->canBeApproved();
+                } else {
+                    // Normal approval logic for other steps
+                    $canApprove = $model->canBeApproved() && $this->canUserApprove($model, $user);
+                }
 
                 return [
                     'id' => $model->id,
@@ -559,7 +605,9 @@ class ApprovalCenterService
                     'submitted_by' => $model->employee ? $model->employee->name : 'N/A',
                     'submitted_at' => $this->formatVietnameseDate($model->created_at),
                     'details' => $this->getLeaveDetails($model),
-                    'can_approve' => $model->canBeApproved() && $this->canUserApprove($model, $user),
+                    'can_approve' => $canApprove,
+                    // Flag to check if at reviewer step and can proceed (has selected approvers)
+                    'can_approve_reviewer_step' => ($isReviewerStep && $hasReviewPermission) ? $hasSelectedApprovers : true,
                     'can_reject' => $model->canBeRejected() && $this->canUserApprove($model, $user),
                     'needs_pin' => $needsPin,
                     'is_reviewer_step' => $isReviewerStep && $hasReviewPermission,

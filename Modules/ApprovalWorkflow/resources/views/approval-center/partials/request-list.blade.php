@@ -78,13 +78,14 @@
 
                     {{-- Content --}}
                     <div class="flex-grow-1" style="min-width: 0;">
-                        {{-- Row 1: Badge trạng thái ở góc phải --}}
+                        {{-- Row 1: Người gửi đơn ở trái, Badge trạng thái ở góc phải --}}
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div style="flex: 1;">
-                                {{-- Chi tiết và khoảng thời gian --}}
+                                {{-- Người gửi đơn --}}
                                 <div class="mb-2">
-                                    <small class="text-muted d-block" style="font-size: 0.875rem;">{{ $request['title'] }}</small>
-                                    <small class="text-muted d-block" style="font-size: 0.875rem;">{{ $request['period'] }}</small>
+                                    <small class="text-muted" style="font-size: 0.875rem; display: flex; align-items: center; gap: 6px;">
+                                        <i class="la la-user"></i> {{ $request['initiated_by'] }}
+                                    </small>
                                 </div>
                             </div>
                             @php
@@ -96,11 +97,12 @@
                             <span class="{{ $badgeClass }}" style="color: white !important;">{{ $statusLabel }}</span>
                         </div>
 
-                        {{-- Row 2: Icon người + tên | Thời gian ở góc phải --}}
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted" style="font-size: 0.875rem; display: flex; align-items: center; gap: 6px;">
-                                <i class="la la-user"></i> {{ $request['initiated_by'] }}
-                            </small>
+                        {{-- Row 2: Loại nghỉ và khoảng thời gian | Thời gian ở góc phải --}}
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div style="flex: 1;">
+                                <small class="text-muted d-block" style="font-size: 0.875rem; margin-bottom: 4px;">Loại nghỉ: {{ $request['title'] }}</small>
+                                <small class="text-muted d-block" style="font-size: 0.875rem; margin-top: 0;">{{ $request['period'] }}</small>
+                            </div>
                             <small class="text-muted" style="font-size: 0.875rem; white-space: nowrap;">{{ $request['created_at_formatted'] }}</small>
                         </div>
                     </div>
@@ -112,12 +114,11 @@
 
 <style>
 .request-item {
-    transition: all 0.2s;
+    transition: border 0.2s;
 }
 
-.request-item:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    transform: translateY(-1px);
+.request-item:hover:not(.active) {
+    border-left: 4px solid #007bff !important;
 }
 
 .request-item.active {

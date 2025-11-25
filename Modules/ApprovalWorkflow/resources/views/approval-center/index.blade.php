@@ -349,6 +349,10 @@
 
 @push('after_scripts')
 <script>
+@php
+    $userHasPin = isset($hasPin) ? $hasPin : (!empty(backpack_user()->certificate_pin));
+@endphp
+const userHasPin = @json($userHasPin);
     /**
      * Generate avatar URL - use existing avatar or create one with last letter of name
      * @param {string} name - Full name of the person
@@ -546,12 +550,46 @@ $(document).ready(function() {
     }
 
     function showBulkApproveModal() {
+        // Check if user has PIN configured
+        if (!userHasPin) {
+            // Show notification if PIN not configured
+            const notificationModal = `
+                <div class="modal fade" id="bulkPinNotificationModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Thông báo</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-warning">
+                                    <p class="mb-0">Bạn chưa cài đặt mã PIN, vui lòng <a href="http://a31.local/account/info" target="_blank" class="alert-link">click vào đây</a> để thiết lập mã PIN cho chữ ký số.</p>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Đã hiểu</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('body').append(notificationModal);
+            $('#bulkPinNotificationModal').modal('show');
+            $('#bulkPinNotificationModal').on('hidden.bs.modal', function() {
+                $(this).remove();
+            });
+            return;
+        }
+
         const requests = [];
-        let hasReviewerStep = false;
+        let reviewerStepCount = 0;
+        let totalCount = 0;
+        
         $('.request-checkbox:checked').each(function() {
+            totalCount++;
             const isReviewerStep = $(this).data('is-reviewer-step') == '1';
             if (isReviewerStep) {
-                hasReviewerStep = true;
+                reviewerStepCount++;
             }
             requests.push({
                 id: $(this).val(),
@@ -565,11 +603,15 @@ $(document).ready(function() {
             });
         });
 
-        // If has reviewer step requests, show approver selection modal instead
-        if (hasReviewerStep) {
+        // If ALL selected requests are at reviewer step, show approver selection modal (bulk thẩm định)
+        // Otherwise, show normal bulk approve modal
+        if (totalCount > 0 && reviewerStepCount === totalCount) {
+            // All requests are at reviewer step - show bulk assign approvers modal (thẩm định)
             showBulkAssignApproversModal(requests);
             return;
         }
+        
+        // If mixed (some reviewer step, some not) or all non-reviewer step, show normal bulk approve modal
 
         let modalHtml = `
             <div class="modal fade" id="bulkApproveModal" tabindex="-1" data-bs-backdrop="static">
@@ -963,9 +1005,11 @@ $(document).ready(function() {
         const id = $(this).data('id');
         const modelType = $(this).data('model-type');
 
-        // Update active state
-        $('.request-item').removeClass('active');
-        $(this).addClass('active');
+        // Remove active class from ALL request items first
+        $('.request-item').removeClass('active border-primary');
+        
+        // Add active class only to clicked item
+        $(this).addClass('active border-primary');
 
         // Load details
         loadRequestDetails(id, modelType);
@@ -1391,6 +1435,37 @@ $(document).ready(function() {
     });
 
     function showPinModal(id, modelType) {
+        // Check if user has PIN configured
+        if (!userHasPin) {
+            // Show notification if PIN not configured
+            const notificationModal = `
+                <div class="modal fade" id="pinNotificationModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Thông báo</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-warning">
+                                    <p class="mb-0">Bạn chưa cài đặt mã PIN, vui lòng <a href="http://a31.local/account/info" target="_blank" class="alert-link">click vào đây</a> để thiết lập mã PIN cho chữ ký số.</p>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Đã hiểu</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('body').append(notificationModal);
+            $('#pinNotificationModal').modal('show');
+            $('#pinNotificationModal').on('hidden.bs.modal', function() {
+                $(this).remove();
+            });
+            return;
+        }
+
         // Show PIN input modal
         const modal = `
             <div class="modal fade" id="pinModal" tabindex="-1">
@@ -1563,7 +1638,7 @@ $(document).ready(function() {
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
                             <button type="button" class="btn btn-primary" id="confirm-bulk-assign-approvers" disabled>
-                                Xác nhận và gửi lên BGD
+                                Gửi lên Ban giám đốc
                             </button>
                         </div>
                     </div>

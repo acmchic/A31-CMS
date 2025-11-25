@@ -73,6 +73,9 @@ class ApprovalCenterController extends Controller
         // Get pending counts by type for badge display
         $pendingCounts = $this->service->getPendingCountsByType($user);
 
+        // Check if user has PIN configured
+        $hasPin = !empty($user->certificate_pin);
+
         return view('approvalworkflow::approval-center.index', [
             'requests' => $requests,
             'selectedRequest' => $selectedRequest,
@@ -83,6 +86,7 @@ class ApprovalCenterController extends Controller
             ],
             'departmentName' => $departmentName,
             'pendingCounts' => $pendingCounts,
+            'hasPin' => $hasPin,
         ]);
     }
 

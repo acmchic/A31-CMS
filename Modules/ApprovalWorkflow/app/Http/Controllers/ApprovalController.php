@@ -128,6 +128,14 @@ class ApprovalController extends Controller
                         'message' => 'Chỉ có thể gửi lên BGD khi đơn ở trạng thái đã được Trưởng phòng xác nhận'
                     ], 400);
                 }
+                
+                // Validate: must have selected_approvers before sending to BGD
+                if (empty($model->selected_approvers)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Vui lòng chọn người phê duyệt (Ban Giám đốc) trước khi chuyển đơn lên BGD'
+                    ], 400);
+                }
             }
 
             // Approve without signature (just workflow update)
