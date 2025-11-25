@@ -1,16 +1,40 @@
 <div class="nav-item dropdown">
     <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown" aria-label="Open user menu">
-        @if(backpack_user()->profile_photo_url)
-            {{-- Show uploaded profile photo --}}
-            <img src="{{ backpack_user()->profile_photo_url }}" 
-                 alt="{{ backpack_user()->name }}" 
+        @php
+            $user = backpack_user();
+            $profilePhotoUrl = $user->profile_photo_url;
+            // Get first letter of last word for avatar initial
+            $name = $user->name ?? '';
+            $avatarInitial = '?';
+            if (!empty($name)) {
+                $words = array_filter(explode(' ', trim($name)));
+                if (!empty($words)) {
+                    $lastWord = end($words);
+                    if (mb_strlen($lastWord) > 0) {
+                        $avatarInitial = mb_strtoupper(mb_substr($lastWord, 0, 1, 'UTF-8'), 'UTF-8');
+                    }
+                }
+                if ($avatarInitial === '?') {
+                    $avatarInitial = mb_strtoupper(mb_substr($name, 0, 1, 'UTF-8'), 'UTF-8');
+                }
+            }
+        @endphp
+        @if($profilePhotoUrl)
+            {{-- Show uploaded profile photo with fallback on error --}}
+            <img src="{{ $profilePhotoUrl }}" 
+                 alt="{{ $user->name }}" 
                  class="avatar avatar-sm rounded-circle"
-                 style="width: 32px; height: 32px; object-fit: cover; border: 2px solid #fff;">
+                 style="width: 32px; height: 32px; object-fit: cover; border: 2px solid #fff;"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <span class="avatar avatar-sm rounded-circle bg-primary d-flex align-items-center justify-content-center" 
+                  style="width: 32px; height: 32px; display: none;">
+                <span class="text-white fw-bold">{{ $avatarInitial }}</span>
+            </span>
         @else
             {{-- Show initial letter if no photo --}}
             <span class="avatar avatar-sm rounded-circle bg-primary d-flex align-items-center justify-content-center" 
                   style="width: 32px; height: 32px;">
-                <span class="text-white fw-bold">{{ backpack_user()->getAttribute('name') ? mb_substr(backpack_user()->name, 0, 1, 'UTF-8') : 'A' }}</span>
+                <span class="text-white fw-bold">{{ $avatarInitial }}</span>
             </span>
         @endif
         <div class="d-none d-xl-block ps-2">

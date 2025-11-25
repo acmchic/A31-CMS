@@ -113,6 +113,25 @@
 @endif
 
 <style>
+/* Global CSS - Căn chỉnh tất cả checkbox với label trong toàn bộ trang */
+.form-check-input {
+    vertical-align: middle !important;
+    margin-top: 0 !important;
+    margin-right: 0.5rem !important;
+}
+
+.form-check-label {
+    vertical-align: middle !important;
+    margin-bottom: 0 !important;
+    cursor: pointer !important;
+}
+
+.form-check {
+    display: flex !important;
+    align-items: center !important;
+    min-height: auto !important;
+}
+
 .request-item {
     transition: border 0.2s;
 }

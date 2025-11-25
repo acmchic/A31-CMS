@@ -231,13 +231,47 @@ class User extends Authenticatable
 
     /**
      * Get the profile photo URL
+     * Only return URL if file actually exists
      */
     public function getProfilePhotoUrlAttribute()
     {
-        if ($this->profile_photo_path) {
+        if ($this->profile_photo_path && \Storage::disk('public')->exists($this->profile_photo_path)) {
             return \Storage::url($this->profile_photo_path);
         }
         return null;
+    }
+    
+    /**
+     * Get the first letter of the last word in name for avatar
+     * Example: "Ban Giám Đốc" => "Đ", "Bùi Tân Chinh" => "C"
+     */
+    public function getAvatarInitialAttribute()
+    {
+        $name = $this->name ?? '';
+        if (empty($name)) {
+            return '?';
+        }
+        
+        // Split by spaces and get last word
+        $words = array_filter(explode(' ', trim($name)));
+        if (empty($words)) {
+            return '?';
+        }
+        
+        $lastWord = end($words);
+        
+        // Get first letter of last word
+        if (mb_strlen($lastWord) > 0) {
+            $firstChar = mb_substr($lastWord, 0, 1, 'UTF-8');
+            return mb_strtoupper($firstChar, 'UTF-8');
+        }
+        
+        // Fallback to first letter of full name
+        if (mb_strlen($name) > 0) {
+            return mb_strtoupper(mb_substr($name, 0, 1, 'UTF-8'), 'UTF-8');
+        }
+        
+        return '?';
     }
 
     /**

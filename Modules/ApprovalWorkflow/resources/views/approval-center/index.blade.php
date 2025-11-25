@@ -126,6 +126,25 @@
 
 @push('after_styles')
 <style>
+/* Global CSS - Căn chỉnh tất cả checkbox với label trong toàn bộ trang */
+.form-check-input {
+    vertical-align: middle !important;
+    margin-top: 0 !important;
+    margin-right: 0.5rem !important;
+}
+
+.form-check-label {
+    vertical-align: middle !important;
+    margin-bottom: 0 !important;
+    cursor: pointer !important;
+}
+
+.form-check {
+    display: flex !important;
+    align-items: center !important;
+    min-height: auto !important;
+}
+
 .placeholder {
     display: inline-block;
     min-height: 1em;
@@ -360,29 +379,60 @@ const userHasPin = @json($userHasPin);
      * @returns {string} Avatar URL (either existing or generated data URI)
      */
     function getAvatarUrl(name, avatarUrl) {
-        // If avatar exists in database, use it
+        // If avatar exists in database, return it (will handle error with onerror if file doesn't exist)
         if (avatarUrl && avatarUrl.trim() !== '') {
             return avatarUrl;
         }
         
-        // Extract last letter from name (after removing spaces and special characters)
-        // Get the last meaningful character
-        const cleanedName = name.trim();
-        let lastLetter = '';
+        // Extract first letter of LAST word from name
+        // Example: "Ban Giám Đốc" => "Đ" (first letter of "Đốc")
+        // Example: "Bùi Tân Chinh" => "C" (first letter of "Chinh")
+        return getInitialAvatarUrl(name);
+    }
+    
+    function getInitialAvatarUrl(name) {
+        const cleanedName = name ? name.trim() : '';
+        if (!cleanedName) {
+            return generateAvatarSvg('?');
+        }
         
-        // Find last letter/number (skip spaces and punctuation)
-        for (let i = cleanedName.length - 1; i >= 0; i--) {
-            const char = cleanedName[i];
+        // Split by spaces and get last word
+        const words = cleanedName.split(/\s+/).filter(word => word.length > 0);
+        if (words.length === 0) {
+            return generateAvatarSvg('?');
+        }
+        
+        const lastWord = words[words.length - 1];
+        
+        // Get first letter of last word
+        let firstLetter = '';
+        for (let i = 0; i < lastWord.length; i++) {
+            const char = lastWord[i];
             if (/[a-zA-Z0-9À-ỹ]/.test(char)) {
-                lastLetter = char.toUpperCase();
+                firstLetter = char.toUpperCase();
                 break;
             }
         }
         
-        // Fallback to first letter if no valid last letter found
-        if (!lastLetter) {
-            lastLetter = cleanedName.length > 0 ? cleanedName[0].toUpperCase() : '?';
+        // Fallback to first letter of full name if no valid letter found
+        if (!firstLetter) {
+            for (let i = 0; i < cleanedName.length; i++) {
+                const char = cleanedName[i];
+                if (/[a-zA-Z0-9À-ỹ]/.test(char)) {
+                    firstLetter = char.toUpperCase();
+                    break;
+                }
+            }
         }
+        
+        if (!firstLetter) {
+            firstLetter = '?';
+        }
+        
+        return generateAvatarSvg(firstLetter);
+    }
+    
+    function generateAvatarSvg(letter) {
         
         // Generate a consistent color based on the letter (using simple hash)
         const colors = [
@@ -391,7 +441,7 @@ const userHasPin = @json($userHasPin);
             '#EC7063', '#5DADE2', '#58D68D', '#F4D03F', '#AF7AC5',
             '#85C1E9', '#F1948A', '#82E0AA', '#F9E79F', '#D2B4DE'
         ];
-        const colorIndex = lastLetter.charCodeAt(0) % colors.length;
+        const colorIndex = letter.charCodeAt(0) % colors.length;
         const backgroundColor = colors[colorIndex];
         
         // Calculate text color (white or black based on background brightness)
@@ -409,7 +459,7 @@ const userHasPin = @json($userHasPin);
             '<rect width="' + size + '" height="' + size + '" fill="' + backgroundColor + '"/>' +
             '<text x="50%" y="50%" font-family="Arial, sans-serif" font-size="' + fontSize + '" ' +
             'font-weight="bold" fill="' + textColor + '" text-anchor="middle" ' +
-            'dominant-baseline="central">' + lastLetter + '</text>' +
+            'dominant-baseline="central">' + letter + '</text>' +
             '</svg>';
         
         return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
@@ -1568,7 +1618,9 @@ $(document).ready(function() {
                     <div class="form-check d-flex align-items-center">
                         <input class="form-check-input bulk-approver-checkbox" type="checkbox" value="${director.id}" id="bulk_approver_${director.id}">
                         <label class="form-check-label d-flex align-items-center ms-2" for="bulk_approver_${director.id}" style="cursor: pointer; width: 100%;">
-                            <img src="${avatar}" alt="${director.name}" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                            <img src="${avatar}" alt="${director.name}" class="rounded-circle me-2 avatar-img" style="width: 32px; height: 32px; object-fit: cover;" 
+                                 data-name="${director.name}" 
+                                 onerror="this.onerror=null; this.src=getInitialAvatarUrl('${director.name}');">
                             <span>${director.name}</span>
                         </label>
                     </div>
@@ -1699,7 +1751,9 @@ $(document).ready(function() {
                     const avatar = getAvatarUrl(approver.name, director ? director.avatar : null);
                     selectedHtml += `
                         <div class="mb-2 p-2 border rounded d-flex align-items-center">
-                            <img src="${avatar}" alt="${approver.name}" class="rounded-circle me-2" style="width: 24px; height: 24px; object-fit: cover;">
+                            <img src="${avatar}" alt="${approver.name}" class="rounded-circle me-2 avatar-img" style="width: 24px; height: 24px; object-fit: cover;" 
+                                 data-name="${approver.name}" 
+                                 onerror="this.onerror=null; this.src=getInitialAvatarUrl('${approver.name}');">
                             <span>${approver.name}</span>
                         </div>
                     `;
@@ -1812,7 +1866,9 @@ $(document).ready(function() {
                     <div class="form-check d-flex align-items-center">
                         <input class="form-check-input approver-checkbox" type="checkbox" value="${director.id}" id="approver_${director.id}">
                         <label class="form-check-label d-flex align-items-center ms-2" for="approver_${director.id}" style="cursor: pointer; width: 100%;">
-                            <img src="${avatar}" alt="${director.name}" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                            <img src="${avatar}" alt="${director.name}" class="rounded-circle me-2 avatar-img" style="width: 32px; height: 32px; object-fit: cover;" 
+                                 data-name="${director.name}" 
+                                 onerror="this.onerror=null; this.src=getInitialAvatarUrl('${director.name}');">
                             <span>${director.name}</span>
                         </label>
                     </div>
