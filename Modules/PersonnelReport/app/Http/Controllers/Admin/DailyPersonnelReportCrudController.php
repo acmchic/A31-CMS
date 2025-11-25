@@ -591,7 +591,24 @@ class DailyPersonnelReportCrudController extends CrudController
         
         // Kiểm tra nếu ngày báo cáo là quá khứ (trước ngày hiện tại)
         // So sánh với start of today để chính xác hơn
-        $reportDateCarbon = \Carbon\Carbon::parse($reportDate)->startOfDay();
+        // Try to parse date - support both Y-m-d and d/m/Y formats
+        try {
+            // First try d/m/Y format (from Flatpickr)
+            if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $reportDate)) {
+                $reportDateCarbon = \Carbon\Carbon::createFromFormat('d/m/Y', $reportDate)->startOfDay();
+                // Convert to Y-m-d format for consistency
+                $reportDate = $reportDateCarbon->format('Y-m-d');
+            } else {
+                // Try Y-m-d format (default)
+                $reportDateCarbon = \Carbon\Carbon::parse($reportDate)->startOfDay();
+                // Ensure format is Y-m-d
+                $reportDate = $reportDateCarbon->format('Y-m-d');
+            }
+        } catch (\Exception $e) {
+            // Fallback to today if parsing fails
+            $reportDateCarbon = \Carbon\Carbon::today()->startOfDay();
+            $reportDate = $reportDateCarbon->format('Y-m-d');
+        }
         $todayCarbon = \Carbon\Carbon::today()->startOfDay();
         $isReadOnly = $reportDateCarbon->lt($todayCarbon); // Less than today = past date
         

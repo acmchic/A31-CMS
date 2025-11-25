@@ -735,9 +735,30 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function changeDate() {
-    const date = document.getElementById('report-date-input').value;
-    if (date) {
-        window.location.href = '{{ backpack_url("daily-personnel-report/create-2") }}?report_date=' + date;
+    const dateInput = document.getElementById('report-date-input');
+    let dateValue = dateInput.value;
+    
+    // If Flatpickr is initialized, get the Y-m-d format value
+    if (dateInput._flatpickr && dateInput._flatpickr.selectedDates.length > 0) {
+        const date = dateInput._flatpickr.selectedDates[0];
+        dateValue = date.getFullYear() + '-' + 
+                   String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+                   String(date.getDate()).padStart(2, '0');
+    } else if (dateInput.getAttribute('data-ymd-value')) {
+        dateValue = dateInput.getAttribute('data-ymd-value');
+    } else if (dateValue) {
+        // Try to parse d/m/Y format and convert to Y-m-d
+        const parts = dateValue.split('/');
+        if (parts.length === 3) {
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            const year = parts[2];
+            dateValue = year + '-' + month + '-' + day;
+        }
+    }
+    
+    if (dateValue) {
+        window.location.href = '{{ backpack_url("daily-personnel-report/create-2") }}?report_date=' + dateValue;
     }
 }
 
@@ -1007,7 +1028,29 @@ if (reportForm) {
         }
         
         document.getElementById('hidden-absent-employees').value = JSON.stringify(absentEmployees);
-        document.getElementById('hidden-report-date').value = document.getElementById('report-date-input').value;
+        const dateInput = document.getElementById('report-date-input');
+        let dateValue = dateInput.value;
+        
+        // If Flatpickr is initialized, get the Y-m-d format value
+        if (dateInput._flatpickr && dateInput._flatpickr.selectedDates.length > 0) {
+            const date = dateInput._flatpickr.selectedDates[0];
+            dateValue = date.getFullYear() + '-' + 
+                       String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+                       String(date.getDate()).padStart(2, '0');
+        } else if (dateInput.getAttribute('data-ymd-value')) {
+            dateValue = dateInput.getAttribute('data-ymd-value');
+        } else if (dateValue) {
+            // Try to parse d/m/Y format and convert to Y-m-d
+            const parts = dateValue.split('/');
+            if (parts.length === 3) {
+                const day = parts[0].padStart(2, '0');
+                const month = parts[1].padStart(2, '0');
+                const year = parts[2];
+                dateValue = year + '-' + month + '-' + day;
+            }
+        }
+        
+        document.getElementById('hidden-report-date').value = dateValue;
     });
 }
 </script>
