@@ -64,6 +64,7 @@
                                    data-title="{{ $request['title'] }}"
                                    data-type="{{ $request['type_label'] }}"
                                    data-status="{{ $request['status_label'] }}"
+                                   data-status-badge="{{ $request['status_badge'] ?? 'secondary' }}"
                                    data-initiated-by="{{ $request['initiated_by'] }}"
                                    data-is-reviewer-step="{{ $isReviewerStep ? '1' : '0' }}">
                         @else
@@ -77,32 +78,30 @@
 
                     {{-- Content --}}
                     <div class="flex-grow-1" style="min-width: 0;">
+                        {{-- Row 1: Badge trạng thái ở góc phải --}}
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div>
-                                <span class="badge bg-{{ $request['status_badge'] }} mb-1">{{ $request['status_label'] }}</span>
-                                <h6 class="mb-1">{{ $request['type_label'] }}</h6>
+                            <div style="flex: 1;">
+                                {{-- Chi tiết và khoảng thời gian --}}
+                                <div class="mb-2">
+                                    <small class="text-muted d-block" style="font-size: 0.875rem;">{{ $request['title'] }}</small>
+                                    <small class="text-muted d-block" style="font-size: 0.875rem;">{{ $request['period'] }}</small>
+                                </div>
                             </div>
-                            <small class="text-muted">{{ $request['created_at_formatted'] }}</small>
+                            @php
+                                // Get Tabler badge class based on status
+                                $statusLabel = $request['status_label'] ?? '';
+                                $statusBadge = $request['status_badge'] ?? 'secondary';
+                                $badgeClass = "badge bg-{$statusBadge} text-white";
+                            @endphp
+                            <span class="{{ $badgeClass }}" style="color: white !important;">{{ $statusLabel }}</span>
                         </div>
 
-                        <div class="mb-2">
-                            <small class="text-muted d-block">{{ $request['title'] }}</small>
-                            <small class="text-muted d-block">{{ $request['period'] }}</small>
-                        </div>
-
+                        {{-- Row 2: Icon người + tên | Thời gian ở góc phải --}}
                         <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">
+                            <small class="text-muted" style="font-size: 0.875rem; display: flex; align-items: center; gap: 6px;">
                                 <i class="la la-user"></i> {{ $request['initiated_by'] }}
                             </small>
-                            <div>
-                                @if($needsApproverSelection)
-                                    <span class="badge bg-warning text-dark">
-                                        <i class="la la-user-plus"></i> Chọn phê duyệt
-                                    </span>
-                                @elseif($request['can_approve'] || $request['can_reject'])
-                                    <span class="badge bg-info">Cần xử lý</span>
-                                @endif
-                            </div>
+                            <small class="text-muted" style="font-size: 0.875rem; white-space: nowrap;">{{ $request['created_at_formatted'] }}</small>
                         </div>
                     </div>
                 </div>

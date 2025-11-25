@@ -1,8 +1,12 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <div>
-            <h5 class="mb-0">{{ $request['type_label'] ?? $request['type'] }}</h5>
-            <span class="badge bg-{{ $request['status_badge'] }}">{{ $request['status_label'] }}</span>
+        <div class="d-flex align-items-center justify-content-between" style="gap: 12px;">
+            <h5 class="mb-0" style="font-size: 1.25rem; font-weight: 600; padding-right: 12px;">{{ $request['type_label'] ?? $request['type'] }}</h5>
+            @php
+                $statusBadge = $request['status_badge'] ?? 'secondary';
+                $badgeClass = "badge bg-{$statusBadge} text-white badge-pill";
+            @endphp
+            <span class="{{ $badgeClass }}" style="padding: 6px 12px;">{{ $request['status_label'] }}</span>
         </div>
         <div class="d-flex align-items-center gap-2">
             @if(isset($request['has_signed_pdf']) && $request['has_signed_pdf'] && isset($request['pdf_url']))

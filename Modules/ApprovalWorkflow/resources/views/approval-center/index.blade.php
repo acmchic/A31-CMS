@@ -23,7 +23,10 @@
             @php
                 $user = backpack_user();
                 $leaveCount = 0;
-                if ($user->hasRole('Admin') || \App\Helpers\PermissionHelper::can($user, 'leave.review')) {
+                $hasReviewPermission = \App\Helpers\PermissionHelper::can($user, 'leave.review');
+                $hasOfficerReviewPermission = \App\Helpers\PermissionHelper::can($user, 'leave.review.officer');
+                
+                if ($user->hasRole('Admin') || $hasReviewPermission || $hasOfficerReviewPermission) {
                     $leaveCount = $pendingCounts['leave']['review'] ?? 0;
                 } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
                     $leaveCount = $pendingCounts['leave']['director'] ?? 0;
@@ -32,7 +35,7 @@
                 }
 
                 $vehicleCount = 0;
-                if ($user->hasRole('Admin') || \App\Helpers\PermissionHelper::can($user, 'leave.review')) {
+                if ($user->hasRole('Admin') || $hasReviewPermission || $hasOfficerReviewPermission) {
                     $vehicleCount = $pendingCounts['vehicle']['review'] ?? 0;
                 } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
                     $vehicleCount = $pendingCounts['vehicle']['director'] ?? 0;
@@ -72,31 +75,29 @@
     <!-- Middle Column: Filters and Request List -->
     <div class="col-md-4 border-end" style="overflow-y: auto; max-height: 100%;">
         <!-- Filters -->
-        <div class="card mb-3">
-            <div class="card-body">
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-6">
-                        <label class="form-label small text-muted mb-1">Trạng thái</label>
-                        <select id="filter-status" class="form-select">
-                            <option value="all" {{ $filters['status'] === 'all' ? 'selected' : '' }}>Tất cả</option>
-                            <option value="pending" {{ $filters['status'] === 'pending' ? 'selected' : '' }}>Chỉ huy xác nhận</option>
-                            <option value="approved_by_department_head" {{ $filters['status'] === 'approved_by_department_head' ? 'selected' : '' }}>Thẩm định</option>
-                            <option value="approved_by_reviewer" {{ $filters['status'] === 'approved_by_reviewer' ? 'selected' : '' }}>BGD phê duyệt</option>
-                            <option value="completed" {{ $filters['status'] === 'completed' ? 'selected' : '' }}>Hoàn tất</option>
-                            <option value="rejected" {{ $filters['status'] === 'rejected' ? 'selected' : '' }}>Đã từ chối</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small text-muted mb-1">Thời gian</label>
-                        <select id="filter-time" class="form-select">
-                            <option value="all" {{ $filters['time_range'] === 'all' ? 'selected' : '' }}>Tất cả</option>
-                            <option value="today" {{ $filters['time_range'] === 'today' ? 'selected' : '' }}>Hôm nay</option>
-                            <option value="week" {{ $filters['time_range'] === 'week' ? 'selected' : '' }}>Tuần này</option>
-                            <option value="month" {{ $filters['time_range'] === 'month' ? 'selected' : '' }}>Tháng này</option>
-                        </select>
-                    </div>
-                </div>
+        <div class="filter-bar" style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 16px; background: #f8f9fa;">
+            <div class="filter-dropdown-wrapper">
+                <select id="filter-time" class="filter-dropdown">
+                    <option value="all" {{ $filters['time_range'] === 'all' ? 'selected' : '' }}>Tất cả thời gian</option>
+                    <option value="today" {{ $filters['time_range'] === 'today' ? 'selected' : '' }}>Hôm nay</option>
+                    <option value="week" {{ $filters['time_range'] === 'week' ? 'selected' : '' }}>Tuần này</option>
+                    <option value="month" {{ $filters['time_range'] === 'month' ? 'selected' : '' }}>Tháng này</option>
+                </select>
+                <i class="la la-angle-down filter-dropdown-icon"></i>
             </div>
+            <div class="filter-dropdown-wrapper">
+                <select id="filter-status" class="filter-dropdown">
+                    <option value="all" {{ $filters['status'] === 'all' ? 'selected' : '' }}>Tất cả trạng thái</option>
+                    <option value="pending" {{ $filters['status'] === 'pending' ? 'selected' : '' }}>Chỉ huy xác nhận</option>
+                    <option value="approved_by_department_head" {{ $filters['status'] === 'approved_by_department_head' ? 'selected' : '' }}>Thẩm định</option>
+                    <option value="approved_by_reviewer" {{ $filters['status'] === 'approved_by_reviewer' ? 'selected' : '' }}>BGD phê duyệt</option>
+                    <option value="completed" {{ $filters['status'] === 'completed' ? 'selected' : '' }}>Hoàn tất</option>
+                    <option value="rejected" {{ $filters['status'] === 'rejected' ? 'selected' : '' }}>Đã từ chối</option>
+                </select>
+                <i class="la la-angle-down filter-dropdown-icon"></i>
+            </div>
+            <div style="flex: 1;"></div>
+            <i class="la la-filter" style="color: #6c757d; font-size: 1.2rem; cursor: pointer;"></i>
         </div>
 
         <!-- Request List -->
@@ -183,11 +184,82 @@
     flex-shrink: 0;
 }
 
-/* Improve select dropdowns */
+/* Filter bar styling */
+.filter-bar {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #f8f9fa;
+}
+
+.filter-dropdown-wrapper {
+    position: relative;
+    display: inline-block;
+    min-width: 150px;
+}
+
+.filter-dropdown {
+    border: none;
+    background: transparent;
+    color: #495057;
+    font-size: 0.9rem;
+    padding: 4px 28px 4px 4px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    outline: none;
+    transition: color 0.2s;
+    width: 100%;
+    min-width: 150px;
+    position: relative;
+    z-index: 1;
+}
+
+.filter-dropdown-icon {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #495057;
+    font-size: 0.85rem;
+    z-index: 0;
+}
+
+.filter-dropdown:hover {
+    color: #212529;
+}
+
+.filter-dropdown:hover + .filter-dropdown-icon {
+    color: #212529;
+}
+
+.filter-dropdown:focus {
+    color: #212529;
+}
+
+.filter-dropdown:focus + .filter-dropdown-icon {
+    color: #212529;
+}
+
+/* Ensure dropdown options are visible */
+.filter-dropdown option {
+    background: white;
+    color: #495057;
+    padding: 8px;
+}
+
+/* Improve select dropdowns - keep for backward compatibility */
 #filter-status, #filter-time {
-    font-size: 0.95rem;
-    padding: 0.5rem 0.75rem;
-    min-height: 38px;
+    font-size: 0.9rem;
+    padding: 4px 28px 4px 4px;
+    border: none;
+    background: transparent;
+    color: #495057;
+    min-width: 150px;
 }
 
 /* Better spacing for detail view */
@@ -277,6 +349,68 @@
 
 @push('after_scripts')
 <script>
+    /**
+     * Generate avatar URL - use existing avatar or create one with last letter of name
+     * @param {string} name - Full name of the person
+     * @param {string|null} avatarUrl - Existing avatar URL from database, can be null
+     * @returns {string} Avatar URL (either existing or generated data URI)
+     */
+    function getAvatarUrl(name, avatarUrl) {
+        // If avatar exists in database, use it
+        if (avatarUrl && avatarUrl.trim() !== '') {
+            return avatarUrl;
+        }
+        
+        // Extract last letter from name (after removing spaces and special characters)
+        // Get the last meaningful character
+        const cleanedName = name.trim();
+        let lastLetter = '';
+        
+        // Find last letter/number (skip spaces and punctuation)
+        for (let i = cleanedName.length - 1; i >= 0; i--) {
+            const char = cleanedName[i];
+            if (/[a-zA-Z0-9À-ỹ]/.test(char)) {
+                lastLetter = char.toUpperCase();
+                break;
+            }
+        }
+        
+        // Fallback to first letter if no valid last letter found
+        if (!lastLetter) {
+            lastLetter = cleanedName.length > 0 ? cleanedName[0].toUpperCase() : '?';
+        }
+        
+        // Generate a consistent color based on the letter (using simple hash)
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+            '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52BE80',
+            '#EC7063', '#5DADE2', '#58D68D', '#F4D03F', '#AF7AC5',
+            '#85C1E9', '#F1948A', '#82E0AA', '#F9E79F', '#D2B4DE'
+        ];
+        const colorIndex = lastLetter.charCodeAt(0) % colors.length;
+        const backgroundColor = colors[colorIndex];
+        
+        // Calculate text color (white or black based on background brightness)
+        const hex = backgroundColor.replace('#', '');
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        const textColor = brightness > 128 ? '#000000' : '#FFFFFF';
+        
+        // Create SVG data URI (using URL encoding for better compatibility)
+        const size = 100;
+        const fontSize = 40;
+        const svg = '<svg width="' + size + '" height="' + size + '" xmlns="http://www.w3.org/2000/svg">' +
+            '<rect width="' + size + '" height="' + size + '" fill="' + backgroundColor + '"/>' +
+            '<text x="50%" y="50%" font-family="Arial, sans-serif" font-size="' + fontSize + '" ' +
+            'font-weight="bold" fill="' + textColor + '" text-anchor="middle" ' +
+            'dominant-baseline="central">' + lastLetter + '</text>' +
+            '</svg>';
+        
+        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+
 $(document).ready(function() {
     // Setup print button handler at document level (event delegation)
     $(document).off('click', '#btn-print-pdf').on('click', '#btn-print-pdf', function(e) {
@@ -425,6 +559,7 @@ $(document).ready(function() {
                 title: $(this).data('title'),
                 type: $(this).data('type'),
                 status: $(this).data('status'),
+                status_badge: $(this).data('status-badge') || 'secondary',
                 initiated_by: $(this).data('initiated-by'),
                 is_reviewer_step: isReviewerStep
             });
@@ -469,7 +604,7 @@ $(document).ready(function() {
                                             <td><span class="badge bg-primary">${req.type}</span></td>
                                             <td>${req.title}</td>
                                             <td><i class="la la-user"></i> ${req.initiated_by}</td>
-                                            <td><span class="badge bg-info">${req.status}</span></td>
+                                            <td><span class="badge bg-${req.status_badge || 'info'} text-white badge-pill">${req.status}</span></td>
                                         </tr>
             `;
         });
@@ -953,7 +1088,7 @@ $(document).ready(function() {
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <div>
                         <h5 class="mb-0">${request.type_label || request.type}</h5>
-                        <span class="badge bg-${request.status_badge}">${request.status_label}</span>
+                        <span class="badge bg-${request.status_badge} text-white badge-pill">${request.status_label}</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
         `;
@@ -1352,7 +1487,7 @@ $(document).ready(function() {
     function renderBulkAssignApproversModal(requests, directors) {
         let directorsHtml = '';
         directors.forEach(function(director) {
-            const avatar = director.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(director.name) + '&background=random';
+            const avatar = getAvatarUrl(director.name, director.avatar);
             directorsHtml += `
                 <div class="member-item mb-2 p-2 border rounded" style="cursor: pointer;" data-id="${director.id}">
                     <div class="form-check d-flex align-items-center">
@@ -1440,8 +1575,9 @@ $(document).ready(function() {
         $('body').append(modal);
         $('#bulkAssignApproversModal').modal('show');
 
-        // Store requests in modal data
+        // Store requests and directors in modal data
         $('#bulkAssignApproversModal').data('requests', requests);
+        $('#bulkAssignApproversModal').data('directors', directors);
 
         // Search functionality
         $('#bulk-search-approvers').on('input', function() {
@@ -1480,8 +1616,12 @@ $(document).ready(function() {
                 $('#confirm-bulk-assign-approvers').prop('disabled', true);
             } else {
                 let selectedHtml = '';
+                // Get directors from modal data
+                const modalDirectors = $('#bulkAssignApproversModal').data('directors') || [];
                 selectedApprovers.forEach(function(approver) {
-                    const avatar = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(approver.name) + '&background=random';
+                    // Find director data to get avatar if available
+                    const director = modalDirectors.find(d => String(d.id) === String(approver.id));
+                    const avatar = getAvatarUrl(approver.name, director ? director.avatar : null);
                     selectedHtml += `
                         <div class="mb-2 p-2 border rounded d-flex align-items-center">
                             <img src="${avatar}" alt="${approver.name}" class="rounded-circle me-2" style="width: 24px; height: 24px; object-fit: cover;">
@@ -1591,7 +1731,7 @@ $(document).ready(function() {
     function renderAssignApproversModal(id, modelType, directors) {
         let directorsHtml = '';
         directors.forEach(function(director) {
-            const avatar = director.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(director.name) + '&background=random';
+            const avatar = getAvatarUrl(director.name, director.avatar);
             directorsHtml += `
                 <div class="member-item mb-2 p-2 border rounded" style="cursor: pointer;" data-id="${director.id}">
                     <div class="form-check d-flex align-items-center">

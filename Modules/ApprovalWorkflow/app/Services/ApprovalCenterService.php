@@ -11,6 +11,38 @@ use Carbon\Carbon;
 class ApprovalCenterService
 {
     /**
+     * Check if rank_code is an officer rank (only numbers and slashes, no CN/QN text)
+     * Sĩ quan: 1//, 2//, 3//, 1/, etc. (only numbers and /, //, ///, ////)
+     * Nhân viên: CNQP, QNCN, 1//CN, 2/CN, etc. (has CN, QN or other text)
+     * 
+     * @param string|null $rankCode
+     * @return bool
+     */
+    public function isOfficerRank($rankCode)
+    {
+        if (empty($rankCode)) {
+            return false;
+        }
+        
+        $rankCode = trim($rankCode);
+        
+        // Remove all slashes and check if remaining is only numbers
+        // If there's any letter (CN, QN, etc.), it's not an officer rank
+        $withoutSlashes = str_replace(['/', ' '], '', $rankCode);
+        
+        // If after removing slashes, it's empty or contains letters, it's not officer rank
+        if (empty($withoutSlashes)) {
+            return false;
+        }
+        
+        // Check if remaining contains only numbers (0-9)
+        // Sĩ quan: only numbers and slashes, no letters
+        // Pattern: can have numbers and slashes only, like "1//", "2/", "3///", etc.
+        return preg_match('/^[\d\/\s]+$/', $rankCode) === 1 && 
+               preg_match('/[a-zA-ZÀ-ỹ]/', $rankCode) === 0;
+    }
+    
+    /**
      * Get all approval requests that user can approve
      */
     public function getApprovalRequests($user, $filters = [])
@@ -55,9 +87,43 @@ class ApprovalCenterService
         $leaveQuery = EmployeeLeave::query();
         $this->filterLeaveByUserPermissions($leaveQuery, $user, ['status' => 'all']);
 
-        // Count by status
-        $counts['leave']['pending'] = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_PENDING)->count();
-        $counts['leave']['review'] = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD)->count();
+        $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
+        $hasOfficerReviewPermission = PermissionHelper::can($user, 'leave.review.officer');
+
+        // Count by status and rank type
+        $pendingQuery = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_PENDING);
+        $reviewQuery = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD);
+        
+        // Filter review count by rank type if user has specific permission
+        if ($hasReviewPermission && !$hasOfficerReviewPermission) {
+            // Only count employee ranks (CNQP, QNCN, or has CN/QN in rank_code)
+            $reviewQuery->whereHas('employee', function($q) {
+                $q->where(function($rankQ) {
+                    $rankQ->where('rank_code', 'CNQP')
+                          ->orWhere('rank_code', 'QNCN')
+                          ->orWhere('rank_code', 'like', '%CN%')
+                          ->orWhere('rank_code', 'like', '%QN%');
+                });
+            });
+        } elseif (!$hasReviewPermission && $hasOfficerReviewPermission) {
+            // Only count officer ranks (only numbers and slashes, no CN/QN)
+            $reviewQuery->whereHas('employee', function($q) {
+                // Officer ranks: patterns like 1//, 2//, 3//, 1/, 2/, etc.
+                // Must not contain CN or QN
+                $q->where(function($rankQ) {
+                    // Match patterns that are only numbers and slashes
+                    // Using whereRaw with REGEXP for MySQL pattern matching
+                    $rankQ->whereRaw('rank_code REGEXP ?', ['^[0-9/ ]+$']);
+                })
+                ->where('rank_code', 'not like', '%CN%')
+                ->where('rank_code', 'not like', '%QN%')
+                ->where('rank_code', 'not like', '%cn%')
+                ->where('rank_code', 'not like', '%qn%');
+            });
+        }
+        
+        $counts['leave']['pending'] = $pendingQuery->count();
+        $counts['leave']['review'] = $reviewQuery->count();
 
         // For director count, only count requests where user is in selected_approvers
         $directorQuery = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER);
@@ -99,7 +165,10 @@ class ApprovalCenterService
         $counts = $this->getPendingCountsByType($user);
 
         // Determine which count to show based on user role
-        if ($user->hasRole('Admin') || PermissionHelper::can($user, 'leave.review')) {
+        $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
+        $hasOfficerReviewPermission = PermissionHelper::can($user, 'leave.review.officer');
+        
+        if ($user->hasRole('Admin') || $hasReviewPermission || $hasOfficerReviewPermission) {
             // Thẩm định: show review count
             return $counts[$type]['review'];
         } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
@@ -120,7 +189,10 @@ class ApprovalCenterService
         $total = 0;
 
         // Determine which count to show based on user role
-        if ($user->hasRole('Admin') || PermissionHelper::can($user, 'leave.review')) {
+        $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
+        $hasOfficerReviewPermission = PermissionHelper::can($user, 'leave.review.officer');
+        
+        if ($user->hasRole('Admin') || $hasReviewPermission || $hasOfficerReviewPermission) {
             // Thẩm định: show review count
             $total = $counts['leave']['review'] + $counts['vehicle']['review'];
         } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
@@ -168,9 +240,39 @@ class ApprovalCenterService
 
         $user = backpack_user();
 
+        $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
+        $hasOfficerReviewPermission = PermissionHelper::can($user, 'leave.review.officer');
+
         return $query->with(['employee.department'])
             ->orderBy('created_at', 'desc')
             ->get()
+            ->filter(function($leave) use ($hasReviewPermission, $hasOfficerReviewPermission) {
+                // If user has both permissions, see all
+                if ($hasReviewPermission && $hasOfficerReviewPermission) {
+                    return true;
+                }
+                
+                // If user has no review permissions, don't filter here (will be filtered by other logic)
+                if (!$hasReviewPermission && !$hasOfficerReviewPermission) {
+                    return true;
+                }
+                
+                // Get employee rank_code
+                $rankCode = $leave->employee ? $leave->employee->rank_code : null;
+                $isOfficer = $this->isOfficerRank($rankCode);
+                
+                // If user only has regular review permission, only see employee ranks (not officer)
+                if ($hasReviewPermission && !$hasOfficerReviewPermission) {
+                    return !$isOfficer; // Only non-officer ranks
+                }
+                
+                // If user only has officer review permission, only see officer ranks
+                if (!$hasReviewPermission && $hasOfficerReviewPermission) {
+                    return $isOfficer; // Only officer ranks
+                }
+                
+                return true;
+            })
             ->map(function($leave) use ($user) {
                 $isReviewerStep = $leave->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
                 $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
@@ -275,9 +377,53 @@ class ApprovalCenterService
      */
     protected function filterLeaveByUserPermissions($query, $user, $filters = [])
     {
-        // Admin and reviewer see all (status filter already applied, so they see all matching status)
-        if ($user->hasRole('Admin') || PermissionHelper::can($user, 'leave.review')) {
-            // Status filter already applied, no additional permission filtering needed
+        // Admin sees all
+        if ($user->hasRole('Admin')) {
+            return;
+        }
+        
+        // Reviewer permissions - check based on rank type
+        $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
+        $hasOfficerReviewPermission = PermissionHelper::can($user, 'leave.review.officer');
+        
+        if ($hasReviewPermission || $hasOfficerReviewPermission) {
+            // If has both permissions, see all - no filtering needed
+            if ($hasReviewPermission && $hasOfficerReviewPermission) {
+                return;
+            }
+            
+            // Filter by rank type at query level for efficiency
+            // Only filter if status is review step (approved_by_department_head)
+            $statusFilter = $filters['status'] ?? 'all';
+            $isReviewStep = $statusFilter === 'all' || $statusFilter === 'approved_by_department_head';
+            
+            if ($isReviewStep) {
+                $query->whereHas('employee', function($q) use ($hasReviewPermission, $hasOfficerReviewPermission) {
+                    if ($hasReviewPermission && !$hasOfficerReviewPermission) {
+                        // Only see employee ranks (CNQP, QNCN, or has CN/QN in rank_code)
+                        // Not officer ranks (only numbers and slashes)
+                        $q->where(function($rankQ) {
+                            $rankQ->where('rank_code', 'CNQP')
+                                  ->orWhere('rank_code', 'QNCN')
+                                  ->orWhere('rank_code', 'like', '%CN%')
+                                  ->orWhere('rank_code', 'like', '%QN%');
+                        });
+                    } elseif (!$hasReviewPermission && $hasOfficerReviewPermission) {
+                        // Only see officer ranks (only numbers and slashes, no CN/QN)
+                        // Pattern: can have numbers, slashes, spaces, but no letters
+                        $q->where(function($rankQ) {
+                            // Match patterns like 1//, 2//, 3//, 1/, 2/, etc.
+                            // But exclude if contains CN or QN
+                            // Using REGEXP to match only numbers and slashes
+                            $rankQ->whereRaw('rank_code REGEXP ?', ['^[0-9/ ]+$'])
+                                  ->where('rank_code', 'not like', '%CN%')
+                                  ->where('rank_code', 'not like', '%QN%')
+                                  ->where('rank_code', 'not like', '%cn%')
+                                  ->where('rank_code', 'not like', '%qn%');
+                        });
+                    }
+                });
+            }
             return;
         }
 
@@ -707,17 +853,40 @@ class ApprovalCenterService
         ];
     }
 
+    /**
+     * Get Tabler badge class for leave status
+     * Returns Tabler badge classes: bg-blue, bg-azure, bg-indigo, bg-green, bg-red
+     */
     protected function getStatusBadge($status)
     {
+        // Map to Tabler badge colors
         $badges = [
-            EmployeeLeave::WORKFLOW_PENDING => 'warning',
-            EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => 'info',
-            EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER => 'primary',
-            EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR => 'success',
-            EmployeeLeave::WORKFLOW_REJECTED => 'danger',
+            EmployeeLeave::WORKFLOW_PENDING => 'blue',  // Chờ chỉ huy xác nhận
+            EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => 'azure',  // Chờ thẩm định
+            EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER => 'indigo',  // Chờ BGD ký
+            EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR => 'green',  // Đã phê duyệt
+            EmployeeLeave::WORKFLOW_REJECTED => 'red',  // Đã từ chối
         ];
 
         return $badges[$status] ?? 'secondary';
+    }
+
+    /**
+     * Get Tabler badge class name (full class string)
+     */
+    public function getTablerBadgeClass($status, $modelType = 'leave')
+    {
+        if ($modelType === 'leave') {
+            $color = $this->getStatusBadge($status);
+        } else {
+            $color = $this->getVehicleStatusBadge($status);
+        }
+
+        if ($color === 'secondary') {
+            return 'badge bg-secondary text-secondary-fg badge-pill';
+        }
+
+        return "badge bg-{$color} text-{$color}-fg badge-pill";
     }
 
     protected function getVehicleStatusLabel($status)
@@ -735,12 +904,13 @@ class ApprovalCenterService
 
     protected function getVehicleStatusBadge($status)
     {
+        // Map to Tabler badge colors
         $badges = [
-            'submitted' => 'info',
-            'dept_review' => 'primary',
-            'director_review' => 'warning',
-            'approved' => 'success',
-            'rejected' => 'danger',
+            'submitted' => 'cyan',
+            'dept_review' => 'azure',
+            'director_review' => 'indigo',
+            'approved' => 'green',
+            'rejected' => 'red',
         ];
 
         return $badges[$status] ?? 'secondary';
@@ -798,17 +968,25 @@ class ApprovalCenterService
             return $userDepartmentId == $leave->employee->department_id;
         }
 
-        // Step 2: Only reviewer can approve (check by role or permission)
+        // Step 2: Only reviewer can approve (check by role or permission based on rank)
         if ($status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD) {
-            // Check by role
+            // Get employee rank_code to determine which permission to check
+            $rankCode = $leave->employee ? $leave->employee->rank_code : null;
+            $isOfficer = $this->isOfficerRank($rankCode);
+            
+            // Check by role (admin-like roles can approve all)
             if ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Thẩm định'])) {
                 return true;
             }
-            // Check by permission
-            if (PermissionHelper::can($user, 'leave.review')) {
-                return true;
+            
+            // Check by permission based on rank type
+            if ($isOfficer) {
+                // Officer rank - need leave.review.officer permission
+                return PermissionHelper::can($user, 'leave.review.officer');
+            } else {
+                // Employee rank (CNQP, QNCN) - need leave.review permission
+                return PermissionHelper::can($user, 'leave.review');
             }
-            return false;
         }
 
         // Step 3: Only director (BGD) can approve - but only if they are in selected_approvers list

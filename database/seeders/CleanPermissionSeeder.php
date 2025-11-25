@@ -122,6 +122,17 @@ class CleanPermissionSeeder extends Seeder
         $allPermissions[] = $leaveReviewPermission;
         $this->command->line("  {$permissionId}: {$leaveReviewPermission} (Thẩm định Đơn nghỉ phép)");
         $permissionId++;
+        
+        // Add permission for officer leave review
+        $leaveOfficerReviewPermission = "leave.review.officer";
+        Permission::create([
+            'id' => $permissionId,
+            'name' => $leaveOfficerReviewPermission,
+            'guard_name' => 'web'
+        ]);
+        $allPermissions[] = $leaveOfficerReviewPermission;
+        $this->command->line("  {$permissionId}: {$leaveOfficerReviewPermission} (Thẩm định nghỉ phép sĩ quan)");
+        $permissionId++;
 
         // Add approval center permission
         $this->command->line("Module: Trung tâm phê duyệt");

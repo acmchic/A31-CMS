@@ -231,9 +231,28 @@ class ApprovalCenterController extends Controller
                 $leave = EmployeeLeave::findOrFail($id);
                 
                 $isReviewerStep = $leave->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
-                $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
                 
-                if (!$isReviewerStep || !$hasReviewPermission) {
+                // Check permission based on employee rank
+                $rankCode = $leave->employee ? $leave->employee->rank_code : null;
+                $isOfficer = $this->service->isOfficerRank($rankCode);
+                
+                $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
+                $hasOfficerReviewPermission = PermissionHelper::can($user, 'leave.review.officer');
+                
+                // Check if user has appropriate permission for this rank type
+                // Admin can always approve, or if user has both permissions
+                $hasCorrectPermission = false;
+                if ($user->hasRole('Admin') || ($hasReviewPermission && $hasOfficerReviewPermission)) {
+                    $hasCorrectPermission = true;
+                } elseif ($isOfficer) {
+                    // Officer rank - need leave.review.officer permission
+                    $hasCorrectPermission = $hasOfficerReviewPermission;
+                } else {
+                    // Employee rank - need leave.review permission
+                    $hasCorrectPermission = $hasReviewPermission;
+                }
+                
+                if (!$isReviewerStep || !$hasCorrectPermission) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Bạn không có quyền thực hiện thao tác này',
@@ -377,8 +396,10 @@ class ApprovalCenterController extends Controller
         
         $user = backpack_user();
         $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
+        $hasOfficerReviewPermission = PermissionHelper::can($user, 'leave.review.officer');
         
-        if (!$hasReviewPermission) {
+        // Check if user has at least one review permission
+        if (!$hasReviewPermission && !$hasOfficerReviewPermission && !$user->hasRole('Admin')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Bạn không có quyền thực hiện thao tác này',
@@ -417,6 +438,34 @@ class ApprovalCenterController extends Controller
                 
                 // Check if this is reviewer step
                 $isReviewerStep = $leave->workflow_status === \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
+                
+                if (!$isReviewerStep) {
+                    $failCount++;
+                    $errors[] = 'Đơn #' . $id . ': Không ở bước thẩm định';
+                    continue;
+                }
+                
+                // Check permission based on employee rank for this specific leave request
+                $rankCode = $leave->employee ? $leave->employee->rank_code : null;
+                $isOfficer = $this->service->isOfficerRank($rankCode);
+                
+                // Check if user has appropriate permission for this rank type
+                $hasCorrectPermission = false;
+                if ($user->hasRole('Admin') || ($hasReviewPermission && $hasOfficerReviewPermission)) {
+                    $hasCorrectPermission = true;
+                } elseif ($isOfficer) {
+                    // Officer rank - need leave.review.officer permission
+                    $hasCorrectPermission = $hasOfficerReviewPermission;
+                } else {
+                    // Employee rank - need leave.review permission
+                    $hasCorrectPermission = $hasReviewPermission;
+                }
+                
+                if (!$hasCorrectPermission) {
+                    $failCount++;
+                    $errors[] = 'Đơn #' . $id . ': Bạn không có quyền thẩm định loại cấp bậc này';
+                    continue;
+                }
                 
                 if (!$isReviewerStep) {
                     $failCount++;

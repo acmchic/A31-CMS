@@ -87,7 +87,7 @@ $(document).ready(function() {
         },
         'personnel_report': {
             title: '📊 Báo cáo quân số',
-            permissions: ['report.view.company', 'report.view', 'report.create', 'report.edit', 'report.delete', 'report.approve', 'leave.view', 'leave.create', 'leave.edit', 'leave.delete', 'leave.approve', 'leave.review']
+            permissions: ['report.view.company', 'report.view', 'report.create', 'report.edit', 'report.delete', 'report.approve', 'leave.view', 'leave.create', 'leave.edit', 'leave.delete', 'leave.approve', 'leave.review', 'leave.review.officer']
         },
         'approval_center': {
             title: '✅ Trung tâm phê duyệt',
@@ -148,6 +148,7 @@ $(document).ready(function() {
         'leave.delete': 'Xóa đơn nghỉ phép',
         'leave.approve': 'Phê duyệt đơn nghỉ phép',
         'leave.review': 'Thẩm định nghỉ phép',
+        'leave.review.officer': 'Thẩm định nghỉ phép sĩ quan',
         'approval_center.view': 'Trung tâm phê duyệt',
         'record_management.view': 'Xem quản lý sổ sách',
         'record_management.view.own': 'Xem sổ sách cá nhân',
