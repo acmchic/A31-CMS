@@ -30,10 +30,10 @@
     <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card bg-gradient-primary text-white shadow-lg" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;">
-                <div class="card-body text-center py-4" style="color: #ffffff !important;">
-                    <h3 class="mb-2" style="color: #ffffff !important;"><i class="la la-calendar-check" style="color: #ffffff !important;"></i> BÁO CÁO QUÂN SỐ HÀNG NGÀY</h3>
-                    <h5 class="mb-0" style="color: #ffffff !important;"><strong style="color: #ffffff !important;">{{ $department->name }}</strong></h5>
+            <div class="card shadow-lg" style="background: #ffffff !important;">
+                <div class="card-body text-center py-4" style="color: #000000 !important;">
+                    <h3 class="mb-2" style="color: #000000 !important;"><i class="la la-calendar-check" style="color: #000000 !important;"></i> BÁO CÁO QUÂN SỐ HÀNG NGÀY</h3>
+                    <h5 class="mb-0" style="color: #000000 !important;"><strong style="color: #000000 !important;">{{ $department->name }}</strong></h5>
                 </div>
             </div>
         </div>
@@ -80,60 +80,42 @@
         </div>
     </div>
 
-    <!-- Reason Breakdown -->
-    <div class="row mb-4">
+    <!-- Reason Breakdown - Hidden -->
+    <div class="row mb-4" style="display: none;">
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header bg-light">
                     <h5 class="mb-0"><strong>Chi tiết lý do vắng mặt:</strong></h5>
                 </div>
                 <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col">
-                            <div class="badge badge-info badge-lg p-2">
-                                Công tác - Cơ động: <strong id="reason-cong-tac-co-dong">0</strong>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="badge badge-success badge-lg p-2">
-                                Học: <strong id="reason-hoc">0</strong>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="badge badge-warning badge-lg p-2">
-                                Phép - Tranh thủ: <strong id="reason-phep">0</strong>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="badge badge-danger badge-lg p-2">
-                                Đi viện: <strong id="reason-di-vien">0</strong>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="badge badge-secondary badge-lg p-2">
-                                Chờ hưu: <strong id="reason-cho-huu">0</strong>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="badge badge-dark badge-lg p-2">
-                                Ốm tại trại: <strong id="reason-om-tai-trai">0</strong>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="badge badge-primary badge-lg p-2">
-                                Thai sản: <strong id="reason-thai-san">0</strong>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="badge badge-info badge-lg p-2">
-                                Khám bệnh: <strong id="reason-kham-benh">0</strong>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="badge badge-secondary badge-lg p-2">
-                                Khác: <strong id="reason-khac">0</strong>
-                            </div>
-                        </div>
+                    <div class="d-flex flex-wrap gap-2" style="gap: 8px;">
+                        <span class="badge badge-outline badge-outline-blue badge-pill" style="padding: 6px 12px; font-size: 0.875rem;">
+                            Công tác - Cơ động: <strong id="reason-cong-tac-co-dong">0</strong>
+                        </span>
+                        <span class="badge badge-outline badge-outline-green badge-pill" style="padding: 6px 12px; font-size: 0.875rem;">
+                            Học: <strong id="reason-hoc">0</strong>
+                        </span>
+                        <span class="badge badge-outline badge-outline-orange badge-pill" style="padding: 6px 12px; font-size: 0.875rem;">
+                            Phép - Tranh thủ: <strong id="reason-phep">0</strong>
+                        </span>
+                        <span class="badge badge-outline badge-outline-red badge-pill" style="padding: 6px 12px; font-size: 0.875rem;">
+                            Đi viện: <strong id="reason-di-vien">0</strong>
+                        </span>
+                        <span class="badge badge-outline badge-outline-secondary badge-pill" style="padding: 6px 12px; font-size: 0.875rem;">
+                            Chờ hưu: <strong id="reason-cho-huu">0</strong>
+                        </span>
+                        <span class="badge badge-outline badge-outline-cyan badge-pill" style="padding: 6px 12px; font-size: 0.875rem;">
+                            Ốm tại trại: <strong id="reason-om-tai-trai">0</strong>
+                        </span>
+                        <span class="badge badge-outline badge-outline-pink badge-pill" style="padding: 6px 12px; font-size: 0.875rem;">
+                            Thai sản: <strong id="reason-thai-san">0</strong>
+                        </span>
+                        <span class="badge badge-outline badge-outline-azure badge-pill" style="padding: 6px 12px; font-size: 0.875rem;">
+                            Khám bệnh: <strong id="reason-kham-benh">0</strong>
+                        </span>
+                        <span class="badge badge-outline badge-outline-gray badge-pill" style="padding: 6px 12px; font-size: 0.875rem;">
+                            Khác: <strong id="reason-khac">0</strong>
+                        </span>
                     </div>
                 </div>
             </div>
