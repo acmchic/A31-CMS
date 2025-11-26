@@ -45,12 +45,16 @@
             @endphp
 
             <div class="type-item {{ $filters['type'] === 'leave' ? 'active' : '' }}"
-                 data-type="leave"
-                 style="cursor: pointer; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; position: relative;">
+                 data-type="leave">
                 <div class="d-flex align-items-center justify-content-between">
-                    <span class="fw-semibold">Nghỉ phép</span>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="type-icon-wrapper">
+                            <i class="la la-calendar-check type-icon"></i>
+                        </div>
+                        <span class="type-label">Nghỉ phép</span>
+                    </div>
                     @if($leaveCount > 0)
-                        <span class="badge bg-danger rounded-pill" style="font-size: 0.7rem; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;">
+                        <span class="badge bg-danger rounded-pill type-badge">
                             {{ $leaveCount }}
                         </span>
                     @endif
@@ -58,12 +62,16 @@
             </div>
 
             <div class="type-item {{ $filters['type'] === 'vehicle' ? 'active' : '' }}"
-                 data-type="vehicle"
-                 style="cursor: pointer; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; position: relative;">
+                 data-type="vehicle">
                 <div class="d-flex align-items-center justify-content-between">
-                    <span class="fw-semibold">Đăng ký xe</span>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="type-icon-wrapper">
+                            <i class="la la-car type-icon"></i>
+                        </div>
+                        <span class="type-label">Đăng ký xe</span>
+                    </div>
                     @if($vehicleCount > 0)
-                        <span class="badge bg-danger rounded-pill" style="font-size: 0.7rem; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;">
+                        <span class="badge bg-danger rounded-pill type-badge">
                             {{ $vehicleCount }}
                         </span>
                     @endif
@@ -131,6 +139,29 @@
     vertical-align: middle !important;
     margin-top: 0 !important;
     margin-right: 0.5rem !important;
+    border: 2px solid #6c757d !important;
+    border-radius: 4px !important;
+    width: 20px !important;
+    height: 20px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+.form-check-input:hover {
+    border-color: #495057 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.form-check-input:checked {
+    background-color: #28a745 !important;
+    border-color: #28a745 !important;
+    box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+
+.form-check-input:focus {
+    border-color: #28a745 !important;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25) !important;
+    outline: none;
 }
 
 .form-check-label {
@@ -178,29 +209,84 @@
     animation: placeholder-glow 2s ease-in-out infinite;
 }
 
-/* Type Sidebar */
+/* Type Sidebar - Modern Design */
 .type-sidebar {
     background-color: #fff;
+    padding: 8px 0;
 }
 
 .type-item {
     transition: all 0.2s ease;
     position: relative;
+    padding: 14px 20px;
+    margin: 4px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 1px solid transparent;
 }
 
 .type-item:hover {
     background-color: #f8f9fa;
+    border-color: #e5e7eb;
 }
 
 .type-item.active {
-    background-color: #f0f7ff;
-    border-left: 3px solid #007bff;
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.type-item.active .type-label {
+    color: #1e293b;
     font-weight: 600;
 }
 
-.type-item .badge {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    flex-shrink: 0;
+.type-item.active .type-icon {
+    color: #475569;
+}
+
+.type-item.active .type-icon-wrapper {
+    background-color: #cbd5e1;
+}
+
+.type-icon-wrapper {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    transition: all 0.2s ease;
+}
+
+.type-item.active .type-icon-wrapper {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.type-icon {
+    font-size: 1.2rem;
+    color: #94a3b8;
+    transition: all 0.2s ease;
+}
+
+.type-label {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #1e293b;
+    transition: color 0.2s ease;
+}
+
+.type-badge {
+    font-size: 0.7rem;
+    min-width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+    font-weight: 600;
 }
 
 /* Filter bar styling */
@@ -540,6 +626,10 @@ $(document).ready(function() {
             // Already active, do nothing
             return;
         }
+
+        // Show skeleton loading for both list and detail
+        showListSkeleton();
+        showLoadingSkeleton();
 
         // Update active state
         $('.type-item').removeClass('active');
@@ -1105,12 +1195,48 @@ $(document).ready(function() {
         const status = $('#filter-status').val();
         const timeRange = $('#filter-time').val();
 
+        // Show skeleton loading for list and detail
+        showListSkeleton();
+        showLoadingSkeleton();
+
+        // Update URL without reload
         const url = new URL(window.location.href);
         url.searchParams.set('type', type);
         url.searchParams.set('status', status);
         url.searchParams.set('time_range', timeRange);
+        window.history.pushState({}, '', url.toString());
 
-        window.location.href = url.toString();
+        // Load data via AJAX
+        $.ajax({
+            url: '{{ route("approval-center.index") }}',
+            method: 'GET',
+            data: {
+                type: type,
+                status: status,
+                time_range: timeRange
+            },
+            success: function(response) {
+                // Parse HTML response and extract list and detail
+                const $response = $(response);
+                const listHtml = $response.find('#request-list').html();
+                const detailHtml = $response.find('#request-detail').html();
+                
+                // Update list
+                $('#request-list').html(listHtml || '<div class="card"><div class="card-body text-center text-muted py-5"><i class="la la-inbox la-3x mb-3"></i><p>Không có yêu cầu nào</p></div></div>');
+                
+                // Update detail if there's a selected request
+                if (detailHtml) {
+                    $('#request-detail').html(detailHtml);
+                } else {
+                    $('#request-detail').html('<div class="card"><div class="card-body text-center text-muted py-5"><i class="la la-folder-open la-3x mb-3" style="opacity: 0.3;"></i><p class="mb-0">Không có yêu cầu nào</p></div></div>');
+                }
+            },
+            error: function() {
+                // Hide skeleton on error
+                $('#request-list').html('<div class="card"><div class="card-body text-center text-danger py-5"><i class="la la-exclamation-circle la-3x mb-3"></i><p>Không thể tải dữ liệu</p></div></div>');
+                $('#request-detail').html('<div class="card"><div class="card-body text-center text-danger py-5"><i class="la la-exclamation-circle la-3x mb-3"></i><p>Không thể tải dữ liệu</p></div></div>');
+            }
+        });
     }
 
     function loadRequestDetails(id, modelType) {
@@ -1133,6 +1259,93 @@ $(document).ready(function() {
                 alert('Không thể tải chi tiết');
             }
         });
+    }
+
+    function showListSkeleton() {
+        const listSkeletonHtml = `
+            <div class="card mb-3">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-start">
+                        <div class="me-3 mt-1">
+                            <div class="placeholder" style="width: 18px; height: 18px; border-radius: 4px;"></div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div style="flex: 1;">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <div class="placeholder" style="width: 32px; height: 32px; border-radius: 50%;"></div>
+                                        <div class="placeholder col-4"></div>
+                                    </div>
+                                </div>
+                                <div class="placeholder" style="width: 100px; height: 24px; border-radius: 12px;"></div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div style="flex: 1;">
+                                    <div class="placeholder col-6 mb-2"></div>
+                                    <div class="placeholder col-8"></div>
+                                </div>
+                                <div class="placeholder" style="width: 120px; height: 20px; border-radius: 6px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card mb-3">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-start">
+                        <div class="me-3 mt-1">
+                            <div class="placeholder" style="width: 18px; height: 18px; border-radius: 4px;"></div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div style="flex: 1;">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <div class="placeholder" style="width: 32px; height: 32px; border-radius: 50%;"></div>
+                                        <div class="placeholder col-4"></div>
+                                    </div>
+                                </div>
+                                <div class="placeholder" style="width: 100px; height: 24px; border-radius: 12px;"></div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div style="flex: 1;">
+                                    <div class="placeholder col-6 mb-2"></div>
+                                    <div class="placeholder col-8"></div>
+                                </div>
+                                <div class="placeholder" style="width: 120px; height: 20px; border-radius: 6px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card mb-3">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-start">
+                        <div class="me-3 mt-1">
+                            <div class="placeholder" style="width: 18px; height: 18px; border-radius: 4px;"></div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div style="flex: 1;">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <div class="placeholder" style="width: 32px; height: 32px; border-radius: 50%;"></div>
+                                        <div class="placeholder col-4"></div>
+                                    </div>
+                                </div>
+                                <div class="placeholder" style="width: 100px; height: 24px; border-radius: 12px;"></div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div style="flex: 1;">
+                                    <div class="placeholder col-6 mb-2"></div>
+                                    <div class="placeholder col-8"></div>
+                                </div>
+                                <div class="placeholder" style="width: 120px; height: 20px; border-radius: 6px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        $('#request-list').html(listSkeletonHtml);
     }
 
     function showLoadingSkeleton() {
