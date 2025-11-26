@@ -97,14 +97,10 @@
             </div>
             <div class="card-body">
                 <p><strong>Trạng thái:</strong>
-                    <span class="badge {{ $entry->status === 'approved' ? 'bg-success' : ($entry->status === 'rejected' ? 'bg-danger' : 'bg-warning') }}">
-                        {{ $entry->status_display }}
-                    </span>
+                    {!! renderStatusBadge($entry->status, $entry->status_display, 'general') !!}
                 </p>
                 <p><strong>Quy trình:</strong>
-                    <span class="badge {{ $entry->workflow_status === 'approved' ? 'bg-success' : ($entry->workflow_status === 'rejected' ? 'bg-danger' : 'bg-info') }}">
-                        {{ $entry->workflow_status_display }}
-                    </span>
+                    {!! renderStatusBadge($entry->workflow_status, $entry->workflow_status_display, 'vehicle') !!}
                 </p>
 
                 @if($entry->created_at)

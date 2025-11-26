@@ -1,7 +1,7 @@
 @if($entry->workflow_status === 'pending')
 <form method="POST" action="{{ backpack_url('leave-request/' . $entry->id . '/reject') }}" id="reject-form-{{ $entry->id }}" style="display: inline;">
     @csrf
-    <button type="button" class="btn btn-sm btn-danger" title="Từ chối" onclick="confirmReject_{{ $entry->id }}()">
+    <button type="button" class="btn btn-sm btn-danger" title="Từ chối" onclick="confirmReject_{{ $entry->id }}()" style="color: #ffffff !important;">
         <i class="la la-times"></i> Từ chối
     </button>
 </form>

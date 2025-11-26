@@ -31,8 +31,8 @@ trait ApprovalButtons
         $approvalUrl = route('approval.approve-with-pin', ['modelClass' => $modelClass, 'id' => $this->id]);
 
         return '
-        <button class="btn btn-sm btn-success" onclick="showPinModal_' . $this->id . '()">
-            <i class="la la-check"></i> Phê duyệt
+        <button class="btn btn-sm btn-success" onclick="showPinModal_' . $this->id . '()" style="color: #ffffff !important;">
+            <i class="la la-check" style="color: #ffffff !important;"></i> Phê duyệt
         </button>
         <script>
         function showPinModal_' . $this->id . '() {
@@ -218,8 +218,8 @@ trait ApprovalButtons
         $modalId = 'rejectModal_' . $this->id;
 
         return '
-        <button class="btn btn-sm btn-danger" onclick="showRejectModal_' . $this->id . '()">
-            <i class="la la-times"></i> Từ chối
+        <button class="btn btn-sm btn-danger" onclick="showRejectModal_' . $this->id . '()" style="color: #ffffff !important;">
+            <i class="la la-times" style="color: #ffffff !important;"></i> Từ chối
         </button>
         <script>
         function showRejectModal_' . $this->id . '() {

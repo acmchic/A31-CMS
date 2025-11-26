@@ -25,7 +25,7 @@
                 $leaveCount = 0;
                 $hasReviewPermission = \App\Helpers\PermissionHelper::can($user, 'leave.review');
                 $hasOfficerReviewPermission = \App\Helpers\PermissionHelper::can($user, 'leave.review.officer');
-                
+
                 if ($user->hasRole('Admin') || $hasReviewPermission || $hasOfficerReviewPermission) {
                     $leaveCount = $pendingCounts['leave']['review'] ?? 0;
                 } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
@@ -73,7 +73,7 @@
     </div>
 
     <!-- Middle Column: Filters and Request List -->
-    <div class="col-md-4 border-end" style="overflow-y: auto; max-height: 100%;">
+    <div class="col-md-3 border-end" style="overflow-y: auto; max-height: 100%;">
         <!-- Filters -->
         <div class="filter-bar" style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 16px; background: #f8f9fa;">
             <div class="filter-dropdown-wrapper">
@@ -107,7 +107,7 @@
     </div>
 
     <!-- Right Column: Request Details -->
-    <div class="col-md-6" style="overflow-y: auto; max-height: 100%;">
+    <div class="col-md-7" style="overflow-y: auto; max-height: 100%;">
         <div id="request-detail">
             @if($selectedRequest)
                 @include('approvalworkflow::approval-center.partials.request-detail', ['request' => $selectedRequest])
@@ -368,6 +368,40 @@
 
 @push('after_scripts')
 <script>
+    // Helper function to get status icon (matches PHP getStatusIcon function)
+    function getStatusIconJS(status, type) {
+        if (type === 'leave') {
+            const icons = {
+                'pending': 'la-clock',
+                'approved_by_department_head': 'la-check-circle',
+                'approved_by_reviewer': 'la-check-circle',
+                'approved_by_director': 'la-check-double',
+                'rejected': 'la-times-circle',
+                'cancelled': 'la-ban',
+            };
+            return icons[status] || 'la-circle';
+        }
+
+        if (type === 'vehicle') {
+            const icons = {
+                'submitted': 'la-paper-plane',
+                'dept_review': 'la-clock',
+                'director_review': 'la-hourglass-half',
+                'approved': 'la-check-double',
+                'rejected': 'la-times-circle',
+            };
+            return icons[status] || 'la-circle';
+        }
+
+        // General icons
+        const icons = {
+            'pending': 'la-clock',
+            'approved': 'la-check',
+            'rejected': 'la-times',
+            'cancelled': 'la-ban',
+        };
+        return icons[status] || 'la-circle';
+    }
 @php
     $userHasPin = isset($hasPin) ? $hasPin : (!empty(backpack_user()->certificate_pin));
 @endphp
@@ -383,27 +417,27 @@ const userHasPin = @json($userHasPin);
         if (avatarUrl && avatarUrl.trim() !== '') {
             return avatarUrl;
         }
-        
+
         // Extract first letter of LAST word from name
         // Example: "Ban Giám Đốc" => "Đ" (first letter of "Đốc")
         // Example: "Bùi Tân Chinh" => "C" (first letter of "Chinh")
         return getInitialAvatarUrl(name);
     }
-    
+
     function getInitialAvatarUrl(name) {
         const cleanedName = name ? name.trim() : '';
         if (!cleanedName) {
             return generateAvatarSvg('?');
         }
-        
+
         // Split by spaces and get last word
         const words = cleanedName.split(/\s+/).filter(word => word.length > 0);
         if (words.length === 0) {
             return generateAvatarSvg('?');
         }
-        
+
         const lastWord = words[words.length - 1];
-        
+
         // Get first letter of last word
         let firstLetter = '';
         for (let i = 0; i < lastWord.length; i++) {
@@ -413,7 +447,7 @@ const userHasPin = @json($userHasPin);
                 break;
             }
         }
-        
+
         // Fallback to first letter of full name if no valid letter found
         if (!firstLetter) {
             for (let i = 0; i < cleanedName.length; i++) {
@@ -424,16 +458,16 @@ const userHasPin = @json($userHasPin);
                 }
             }
         }
-        
+
         if (!firstLetter) {
             firstLetter = '?';
         }
-        
+
         return generateAvatarSvg(firstLetter);
     }
-    
+
     function generateAvatarSvg(letter) {
-        
+
         // Generate a consistent color based on the letter (using simple hash)
         const colors = [
             '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
@@ -443,7 +477,7 @@ const userHasPin = @json($userHasPin);
         ];
         const colorIndex = letter.charCodeAt(0) % colors.length;
         const backgroundColor = colors[colorIndex];
-        
+
         // Calculate text color (white or black based on background brightness)
         const hex = backgroundColor.replace('#', '');
         const r = parseInt(hex.substr(0, 2), 16);
@@ -451,7 +485,7 @@ const userHasPin = @json($userHasPin);
         const b = parseInt(hex.substr(4, 2), 16);
         const brightness = (r * 299 + g * 587 + b * 114) / 1000;
         const textColor = brightness > 128 ? '#000000' : '#FFFFFF';
-        
+
         // Create SVG data URI (using URL encoding for better compatibility)
         const size = 100;
         const fontSize = 40;
@@ -461,7 +495,7 @@ const userHasPin = @json($userHasPin);
             'font-weight="bold" fill="' + textColor + '" text-anchor="middle" ' +
             'dominant-baseline="central">' + letter + '</text>' +
             '</svg>';
-        
+
         return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
     }
 
@@ -634,7 +668,7 @@ $(document).ready(function() {
         const requests = [];
         let reviewerStepCount = 0;
         let totalCount = 0;
-        
+
         $('.request-checkbox:checked').each(function() {
             totalCount++;
             const isReviewerStep = $(this).data('is-reviewer-step') == '1';
@@ -660,7 +694,7 @@ $(document).ready(function() {
             showBulkAssignApproversModal(requests);
             return;
         }
-        
+
         // If mixed (some reviewer step, some not) or all non-reviewer step, show normal bulk approve modal
 
         let modalHtml = `
@@ -696,7 +730,7 @@ $(document).ready(function() {
                                             <td><span class="badge bg-primary">${req.type}</span></td>
                                             <td>${req.title}</td>
                                             <td><i class="la la-user"></i> ${req.initiated_by}</td>
-                                            <td><span class="badge bg-${req.status_badge || 'info'} text-white badge-pill">${req.status}</span></td>
+                                            <td><span class="badge bg-${req.status_badge || 'secondary'} text-white badge-pill" style="color: #ffffff !important;">${req.status_label || req.status}</span></td>
                                         </tr>
             `;
         });
@@ -1057,7 +1091,7 @@ $(document).ready(function() {
 
         // Remove active class from ALL request items first
         $('.request-item').removeClass('active border-primary');
-        
+
         // Add active class only to clicked item
         $(this).addClass('active border-primary');
 
@@ -1182,7 +1216,7 @@ $(document).ready(function() {
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <div>
                         <h5 class="mb-0">${request.type_label || request.type}</h5>
-                        <span class="badge bg-${request.status_badge} text-white badge-pill">${request.status_label}</span>
+                        <span class="badge bg-${request.status_badge || 'secondary'} text-white badge-pill" style="color: #ffffff !important;">${request.status_label || request.status}</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
         `;
@@ -1618,8 +1652,8 @@ $(document).ready(function() {
                     <div class="form-check d-flex align-items-center">
                         <input class="form-check-input bulk-approver-checkbox" type="checkbox" value="${director.id}" id="bulk_approver_${director.id}">
                         <label class="form-check-label d-flex align-items-center ms-2" for="bulk_approver_${director.id}" style="cursor: pointer; width: 100%;">
-                            <img src="${avatar}" alt="${director.name}" class="rounded-circle me-2 avatar-img" style="width: 32px; height: 32px; object-fit: cover;" 
-                                 data-name="${director.name}" 
+                            <img src="${avatar}" alt="${director.name}" class="rounded-circle me-2 avatar-img" style="width: 32px; height: 32px; object-fit: cover;"
+                                 data-name="${director.name}"
                                  onerror="this.onerror=null; this.src=getInitialAvatarUrl('${director.name}');">
                             <span>${director.name}</span>
                         </label>
@@ -1751,8 +1785,8 @@ $(document).ready(function() {
                     const avatar = getAvatarUrl(approver.name, director ? director.avatar : null);
                     selectedHtml += `
                         <div class="mb-2 p-2 border rounded d-flex align-items-center">
-                            <img src="${avatar}" alt="${approver.name}" class="rounded-circle me-2 avatar-img" style="width: 24px; height: 24px; object-fit: cover;" 
-                                 data-name="${approver.name}" 
+                            <img src="${avatar}" alt="${approver.name}" class="rounded-circle me-2 avatar-img" style="width: 24px; height: 24px; object-fit: cover;"
+                                 data-name="${approver.name}"
                                  onerror="this.onerror=null; this.src=getInitialAvatarUrl('${approver.name}');">
                             <span>${approver.name}</span>
                         </div>
@@ -1866,8 +1900,8 @@ $(document).ready(function() {
                     <div class="form-check d-flex align-items-center">
                         <input class="form-check-input approver-checkbox" type="checkbox" value="${director.id}" id="approver_${director.id}">
                         <label class="form-check-label d-flex align-items-center ms-2" for="approver_${director.id}" style="cursor: pointer; width: 100%;">
-                            <img src="${avatar}" alt="${director.name}" class="rounded-circle me-2 avatar-img" style="width: 32px; height: 32px; object-fit: cover;" 
-                                 data-name="${director.name}" 
+                            <img src="${avatar}" alt="${director.name}" class="rounded-circle me-2 avatar-img" style="width: 32px; height: 32px; object-fit: cover;"
+                                 data-name="${director.name}"
                                  onerror="this.onerror=null; this.src=getInitialAvatarUrl('${director.name}');">
                             <span>${director.name}</span>
                         </label>

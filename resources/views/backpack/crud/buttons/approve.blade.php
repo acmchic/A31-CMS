@@ -1,8 +1,8 @@
 @if($entry->workflow_status === 'pending')
 <form method="POST" action="{{ backpack_url('leave-request/' . $entry->id . '/approve') }}" id="approve-form-{{ $entry->id }}" style="display: inline;">
     @csrf
-    <button type="button" class="btn btn-sm btn-success" title="Phê duyệt" onclick="confirmApprove_{{ $entry->id }}()">
-        <i class="la la-check"></i> Phê duyệt
+    <button type="button" class="btn btn-sm btn-success" title="Phê duyệt" onclick="confirmApprove_{{ $entry->id }}()" style="color: #ffffff !important;">
+        <i class="la la-check" style="color: #ffffff !important;"></i> Phê duyệt
     </button>
 </form>
 

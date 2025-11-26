@@ -903,24 +903,17 @@ class ApprovalCenterService
 
     /**
      * Get Tabler badge class for leave status
-     * Returns Tabler badge classes: bg-blue, bg-azure, bg-indigo, bg-green, bg-red
+     * Returns Tabler badge classes: bg-orange, bg-azure, bg-indigo, bg-green, bg-red
+     * Uses centralized helper function for consistency
      */
     protected function getStatusBadge($status)
     {
-        // Map to Tabler badge colors
-        $badges = [
-            EmployeeLeave::WORKFLOW_PENDING => 'blue',  // Chờ chỉ huy xác nhận
-            EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => 'azure',  // Chờ thẩm định
-            EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER => 'indigo',  // Chờ BGD ký
-            EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR => 'green',  // Đã phê duyệt
-            EmployeeLeave::WORKFLOW_REJECTED => 'red',  // Đã từ chối
-        ];
-
-        return $badges[$status] ?? 'secondary';
+        return getStatusBadgeColor($status, 'leave');
     }
 
     /**
      * Get Tabler badge class name (full class string)
+     * Always uses text-white for consistency
      */
     public function getTablerBadgeClass($status, $modelType = 'leave')
     {
@@ -930,11 +923,8 @@ class ApprovalCenterService
             $color = $this->getVehicleStatusBadge($status);
         }
 
-        if ($color === 'secondary') {
-            return 'badge bg-secondary text-secondary-fg badge-pill';
-        }
-
-        return "badge bg-{$color} text-{$color}-fg badge-pill";
+        // Always use white text for consistency
+        return "badge bg-{$color} text-white badge-pill";
     }
 
     protected function getVehicleStatusLabel($status)
@@ -952,16 +942,8 @@ class ApprovalCenterService
 
     protected function getVehicleStatusBadge($status)
     {
-        // Map to Tabler badge colors
-        $badges = [
-            'submitted' => 'cyan',
-            'dept_review' => 'azure',
-            'director_review' => 'indigo',
-            'approved' => 'green',
-            'rejected' => 'red',
-        ];
-
-        return $badges[$status] ?? 'secondary';
+        // Uses centralized helper function for consistency
+        return getStatusBadgeColor($status, 'vehicle');
     }
 
     protected function getActionBadge($action)

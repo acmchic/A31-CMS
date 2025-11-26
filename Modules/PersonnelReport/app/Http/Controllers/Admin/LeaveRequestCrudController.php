@@ -448,47 +448,10 @@ class LeaveRequestCrudController extends CrudController
                 $status = $entry->workflow_status;
                 $text = $entry->workflow_status_text;
 
-                // Define icon, badge class and color for each status
-                $statusConfig = [
-                    EmployeeLeave::WORKFLOW_PENDING => [
-                        'icon' => 'la-clock',
-                        'badge' => 'warning', // Yellow badge
-                        'color' => '#ffc107',
-                    ],
-                    EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => [
-                        'icon' => 'la-check-circle',
-                        'badge' => 'info', // Info blue badge
-                        'color' => '#17a2b8',
-                    ],
-                    EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER => [
-                        'icon' => 'la-check-circle',
-                        'badge' => 'primary', // Primary blue badge
-                        'color' => '#007bff',
-                    ],
-                    EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR => [
-                        'icon' => 'la-check-double',
-                        'badge' => 'success', // Success green badge
-                        'color' => '#28a745',
-                    ],
-                    EmployeeLeave::WORKFLOW_REJECTED => [
-                        'icon' => 'la-times-circle',
-                        'badge' => 'danger', // Danger red badge
-                        'color' => '#dc3545',
-                    ],
-                ];
-
-                // Get config for current status, fallback to default
-                $config = $statusConfig[$status] ?? [
-                    'icon' => 'la-circle',
-                    'badge' => 'secondary',
-                    'color' => '#6c757d',
-                ];
-
+                // Use centralized badge helper for consistency
+                // Icon will be auto-get from helper function
                 return '<span data-workflow-status="' . htmlspecialchars($status) . '">' .
-                       '<span class="badge badge-' . $config['badge'] . ' bg-' . $config['badge'] . '" style="font-size: 0.875rem; padding: 0.35em 0.65em;">' .
-                       '<i class="la ' . $config['icon'] . '" style="margin-right: 4px;"></i>' .
-                       $text .
-                       '</span>' .
+                       renderStatusBadge($status, $text, 'leave', null, true) .
                        '</span>';
             })
             ->searchLogic(function ($query, $column, $searchTerm) {

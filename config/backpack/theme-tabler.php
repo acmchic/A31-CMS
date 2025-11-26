@@ -22,7 +22,7 @@ return [
      * Possible values: horizontal, horizontal_dark, horizontal_overlap, vertical,
      * vertical_dark, vertical_transparent (legacy theme), right_vertical, right_vertical_dark, right_vertical_transparent
      */
-    'layout' => 'horizontal_dark',
+    'layout' => 'vertical',
 
     /**
      * Pick a login page layout.
@@ -83,7 +83,7 @@ return [
         /**
          * When true, the content area will take the whole screen width.
          */
-        'useFluidContainers' => false,
+        'useFluidContainers' => true,
 
         /**
          * When true, the sidebar content for vertical layouts will not scroll with the rest of the content.
@@ -98,7 +98,7 @@ return [
         /**
          * When true, the password input will have a toggle button to show/hide the password.
          */
-        'showPasswordVisibilityToggler' => false,
+        'showPasswordVisibilityToggler' => true,
     ],
 
     /**

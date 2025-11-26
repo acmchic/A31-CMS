@@ -7,9 +7,9 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
-        "backpack/crud": "^6.8",
-        "backpack/permissionmanager": "^7.2",
-        "backpack/theme-tabler": "^1.2",
+        "backpack/crud": "^7.0",
+        "backpack/permissionmanager": "^7.3",
+        "backpack/theme-tabler": "^2.0",
         "barryvdh/laravel-dompdf": "^3.1",
         "intervention/image": "^3.11",
         "laravel/framework": "^12.0",

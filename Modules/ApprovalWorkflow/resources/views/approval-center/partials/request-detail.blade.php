@@ -3,10 +3,13 @@
         <div class="d-flex align-items-center justify-content-between" style="gap: 12px;">
             <h5 class="mb-0" style="font-size: 1.25rem; font-weight: 600; padding-right: 12px;">{{ $request['type_label'] ?? $request['type'] }}</h5>
             @php
-                $statusBadge = $request['status_badge'] ?? 'secondary';
-                $badgeClass = "badge bg-{$statusBadge} text-white badge-pill";
+                // Use centralized badge helper for consistency
+                // Icon will be auto-get from helper function
+                $status = $request['status'] ?? '';
+                $statusLabel = $request['status_label'] ?? '';
+                $modelType = $request['model_type'] ?? 'leave';
             @endphp
-            <span class="{{ $badgeClass }}" style="padding: 6px 12px;">{{ $request['status_label'] }}</span>
+            {!! renderStatusBadge($status, $statusLabel, $modelType, null, true) !!}
         </div>
         <div class="d-flex align-items-center gap-2">
             @if(isset($request['has_signed_pdf']) && $request['has_signed_pdf'] && isset($request['pdf_url']))

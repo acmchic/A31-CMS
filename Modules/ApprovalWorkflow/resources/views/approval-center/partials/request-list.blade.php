@@ -89,12 +89,13 @@
                                 </div>
                             </div>
                             @php
-                                // Get Tabler badge class based on status
+                                // Use centralized badge helper for consistency
+                                // Icon will be auto-get from helper function
                                 $statusLabel = $request['status_label'] ?? '';
-                                $statusBadge = $request['status_badge'] ?? 'secondary';
-                                $badgeClass = "badge bg-{$statusBadge} text-white";
+                                $status = $request['status'] ?? '';
+                                $modelType = $request['model_type'] ?? 'leave';
                             @endphp
-                            <span class="{{ $badgeClass }}" style="color: white !important;">{{ $statusLabel }}</span>
+                            {!! renderStatusBadge($status, $statusLabel, $modelType, null, true) !!}
                         </div>
 
                         {{-- Row 2: Loại nghỉ và khoảng thời gian | Thời gian ở góc phải --}}
