@@ -1448,7 +1448,7 @@ $(document).ready(function() {
         const statusBadge = request.status_badge || 'secondary';
         const statusLabel = request.status_label || request.status;
         const modelType = request.model_type || 'leave';
-        
+
         let detailHtml = `
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -1674,7 +1674,7 @@ $(document).ready(function() {
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title">
-                                <i class="la la-print"></i> Xem trước và In PDF
+                                <i class="la la-print"></i> IN
                             </h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>

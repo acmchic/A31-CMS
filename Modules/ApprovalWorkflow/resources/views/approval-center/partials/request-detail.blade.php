@@ -13,8 +13,8 @@
         </div>
         <div class="d-flex align-items-center gap-2">
             @if(isset($request['has_signed_pdf']) && $request['has_signed_pdf'] && isset($request['pdf_url']))
-                <button id="btn-print-pdf" 
-                        class="btn btn-sm btn-outline-secondary" 
+                <button id="btn-print-pdf"
+                        class="btn btn-sm btn-outline-secondary"
                         data-pdf-url="{{ $request['pdf_url'] }}"
                         title="In PDF"
                         style="border: none; background: transparent; padding: 4px 8px;">
@@ -29,7 +29,7 @@
                                              $request['status'] === 'dept_review');
                     $hasSelectedApprovers = isset($request['has_selected_approvers']) && $request['has_selected_approvers'];
                     $canApproveReviewerStep = isset($request['can_approve_reviewer_step']) ? $request['can_approve_reviewer_step'] : true;
-                    
+
                     // Show assign button if at reviewer/department head step and no selected approvers yet
                     // OR if at reviewer step and cannot approve (missing selected approvers)
                     $showAssignButton = (($isReviewerStep || $isDepartmentHeadStep) && !$hasSelectedApprovers) ||
@@ -131,9 +131,9 @@
             setTimeout(initPrintButton, 100);
             return;
         }
-        
+
         var $ = jQuery;
-        
+
         // Setup print button handler for server-rendered content
         // Use event delegation on document to handle dynamically added buttons
         $(document).off('click', '#btn-print-pdf').on('click', '#btn-print-pdf', function(e) {
@@ -152,7 +152,7 @@
             }
         });
     }
-    
+
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initPrintButton);
@@ -170,7 +170,7 @@ if (typeof window.showPrintPreviewModal === 'undefined') {
             window.open(pdfUrl, '_blank');
             return;
         }
-        
+
         var $ = jQuery;
         const modalHtml = `
             <div class="modal fade" id="printPreviewModal" tabindex="-1" style="z-index: 10000;">
@@ -178,13 +178,13 @@ if (typeof window.showPrintPreviewModal === 'undefined') {
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title">
-                                <i class="la la-print"></i> Xem trước và In PDF
+                                <i class="la la-print"></i> IN
                             </h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body p-0" style="height: 80vh;">
-                            <iframe id="pdf-preview-iframe" 
-                                    src="${pdfUrl}" 
+                            <iframe id="pdf-preview-iframe"
+                                    src="${pdfUrl}"
                                     style="width: 100%; height: 100%; border: none;">
                             </iframe>
                         </div>
@@ -200,13 +200,13 @@ if (typeof window.showPrintPreviewModal === 'undefined') {
                 </div>
             </div>
         `;
-        
+
         $('#printPreviewModal').remove();
         $('body').append(modalHtml);
-        
+
         const modal = new bootstrap.Modal(document.getElementById('printPreviewModal'));
         modal.show();
-        
+
         // Handle print button
         $('#btn-print-from-preview').off('click').on('click', function() {
             const iframe = document.getElementById('pdf-preview-iframe');
@@ -217,7 +217,7 @@ if (typeof window.showPrintPreviewModal === 'undefined') {
                 window.open(pdfUrl, '_blank').print();
             }
         });
-        
+
         // Clean up on close
         $('#printPreviewModal').on('hidden.bs.modal', function() {
             $(this).remove();
