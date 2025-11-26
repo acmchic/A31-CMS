@@ -231,22 +231,22 @@
 }
 
 .type-item.active {
-    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-    border-color: #cbd5e1;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border-color: #93c5fd;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
 }
 
 .type-item.active .type-label {
-    color: #1e293b;
+    color: #1e40af;
     font-weight: 600;
 }
 
 .type-item.active .type-icon {
-    color: #475569;
+    color: #3b82f6;
 }
 
 .type-item.active .type-icon-wrapper {
-    background-color: #cbd5e1;
+    background-color: #93c5fd;
 }
 
 .type-icon-wrapper {
@@ -432,7 +432,7 @@
 
 @media (max-width: 768px) {
     .approval-center-banner {
-        padding: 2rem 1.5rem;
+        padding: 1rem 0.5rem;
     }
 
     .banner-department {
@@ -653,6 +653,14 @@ $(document).ready(function() {
     // Select All checkbox
     $('#select-all-requests').on('change', function() {
         const isChecked = $(this).is(':checked');
+
+        // Show/hide checkboxes based on select all state
+        if (isChecked) {
+            $('.request-checkbox-wrapper').show();
+        } else {
+            $('.request-checkbox-wrapper').hide();
+        }
+
         $('.request-checkbox').each(function() {
             if (!$(this).prop('disabled')) {
                 $(this).prop('checked', isChecked);
@@ -667,6 +675,12 @@ $(document).ready(function() {
         updateSelection($(this), $(this).is(':checked'));
         updateBulkActionsBar();
         updateSelectAllCheckbox();
+
+        // Hide checkboxes if all are unchecked
+        const checkedCount = $('.request-checkbox:checked').length;
+        if (checkedCount === 0 && !$('#select-all-requests').is(':checked')) {
+            $('.request-checkbox-wrapper').hide();
+        }
     });
 
     // Prevent checkbox click from triggering card click
@@ -720,7 +734,13 @@ $(document).ready(function() {
     function updateSelectAllCheckbox() {
         const totalCheckboxes = $('.request-checkbox:not(:disabled)').length;
         const checkedCheckboxes = $('.request-checkbox:checked').length;
-        $('#select-all-requests').prop('checked', totalCheckboxes > 0 && checkedCheckboxes === totalCheckboxes);
+        const isAllChecked = totalCheckboxes > 0 && checkedCheckboxes === totalCheckboxes;
+        $('#select-all-requests').prop('checked', isAllChecked);
+
+        // Hide checkboxes if all are unchecked
+        if (!isAllChecked && checkedCheckboxes === 0) {
+            $('.request-checkbox-wrapper').hide();
+        }
     }
 
     function showBulkApproveModal() {
@@ -1220,10 +1240,10 @@ $(document).ready(function() {
                 const $response = $(response);
                 const listHtml = $response.find('#request-list').html();
                 const detailHtml = $response.find('#request-detail').html();
-                
+
                 // Update list
                 $('#request-list').html(listHtml || '<div class="card"><div class="card-body text-center text-muted py-5"><i class="la la-inbox la-3x mb-3"></i><p>Không có yêu cầu nào</p></div></div>');
-                
+
                 // Update detail if there's a selected request
                 if (detailHtml) {
                     $('#request-detail').html(detailHtml);
@@ -1424,12 +1444,17 @@ $(document).ready(function() {
 
     function renderDetailView(request) {
         // Build detail HTML from request data
+        // Get status badge using helper function format
+        const statusBadge = request.status_badge || 'secondary';
+        const statusLabel = request.status_label || request.status;
+        const modelType = request.model_type || 'leave';
+        
         let detailHtml = `
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="mb-0">${request.type_label || request.type}</h5>
-                        <span class="badge bg-${request.status_badge || 'secondary'} text-white badge-pill" style="color: #ffffff !important;">${request.status_label || request.status}</span>
+                    <div class="d-flex align-items-center justify-content-between" style="gap: 12px;">
+                        <h5 class="mb-0" style="font-size: 1.25rem; font-weight: 600; padding-right: 12px;">${request.type_label || request.type}</h5>
+                        <span class="badge bg-${statusBadge} text-white badge-pill" style="color: #ffffff !important;">${statusLabel}</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
         `;

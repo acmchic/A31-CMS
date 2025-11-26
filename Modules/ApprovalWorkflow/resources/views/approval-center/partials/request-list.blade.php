@@ -54,8 +54,8 @@
              style="cursor: pointer; border-radius: 12px; overflow: hidden;">
             <div class="card-body p-4">
                 <div class="d-flex align-items-start">
-                    {{-- Checkbox --}}
-                    <div class="me-3 mt-1">
+                    {{-- Checkbox - Ẩn mặc định, chỉ hiện khi chọn "Chọn tất cả" --}}
+                    <div class="me-1 mt-1 request-checkbox-wrapper" style="display: none;">
                         @if($canBulkApprove)
                             <input type="checkbox"
                                    class="form-check-input request-checkbox"
@@ -180,11 +180,11 @@
 }
 
 .request-item.active {
-    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
     border-color: #3b82f6;
     border-width: 2px;
-    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
     transform: translateY(-2px);
+    background-color: #ffffff;
 }
 
 .request-item.selected {
