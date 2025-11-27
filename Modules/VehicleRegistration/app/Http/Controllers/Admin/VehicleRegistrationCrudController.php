@@ -40,6 +40,13 @@ class VehicleRegistrationCrudController extends CrudController
     private function applyDataFilter()
     {
         $user = backpack_user();
+        
+        // Check if user has permission to view all vehicle data
+        if (PermissionHelper::can($user, 'vehicle_registration.view.all')) {
+            // No filtering - see all registrations
+            return;
+        }
+        
         $scope = PermissionHelper::getUserScope($user);
 
         switch ($scope) {

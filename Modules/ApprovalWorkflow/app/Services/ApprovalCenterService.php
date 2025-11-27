@@ -395,6 +395,7 @@ class ApprovalCenterService
 
         $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
         $hasOfficerReviewPermission = PermissionHelper::can($user, 'leave.review.officer');
+        $hasViewAllPermission = PermissionHelper::can($user, 'leave.view.all');
 
         $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
         $userId = (int)$user->id;
@@ -402,7 +403,12 @@ class ApprovalCenterService
         return $query->with(['employee.department', 'approvalRequest'])
             ->orderBy('created_at', 'desc')
             ->get()
-            ->filter(function($leave) use ($hasReviewPermission, $hasOfficerReviewPermission, $isDirector, $userId) {
+            ->filter(function($leave) use ($hasReviewPermission, $hasOfficerReviewPermission, $hasViewAllPermission, $isDirector, $userId) {
+                // ✅ Nếu có permission view.all, xem tất cả (không filter)
+                if ($hasViewAllPermission) {
+                    return true;
+                }
+                
                 // ✅ Filter theo selected_approvers cho director
                 if ($isDirector) {
                     $approvalRequest = $leave->approvalRequest;
@@ -525,6 +531,8 @@ class ApprovalCenterService
                         : PermissionHelper::can($user, 'leave.review');
                 }
                 
+                $hasViewAllPermission = PermissionHelper::can($user, 'leave.view.all');
+                
                 $needsPin = !($isReviewerStep && $hasReviewPermission);
                 
                 // ✅ Sửa: Lấy selected_approvers từ approvalRequest, không phải từ leave
@@ -537,8 +545,11 @@ class ApprovalCenterService
                     $hasSelectedApprovers = !empty($selectedApprovers);
                 }
                 
-                // ✅ Sửa: Dùng approvalRequest->canBeApprovedBy() để kiểm tra quyền
-                if ($approvalRequest) {
+                // ✅ Sửa: Nếu chỉ có permission view.all, không có quyền approve
+                if ($hasViewAllPermission && !$hasReviewPermission && !PermissionHelper::can($user, 'leave.approve')) {
+                    $canApprove = false;
+                } elseif ($approvalRequest) {
+                    // ✅ Sửa: Dùng approvalRequest->canBeApprovedBy() để kiểm tra quyền
                     $canApprove = $approvalRequest->canBeApprovedBy($user);
                 } else {
                     // Fallback nếu chưa có approvalRequest
@@ -796,6 +807,11 @@ class ApprovalCenterService
             return;
         }
         
+        // Check if user has permission to view all leave data
+        if (PermissionHelper::can($user, 'leave.view.all')) {
+            return; // No filtering - see all data
+        }
+        
         // Reviewer permissions - check based on rank type
         $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
         $hasOfficerReviewPermission = PermissionHelper::can($user, 'leave.review.officer');
@@ -903,6 +919,11 @@ class ApprovalCenterService
         // Admin sees all
         if ($user->hasRole('Admin')) {
             return;
+        }
+
+        // Check if user has permission to view all vehicle data
+        if (PermissionHelper::can($user, 'vehicle_registration.view.all')) {
+            return; // No filtering - see all data
         }
 
         $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);

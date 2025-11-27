@@ -83,11 +83,15 @@ $(document).ready(function() {
         },
         'vehicle_registration': {
             title: '🚗 Đăng ký xe',
-            permissions: ['vehicle_registration.view', 'vehicle_registration.create', 'vehicle_registration.edit', 'vehicle_registration.delete', 'vehicle_registration.assign', 'vehicle_registration.approve', 'vehicle_registration.reject', 'vehicle_registration.download_pdf']
+            permissions: ['vehicle_registration.view', 'vehicle_registration.create', 'vehicle_registration.edit', 'vehicle_registration.delete', 'vehicle_registration.assign', 'vehicle_registration.approve', 'vehicle_registration.reject', 'vehicle_registration.download_pdf', 'vehicle_registration.view.all']
         },
         'personnel_report': {
             title: '📊 Báo cáo quân số',
-            permissions: ['report.view.company', 'report.view', 'report.create', 'report.edit', 'report.delete', 'report.approve', 'leave.view', 'leave.create', 'leave.edit', 'leave.delete', 'leave.approve', 'leave.review', 'leave.review.officer']
+            permissions: ['report.view.company', 'report.view', 'report.create', 'report.edit', 'report.delete', 'report.approve', 'leave.view', 'leave.create', 'leave.edit', 'leave.delete', 'leave.approve', 'leave.review', 'leave.review.officer', 'leave.view.all']
+        },
+        'production_management': {
+            title: '🏭 Quản lý sản xuất',
+            permissions: ['material_plan.view', 'material_plan.create', 'material_plan.edit', 'material_plan.delete', 'material_plan.approve', 'material_plan.view.all']
         },
         'approval_center': {
             title: '✅ Trung tâm phê duyệt',
@@ -136,6 +140,7 @@ $(document).ready(function() {
         'vehicle_registration.approve': 'Phê duyệt đăng ký xe',
         'vehicle_registration.reject': 'Từ chối đăng ký xe',
         'vehicle_registration.download_pdf': 'Tải về đã ký',
+        'vehicle_registration.view.all': 'Xem dữ liệu đăng ký xe toàn bộ',
         'report.view.company': 'Tổng hợp báo cáo quân số',
         'report.view': 'Xem báo cáo quân số',
         'report.create': 'Tạo báo cáo quân số',
@@ -149,6 +154,7 @@ $(document).ready(function() {
         'leave.approve': 'Phê duyệt đơn nghỉ phép',
         'leave.review': 'Thẩm định nghỉ phép',
         'leave.review.officer': 'Thẩm định nghỉ phép sĩ quan',
+        'leave.view.all': 'Xem dữ liệu nghỉ phép toàn bộ',
         'approval_center.view': 'Trung tâm phê duyệt',
         'record_management.view': 'Xem quản lý sổ sách',
         'record_management.view.own': 'Xem sổ sách cá nhân',
@@ -160,7 +166,13 @@ $(document).ready(function() {
         'record_management.delete': 'Xóa sổ sách',
         'record_management.approve': 'Phê duyệt sổ sách',
         'profile.view': 'Xem thông tin cá nhân',
-        'profile.edit': 'Sửa thông tin cá nhân'
+        'profile.edit': 'Sửa thông tin cá nhân',
+        'material_plan.view': 'Xem danh sách phương án vật tư',
+        'material_plan.create': 'Tạo phương án vật tư',
+        'material_plan.edit': 'Sửa phương án vật tư',
+        'material_plan.delete': 'Xóa phương án vật tư',
+        'material_plan.approve': 'Phê duyệt phương án vật tư',
+        'material_plan.view.all': 'Xem dữ liệu quản lý sản xuất toàn bộ'
     };
 
     // Get permission IDs from database (1-57 clean structure)

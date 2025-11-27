@@ -56,6 +56,14 @@ class LeaveRequestCrudController extends CrudController
             return;
         }
 
+        // User with leave.view.all permission sees everything (like admin, with or without status filter)
+        if (PermissionHelper::can($user, 'leave.view.all')) {
+            if ($statusFilter && $statusFilter !== 'all') {
+                CRUD::addClause('where', 'workflow_status', $statusFilter);
+            }
+            return;
+        }
+
         // User with leave.review permission sees everything (like admin, with or without status filter)
         if (PermissionHelper::can($user, 'leave.review')) {
             if ($statusFilter && $statusFilter !== 'all') {
