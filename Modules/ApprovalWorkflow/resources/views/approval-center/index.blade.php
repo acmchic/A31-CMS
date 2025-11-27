@@ -18,7 +18,13 @@
 <div class="row" style="height: calc(100vh - 200px);">
     <!-- First Column: Type Sidebar -->
     <div class="col-md-2 border-end" style="overflow-y: auto; max-height: 100%; padding: 0;">
-        <input type="hidden" id="filter-type" value="{{ $filters['type'] }}">
+        @php
+            $activeType = $filters['type'];
+            if (request()->has('model_type') && !request()->has('type')) {
+                $activeType = request()->get('model_type');
+            }
+        @endphp
+        <input type="hidden" id="filter-type" value="{{ $activeType }}">
         <div class="type-sidebar">
             @php
                 $user = backpack_user();
@@ -54,7 +60,7 @@
                 }
             @endphp
 
-            <div class="type-item {{ $filters['type'] === 'leave' ? 'active' : '' }}"
+            <div class="type-item {{ $activeType === 'leave' ? 'active' : '' }}"
                  data-type="leave">
                 <div class="d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center gap-3">
@@ -71,7 +77,7 @@
                 </div>
             </div>
 
-            <div class="type-item {{ $filters['type'] === 'vehicle' ? 'active' : '' }}"
+            <div class="type-item {{ $activeType === 'vehicle' ? 'active' : '' }}"
                  data-type="vehicle">
                 <div class="d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center gap-3">
@@ -88,7 +94,7 @@
                 </div>
             </div>
 
-            <div class="type-item {{ $filters['type'] === 'material_plan' ? 'active' : '' }}"
+            <div class="type-item {{ $activeType === 'material_plan' ? 'active' : '' }}"
                  data-type="material_plan">
                 <div class="d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center gap-3">
@@ -629,17 +635,14 @@ $(document).ready(function() {
             window.open(pdfUrl, '_blank');
         }
     });
-    // Initialize type items based on current filter
     const currentType = $('#filter-type').val() || 'all';
+    $('.type-item').removeClass('active');
     if (currentType === 'leave') {
         $('.type-item[data-type="leave"]').addClass('active');
-        $('.type-item[data-type="vehicle"]').removeClass('active');
     } else if (currentType === 'vehicle') {
         $('.type-item[data-type="vehicle"]').addClass('active');
-        $('.type-item[data-type="leave"]').removeClass('active');
-    } else {
-        // 'all' - both can be active or none
-        $('.type-item').removeClass('active');
+    } else if (currentType === 'material_plan') {
+        $('.type-item[data-type="material_plan"]').addClass('active');
     }
 
     // Type item click handlers

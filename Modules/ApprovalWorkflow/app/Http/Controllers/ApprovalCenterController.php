@@ -33,10 +33,10 @@ class ApprovalCenterController extends Controller
             abort(403, 'Bạn không có quyền truy cập Trung tâm phê duyệt');
         }
         
-        // Get filter parameters - default status to 'all'
-        $type = $request->get('type', 'all'); // all, leave, vehicle
-        $status = $request->get('status', 'all'); // default: all (Tất cả trạng thái)
-        $timeRange = $request->get('time_range', 'all'); // all, today, week, month
+        $modelType = $request->get('model_type');
+        $type = $request->get('type', $modelType ?: 'all');
+        $status = $request->get('status', 'all');
+        $timeRange = $request->get('time_range', 'all');
         
         // Get all requests that user can approve
         $requests = $this->service->getApprovalRequests($user, [
