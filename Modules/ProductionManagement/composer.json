@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/productionmanagement",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\ProductionManagement\\": "app/",
+            "Modules\\ProductionManagement\\Database\\Factories\\": "database/factories/",
+            "Modules\\ProductionManagement\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\ProductionManagement\\Tests\\": "tests/"
+        }
+    }
+}

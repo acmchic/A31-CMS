@@ -38,7 +38,8 @@ class CleanPermissionSeeder extends Seeder
             'report' => 'Báo cáo quân số',
             'leave' => 'Đơn nghỉ phép',
             'profile' => 'Thông tin cá nhân',
-            'record_management' => 'Quản lý sổ sách'
+            'record_management' => 'Quản lý sổ sách',
+            'material_plan' => 'Phương án vật tư'
         ];
 
         // CRUD actions
@@ -68,7 +69,7 @@ class CleanPermissionSeeder extends Seeder
 
             foreach ($actions as $actionKey => $actionName) {
                 // Skip approve for non-approvable modules
-                if ($actionKey === 'approve' && !in_array($moduleKey, ['leave', 'report', 'employee', 'department', 'record_management'])) {
+                if ($actionKey === 'approve' && !in_array($moduleKey, ['leave', 'report', 'employee', 'department', 'record_management', 'material_plan'])) {
                     continue;
                 }
 
@@ -92,7 +93,7 @@ class CleanPermissionSeeder extends Seeder
                 $permissionId++;
 
                 // Add scoped permissions for view action
-                if ($actionKey === 'view' && in_array($moduleKey, ['user', 'department', 'employee', 'report', 'leave', 'record_management'])) {
+                if ($actionKey === 'view' && in_array($moduleKey, ['user', 'department', 'employee', 'report', 'leave', 'record_management', 'material_plan'])) {
                     foreach ($scopes as $scopeKey => $scopeName) {
                         $scopedPermission = "{$moduleKey}.{$actionKey}.{$scopeKey}";
                         $scopedDisplayName = "{$actionName} {$moduleName} {$scopeName}";
@@ -177,6 +178,7 @@ class CleanPermissionSeeder extends Seeder
                     'report.view.department', 'report.create', 'report.edit',
                     'leave.view.department', 'leave.approve',
                     'record_management.view.department', 'record_management.create', 'record_management.edit',
+                    'material_plan.view.department', 'material_plan.create', 'material_plan.edit',
                     'approval_center.view',
                     'profile.view', 'profile.edit'
                 ]

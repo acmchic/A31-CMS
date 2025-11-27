@@ -4,6 +4,7 @@ namespace Modules\ApprovalWorkflow\Services;
 
 use Modules\PersonnelReport\Models\EmployeeLeave;
 use Modules\VehicleRegistration\Models\VehicleRegistration;
+use Modules\ProductionManagement\Models\MaterialPlan;
 use Modules\ApprovalWorkflow\Models\ApprovalHistory;
 use App\Helpers\PermissionHelper;
 use Carbon\Carbon;
@@ -61,6 +62,12 @@ class ApprovalCenterService
             $requests = $requests->merge($vehicleRequests);
         }
 
+        // Get material plan requests
+        if ($filters['type'] === 'all' || $filters['type'] === 'material_plan') {
+            $materialPlanRequests = $this->getMaterialPlanRequests($user, $filters);
+            $requests = $requests->merge($materialPlanRequests);
+        }
+
         // Sort by created_at desc
         return $requests->sortByDesc('created_at')->values();
     }
@@ -80,19 +87,66 @@ class ApprovalCenterService
                 'pending' => 0,
                 'review' => 0,
                 'director' => 0
+            ],
+            'material_plan' => [
+                'pending' => 0,
+                'review' => 0,
+                'director' => 0
             ]
         ];
 
         // Get leave counts
-        $leaveQuery = EmployeeLeave::query();
-        $this->filterLeaveByUserPermissions($leaveQuery, $user, ['status' => 'all']);
-
         $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
         $hasOfficerReviewPermission = PermissionHelper::can($user, 'leave.review.officer');
+        $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+        $isDepartmentHead = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban']);
 
-        // Count by status and rank type
-        $pendingQuery = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_PENDING);
-        $reviewQuery = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD);
+        // Count pending (department head approval step)
+        // Use the same filter logic as getApprovalRequests() to ensure badge matches what user can see
+        $pendingQuery = EmployeeLeave::query();
+        
+        // Apply the same permission filter as getApprovalRequests()
+        // This ensures badge count matches what user can actually see in the list
+        if (!$user->hasRole('Admin') && !$hasReviewPermission && !$hasOfficerReviewPermission && !$isDirector) {
+            // For regular users and department heads, apply same filter as getApprovalRequests()
+            $pendingQuery->where(function($q) use ($user, $isDepartmentHead) {
+                // User can see their own requests
+                if ($user->employee_id) {
+                    $q->where('employee_id', $user->employee_id);
+                }
+
+                // Department head can see their department
+                if ($isDepartmentHead) {
+                    // Get user's department_id from user->department_id or user->employee->department_id
+                    $userDepartmentId = $user->department_id;
+                    if (!$userDepartmentId && $user->employee_id) {
+                        $employee = \Modules\OrganizationStructure\Models\Employee::find($user->employee_id);
+                        if ($employee && $employee->department_id) {
+                            $userDepartmentId = $employee->department_id;
+                        }
+                    }
+                    
+                    if ($userDepartmentId) {
+                        $q->orWhereHas('employee', function($subQ) use ($userDepartmentId) {
+                            $subQ->where('department_id', $userDepartmentId);
+                        });
+                    }
+                }
+            });
+        }
+        
+        // Then filter by approval status/step
+        $pendingQuery->whereHas('approvalRequest', function($q) {
+            $q->where('status', 'submitted')
+              ->where('current_step', 'department_head_approval');
+        });
+        
+        // Count review (reviewer approval step)
+        $reviewQuery = EmployeeLeave::query()
+            ->whereHas('approvalRequest', function($q) {
+                $q->where('status', 'in_review')
+                  ->where('current_step', 'review');
+            });
         
         // Filter review count by rank type if user has specific permission
         if ($hasReviewPermission && !$hasOfficerReviewPermission) {
@@ -126,17 +180,24 @@ class ApprovalCenterService
         $counts['leave']['review'] = $reviewQuery->count();
 
         // For director count, only count requests where user is in selected_approvers
-        $directorQuery = (clone $leaveQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER);
-        if ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
+        $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+        if ($isDirector) {
             $userId = (int)$user->id;
-            $directorQuery->where(function($q) use ($userId) {
-                $q->whereJsonContains('selected_approvers', $userId)
-                  ->orWhereJsonContains('selected_approvers', (string)$userId)
-                  ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode($userId)])
-                  ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode((string)$userId)]);
-            });
+            // Director: count requests at director_approval step where user is in selected_approvers
+            // Build a fresh query without user permission filters to get accurate count
+            $directorQuery = EmployeeLeave::query()
+                ->whereHas('approvalRequest', function($q) use ($userId) {
+                    $q->where('status', 'in_review')
+                      ->where('current_step', 'director_approval')
+                      ->where(function($jsonQ) use ($userId) {
+                          $jsonQ->whereJsonContains('selected_approvers->director_approval', $userId)
+                                ->orWhereJsonContains('selected_approvers->director_approval', (string)$userId);
+                      });
+                });
+            $counts['leave']['director'] = $directorQuery->count();
+        } else {
+            $counts['leave']['director'] = 0;
         }
-        $counts['leave']['director'] = $directorQuery->count();
 
         // Get vehicle counts
         $vehicleQuery = VehicleRegistration::query();
@@ -147,11 +208,48 @@ class ApprovalCenterService
         if ($isDirector) {
             $counts['vehicle']['pending'] = 0;
             $counts['vehicle']['review'] = 0;
-            $counts['vehicle']['director'] = (clone $vehicleQuery)->where('workflow_status', 'director_review')->count();
+            $counts['vehicle']['director'] = (clone $vehicleQuery)->whereHas('approvalRequest', function($q) {
+                $q->where('status', 'in_review')
+                  ->where('current_step', 'director_approval');
+            })->count();
         } else {
-            $counts['vehicle']['pending'] = (clone $vehicleQuery)->whereIn('workflow_status', ['submitted', 'dept_review'])->count();
+            $counts['vehicle']['pending'] = (clone $vehicleQuery)->whereHas('approvalRequest', function($q) {
+                $q->whereIn('status', ['submitted', 'in_review'])
+                  ->whereIn('current_step', ['vehicle_picked', 'department_head_approval']);
+            })->count();
             $counts['vehicle']['review'] = 0;
             $counts['vehicle']['director'] = 0;
+        }
+
+        // Get material plan counts
+        $materialPlanQuery = MaterialPlan::query();
+        $hasMaterialPlanPermission = PermissionHelper::can($user, 'material_plan.approve');
+        
+        if ($isDirector && $hasMaterialPlanPermission) {
+            // BGD: chỉ đếm các plan có selected_approvers chứa user này và workflow_status là pending hoặc approved_by_reviewer
+            $userId = (int)$user->id;
+            $counts['material_plan']['pending'] = 0;
+            $counts['material_plan']['review'] = 0;
+            $counts['material_plan']['director'] = (clone $materialPlanQuery)
+                ->whereHas('approvalRequest', function($q) use ($userId) {
+                    $q->where(function($statusQ) {
+                        $statusQ->where('status', 'submitted')
+                                ->where('current_step', 'review')
+                            ->orWhere(function($reviewQ) {
+                                $reviewQ->where('status', 'in_review')
+                                        ->where('current_step', 'director_approval');
+                            });
+                    })
+                    ->where(function($jsonQ) use ($userId) {
+                        $jsonQ->whereJsonContains('selected_approvers->director_approval', $userId)
+                              ->orWhereJsonContains('selected_approvers->director_approval', (string)$userId);
+                    });
+                })
+                ->count();
+        } else {
+            $counts['material_plan']['pending'] = 0;
+            $counts['material_plan']['review'] = 0;
+            $counts['material_plan']['director'] = 0;
         }
 
         return $counts;
@@ -207,27 +305,60 @@ class ApprovalCenterService
     }
 
     /**
+     * Helper: Apply leave workflow status filter to approval_requests query
+     */
+    private function applyLeaveWorkflowStatusFilter($query, $status)
+    {
+        $statusMap = [
+            EmployeeLeave::WORKFLOW_PENDING => ['status' => 'submitted', 'step' => 'department_head_approval'],
+            EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => ['status' => 'in_review', 'step' => 'review'],
+            EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER => ['status' => 'in_review', 'step' => 'director_approval'],
+            EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR => ['status' => 'approved', 'step' => null],
+            EmployeeLeave::WORKFLOW_REJECTED => ['status' => 'rejected', 'step' => null],
+        ];
+
+        $mapped = $statusMap[$status] ?? null;
+        if (!$mapped) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        $query->where('status', $mapped['status']);
+        if ($mapped['step'] !== null) {
+            $query->where('current_step', $mapped['step']);
+        } else {
+            $query->whereNull('current_step');
+        }
+    }
+
+    /**
      * Get leave requests
      */
     protected function getLeaveRequests($user, $filters)
     {
         $query = EmployeeLeave::query();
 
-        // Apply status filter FIRST - use simple where() to ensure it's not overridden
-        if ($filters['status'] !== 'all') {
-            $statusValue = null;
-            if ($filters['status'] === 'pending') {
-                $statusValue = EmployeeLeave::WORKFLOW_PENDING;
-            } elseif ($filters['status'] === 'completed') {
-                $statusValue = EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR;
-            } else {
-                // Direct status match (approved_by_department_head, approved_by_reviewer, etc.)
-                $statusValue = $filters['status'];
-            }
+        $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
 
-            if ($statusValue) {
-                // Apply status filter directly - this will be respected by subsequent filters
-                $query->where('workflow_status', $statusValue);
+        // Apply status filter FIRST - but skip for directors when status is 'all' (let filterLeaveByUserPermissions handle it)
+        if ($filters['status'] !== 'all' || !$isDirector) {
+            if ($filters['status'] !== 'all') {
+                $statusValue = null;
+                if ($filters['status'] === 'pending') {
+                    $statusValue = EmployeeLeave::WORKFLOW_PENDING;
+                } elseif ($filters['status'] === 'completed') {
+                    $statusValue = EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR;
+                } else {
+                    // Direct status match (approved_by_department_head, approved_by_reviewer, etc.)
+                    $statusValue = $filters['status'];
+                }
+
+                if ($statusValue) {
+                    // Apply status filter via approval_requests
+                    $query->whereHas('approvalRequest', function($arQ) use ($statusValue) {
+                        $this->applyLeaveWorkflowStatusFilter($arQ, $statusValue);
+                    });
+                }
             }
         }
 
@@ -338,15 +469,26 @@ class ApprovalCenterService
         $this->filterVehicleByUserPermissions($query, $user, $filters);
 
         // Apply status filter (only if not director, or if director but status is not 'all')
+        // Map old status values to new approval_requests status
         if ($filters['status'] !== 'all' && !$isDirector) {
             if ($filters['status'] === 'pending') {
-                $query->whereIn('workflow_status', ['submitted', 'dept_review']);
+                $query->whereHas('approvalRequest', function($q) {
+                    $q->whereIn('status', ['submitted', 'in_review'])
+                      ->whereIn('current_step', ['vehicle_picked', 'department_head_approval']);
+                });
             } elseif ($filters['status'] === 'director_review') {
-                $query->where('workflow_status', 'director_review');
+                $query->whereHas('approvalRequest', function($q) {
+                    $q->where('status', 'in_review')
+                      ->where('current_step', 'director_approval');
+                });
             } elseif ($filters['status'] === 'approved') {
-                $query->where('workflow_status', 'approved');
-            } else {
-                $query->where('workflow_status', $filters['status']);
+                $query->whereHas('approvalRequest', function($q) {
+                    $q->where('status', 'approved');
+                });
+            } elseif ($filters['status'] === 'rejected') {
+                $query->whereHas('approvalRequest', function($q) {
+                    $q->where('status', 'rejected');
+                });
             }
         }
 
@@ -363,9 +505,9 @@ class ApprovalCenterService
                     'type' => 'Official Cars',
                     'type_label' => 'Đăng ký xe',
                     'title' => $this->getVehicleTitle($vehicle),
-                    'status' => $vehicle->workflow_status,
-                    'status_label' => $this->getVehicleStatusLabel($vehicle->workflow_status),
-                    'status_badge' => $this->getVehicleStatusBadge($vehicle->workflow_status),
+                    'status' => $vehicle->approvalRequest ? $vehicle->approvalRequest->status : 'draft',
+                    'status_label' => $vehicle->approvalRequest ? $vehicle->approvalRequest->status_label : 'Nháp',
+                    'status_badge' => $vehicle->approvalRequest ? $this->getVehicleStatusBadge($vehicle->approvalRequest->status) : 'secondary',
                     'initiated_by' => $vehicle->user ? $vehicle->user->name : 'N/A',
                     'initiated_by_username' => $vehicle->user ? $vehicle->user->username : 'N/A',
                     'created_at' => $vehicle->created_at,
@@ -375,6 +517,137 @@ class ApprovalCenterService
                     'can_reject' => $vehicle->canBeRejected() && $this->canUserApproveVehicle($vehicle, backpack_user()),
                 ];
             });
+    }
+
+    /**
+     * Get material plan requests
+     */
+    protected function getMaterialPlanRequests($user, $filters)
+    {
+        $query = MaterialPlan::query();
+
+        // Apply status filter via approval_requests
+        if ($filters['status'] !== 'all') {
+            $query->whereHas('approvalRequest', function($arQ) use ($filters) {
+                if ($filters['status'] === 'pending') {
+                    $arQ->where('status', 'submitted')
+                        ->where('current_step', 'review');
+                } elseif ($filters['status'] === 'approved_by_department_head') {
+                    $arQ->where('status', 'in_review')
+                        ->where('current_step', 'review');
+                } elseif ($filters['status'] === 'approved_by_reviewer') {
+                    $arQ->where('status', 'in_review')
+                        ->where('current_step', 'director_approval');
+                } elseif ($filters['status'] === 'completed') {
+                    $arQ->where('status', 'approved')
+                        ->whereNull('current_step');
+                } elseif ($filters['status'] === 'rejected') {
+                    $arQ->where('status', 'rejected');
+                } else {
+                    // Try to map old status to new
+                    $arQ->where('status', $filters['status']);
+                }
+            });
+        }
+
+        // Apply time range filter
+        $this->applyTimeRangeFilter($query, $filters['time_range']);
+
+        return $query->with(['nguoiLap', 'items.material'])
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->filter(function($plan) use ($user) {
+                // Check if user can approve this plan
+                return $this->canUserApproveMaterialPlan($plan, $user);
+            })
+            ->map(function($plan) {
+                return [
+                    'id' => $plan->id,
+                    'model_type' => 'material_plan',
+                    'type' => 'Material Plans',
+                    'type_label' => 'Phương án vật tư',
+                    'title' => $plan->ten_khi_tai . ($plan->ky_hieu_khi_tai ? ' (' . $plan->ky_hieu_khi_tai . ')' : ''),
+                    'status' => $plan->workflow_status,
+                    'status_label' => $this->getMaterialPlanStatusLabel($plan->workflow_status),
+                    'status_badge' => $this->getMaterialPlanStatusBadge($plan->workflow_status),
+                    'initiated_by' => $plan->nguoiLap ? $plan->nguoiLap->name : 'N/A',
+                    'initiated_by_username' => $plan->nguoiLap && $plan->nguoiLap->user ? $plan->nguoiLap->user->username : 'N/A',
+                    'created_at' => $plan->created_at,
+                    'created_at_formatted' => $this->formatDateWithTimezone($plan->created_at, 'd/m/Y H:i'),
+                    'period' => $plan->ngay_vao_sua_chua ?? '-',
+                    'can_approve' => $plan->canBeApproved() && $this->canUserApproveMaterialPlan($plan, backpack_user()),
+                    'can_reject' => $plan->canBeRejected() && $this->canUserApproveMaterialPlan($plan, backpack_user()),
+                    'is_reviewer_step' => $plan->workflow_status === 'approved_by_department_head',
+                    'has_selected_approvers' => !empty($plan->selected_approvers),
+                ];
+            });
+    }
+
+    /**
+     * Check if user can approve material plan
+     */
+    protected function canUserApproveMaterialPlan($plan, $user)
+    {
+        // Admin can approve all
+        if ($user->hasRole('Admin')) {
+            return true;
+        }
+
+        // Check permission
+        if (!PermissionHelper::can($user, 'material_plan.approve')) {
+            return false;
+        }
+
+        // Check if user is in selected_approvers for director step
+        // MaterialPlan workflow: pending -> approved_by_department_head -> approved_by_reviewer (BGD) -> approved
+        // Nếu có selected_approvers và workflow_status là pending hoặc approved_by_reviewer, check selected_approvers
+        if (!empty($plan->selected_approvers)) {
+            $userId = (int)$user->id;
+            $selectedApprovers = is_array($plan->selected_approvers) ? $plan->selected_approvers : json_decode($plan->selected_approvers, true);
+            
+            // Nếu user là BGD và có trong selected_approvers, có thể approve
+            $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+            if ($isDirector && (in_array($userId, $selectedApprovers) || in_array((string)$userId, $selectedApprovers))) {
+                // Chỉ hiển thị nếu workflow_status là pending (chờ BGD) hoặc approved_by_reviewer
+                return in_array($plan->workflow_status, ['pending', 'approved_by_reviewer']);
+            }
+        }
+
+        // Nếu không có selected_approvers hoặc user không phải BGD, chỉ hiển thị nếu workflow_status là pending
+        // (có thể là thẩm định hoặc các bước khác)
+        return $plan->workflow_status === 'pending';
+    }
+
+    /**
+     * Get material plan status label
+     */
+    protected function getMaterialPlanStatusLabel($status)
+    {
+        $labels = [
+            'pending' => 'Chờ phê duyệt',
+            'approved_by_department_head' => 'Thẩm định',
+            'approved_by_reviewer' => 'BGD phê duyệt',
+            'approved' => 'Đã phê duyệt',
+            'rejected' => 'Đã từ chối',
+        ];
+
+        return $labels[$status] ?? $status;
+    }
+
+    /**
+     * Get material plan status badge
+     */
+    protected function getMaterialPlanStatusBadge($status)
+    {
+        $badges = [
+            'pending' => 'orange',
+            'approved_by_department_head' => 'info',
+            'approved_by_reviewer' => 'warning',
+            'approved' => 'success',
+            'rejected' => 'danger',
+        ];
+
+        return $badges[$status] ?? 'secondary';
     }
 
     /**
@@ -451,31 +724,36 @@ class ApprovalCenterService
             return;
         }
 
-        // Director (BGD): only see requests where they are in selected_approvers list (for approved_by_reviewer step)
+        // Director (BGD): see all requests at approved_by_reviewer step (waiting for BGD approval)
         $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
         if ($isDirector) {
             $statusFilter = $filters['status'] ?? 'all';
+            $userId = (int)$user->id;
 
-            // For director, add additional permission check BUT keep the status filter intact
-            $query->where(function($q) use ($user, $statusFilter) {
-                // Show requests at approved_by_reviewer step where user is in selected_approvers
-                // (status filter already ensures workflow_status matches, so we only need to check selected_approvers)
-                if ($statusFilter === 'all' || $statusFilter === 'approved_by_reviewer') {
-                    $q->where(function($jsonQ) use ($user) {
-                        // Check if user ID is in selected_approvers JSON array
-                        $userId = (int)$user->id;
-                        $jsonQ->whereJsonContains('selected_approvers', $userId)
-                              ->orWhereJsonContains('selected_approvers', (string)$userId)
-                              ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode($userId)])
-                              ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode((string)$userId)]);
+            // For director, show all requests at director_approval step (waiting for BGD)
+            if ($statusFilter === 'all') {
+                // Show all requests at director_approval step OR already approved by this user
+                $query->where(function($q) use ($userId) {
+                    $q->whereHas('approvalRequest', function($arQ) {
+                        $arQ->where('status', 'in_review')
+                            ->where('current_step', 'director_approval');
+                    })
+                    ->orWhereHas('approvalRequest', function($arQ) use ($userId) {
+                        $arQ->where('status', 'approved')
+                            ->whereJsonContains('approval_history->director_approval->approved_by', $userId);
                     });
-                }
-
-                // Also show requests already approved by this user (for history)
-                if ($statusFilter === 'all' || $statusFilter === 'completed' || $statusFilter === 'approved_by_director') {
-                    $q->orWhere('approved_by_director', $user->id);
-                }
-            });
+                });
+            } elseif ($statusFilter === 'approved_by_reviewer') {
+                $query->whereHas('approvalRequest', function($arQ) {
+                    $arQ->where('status', 'in_review')
+                        ->where('current_step', 'director_approval');
+                });
+            } elseif ($statusFilter === 'completed' || $statusFilter === 'approved_by_director') {
+                $query->whereHas('approvalRequest', function($arQ) use ($userId) {
+                    $arQ->where('status', 'approved')
+                        ->whereJsonContains('approval_history->director_approval->approved_by', $userId);
+                });
+            }
             return;
         }
 
@@ -513,31 +791,32 @@ class ApprovalCenterService
             $statusFilter = $filters['status'] ?? 'all';
             $userId = (int)$user->id;
             
-            $query->where(function($q) use ($user, $statusFilter, $userId) {
-                $jsonCondition = function($jsonQ) use ($userId) {
-                    $jsonQ->whereJsonContains('selected_approvers', $userId)
-                          ->orWhereJsonContains('selected_approvers', (string)$userId)
-                          ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode($userId)])
-                          ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode((string)$userId)]);
-                };
-                
-                if ($statusFilter === 'all' || $statusFilter === 'director_review') {
-                    $q->where(function($directorQ) use ($userId, $jsonCondition) {
-                        $directorQ->where('workflow_status', 'director_review')
-                                  ->where($jsonCondition);
+            // For director, show all requests at director_approval step (waiting for BGD approval)
+            if ($statusFilter === 'all') {
+                // Show all requests at director_approval step OR already approved
+                $query->whereHas('approvalRequest', function($q) use ($userId) {
+                    $q->where(function($subQ) use ($userId) {
+                        // At director_approval step
+                        $subQ->where('status', 'in_review')
+                             ->where('current_step', 'director_approval');
+                        // OR already approved (check approval_history)
+                        $subQ->orWhere(function($approvedQ) use ($userId) {
+                            $approvedQ->where('status', 'approved')
+                                      ->whereJsonContains('approval_history->director_approval->approved_by', $userId);
+                        });
                     });
-                }
-                
-                if ($statusFilter === 'all' || $statusFilter === 'approved') {
-                    $q->orWhere(function($approvedQ) use ($userId, $jsonCondition) {
-                        $approvedQ->where('workflow_status', 'approved')
-                                  ->where(function($approvedCondition) use ($userId, $jsonCondition) {
-                                      $approvedCondition->where('director_approved_by', $userId)
-                                                        ->orWhere($jsonCondition);
-                                  });
-                    });
-                }
-            });
+                });
+            } elseif ($statusFilter === 'director_review') {
+                $query->whereHas('approvalRequest', function($q) {
+                    $q->where('status', 'in_review')
+                      ->where('current_step', 'director_approval');
+                });
+            } elseif ($statusFilter === 'approved') {
+                $query->whereHas('approvalRequest', function($q) use ($userId) {
+                    $q->where('status', 'approved')
+                      ->whereJsonContains('approval_history->director_approval->approved_by', $userId);
+                });
+            }
             return;
         }
 
@@ -621,31 +900,64 @@ class ApprovalCenterService
 
             case 'vehicle':
                 $model = VehicleRegistration::with(['user', 'vehicle', 'driver'])->find($id);
-                if (!$model) return null;
-
+                if (!$model) {
+                    return null;
+                }
                 $user = backpack_user();
-                $isDepartmentHeadStep = $model->workflow_status === 'dept_review' && $model->vehicle_id && !$model->department_approved_at;
+                // Check if at department_head_approval step
+                $approvalRequest = $model->approvalRequest;
+                $isDepartmentHeadStep = $approvalRequest && 
+                                       $approvalRequest->status === 'in_review' && 
+                                       $approvalRequest->current_step === 'department_head_approval' &&
+                                       $model->vehicle_id;
                 $hasDepartmentHeadPermission = $this->canUserApproveVehicle($model, $user);
-                $hasSelectedApprovers = !empty($model->selected_approvers);
-
                 return [
                     'id' => $model->id,
                     'model_type' => 'vehicle',
                     'type' => 'Official Cars',
                     'type_label' => 'Đăng ký xe',
                     'title' => $this->getVehicleTitle($model),
-                    'status' => $model->workflow_status,
-                    'status_label' => $this->getVehicleStatusLabel($model->workflow_status),
-                    'status_badge' => $this->getVehicleStatusBadge($model->workflow_status),
+                    'status' => $model->approvalRequest ? $model->approvalRequest->status : 'draft',
+                    'status_label' => $model->approvalRequest ? $model->approvalRequest->status_label : 'Nháp',
+                    'status_badge' => $model->approvalRequest ? $this->getVehicleStatusBadge($model->approvalRequest->status) : 'secondary',
                     'submitted_by' => $model->user ? $model->user->name : 'N/A',
-                    'submitted_at' => $this->formatVietnameseDate($model->created_at),
+                    'submitted_at' => $this->formatDateWithTimezone($model->created_at, 'd/m/Y, H:i'),
                     'details' => $this->getVehicleDetails($model),
                     'can_approve' => $model->canBeApproved() && $this->canUserApproveVehicle($model, $user),
                     'can_reject' => $model->canBeRejected() && $this->canUserApproveVehicle($model, $user),
-                    'is_department_head_step' => $isDepartmentHeadStep && $hasDepartmentHeadPermission,
+                    'is_department_head_step' => $isDepartmentHeadStep,
+                    'has_selected_approvers' => !empty($model->selected_approvers),
+                    'workflow_data' => $this->getVehicleWorkflowProgressData($model),
+                    'has_signed_pdf' => $model->hasSignedPdf(),
+                    'pdf_url' => $model->hasSignedPdf() ? route('approval.preview-pdf', ['modelClass' => base64_encode(get_class($model)), 'id' => $model->id]) : null,
+                    'rejection_reason' => $model->rejection_reason ?? null,
+                ];
+
+            case 'material_plan':
+                $model = MaterialPlan::with(['nguoiLap', 'items.material'])->find($id);
+                if (!$model) return null;
+
+                $user = backpack_user();
+                $hasSelectedApprovers = !empty($model->selected_approvers);
+
+                return [
+                    'id' => $model->id,
+                    'model_type' => 'material_plan',
+                    'type' => 'Material Plans',
+                    'type_label' => 'Phương án vật tư',
+                    'title' => $model->ten_khi_tai . ($model->ky_hieu_khi_tai ? ' (' . $model->ky_hieu_khi_tai . ')' : ''),
+                    'status' => $model->workflow_status,
+                    'status_label' => $this->getMaterialPlanStatusLabel($model->workflow_status),
+                    'status_badge' => $this->getMaterialPlanStatusBadge($model->workflow_status),
+                    'submitted_by' => $model->nguoiLap ? $model->nguoiLap->name : 'N/A',
+                    'submitted_at' => $this->formatDateWithTimezone($model->created_at, 'd/m/Y H:i'),
+                    'details' => $this->getMaterialPlanDetails($model),
+                    'can_approve' => $model->canBeApproved() && $this->canUserApproveMaterialPlan($model, $user),
+                    'can_reject' => $model->canBeRejected() && $this->canUserApproveMaterialPlan($model, $user),
+                    'is_reviewer_step' => $model->workflow_status === 'approved_by_department_head',
                     'has_selected_approvers' => $hasSelectedApprovers,
                     'selected_approvers' => $model->selected_approvers ? (is_array($model->selected_approvers) ? $model->selected_approvers : json_decode($model->selected_approvers, true)) : [],
-                    'workflow_data' => $this->getVehicleWorkflowProgressData($model),
+                    'workflow_data' => $this->getMaterialPlanWorkflowProgressData($model),
                     'has_signed_pdf' => $model->hasSignedPdf(),
                     'pdf_url' => $model->hasSignedPdf() ? route('approval.preview-pdf', ['modelClass' => base64_encode(get_class($model)), 'id' => $model->id]) : null,
                 ];
@@ -689,92 +1001,89 @@ class ApprovalCenterService
      */
     public function approveRequest($id, $modelType, $user, $comment = '', $certificatePin = null)
     {
+        // Get ApprovalRequest directly
+        $approvalRequest = \Modules\ApprovalWorkflow\Models\ApprovalRequest::where('model_type', $this->getModelClassFromType($modelType))
+            ->where('model_id', $id)
+            ->first();
+
+        if (!$approvalRequest) {
+            throw new \Exception('Không tìm thấy yêu cầu phê duyệt');
+        }
+
+        // Check if needs PIN based on step
+        $needsPin = $this->needsPinForStep($approvalRequest, $user);
+
+        // If no PIN needed, approve without PIN
+        if (!$needsPin) {
+            $workflowHandler = app(\Modules\ApprovalWorkflow\Services\ApprovalWorkflowHandler::class);
+            $workflowHandler->approve($approvalRequest, $user, ['comment' => $comment]);
+            
+            $approvalRequest->refresh();
+            
+            return [
+                'success' => true,
+                'message' => 'Đã chuyển lên BGD thành công!',
+                'data' => [
+                    'status' => $approvalRequest->status,
+                    'current_step' => $approvalRequest->current_step,
+                ],
+            ];
+        }
+
+        // For steps that need PIN, require PIN
+        if (!$certificatePin) {
+            throw new \Exception('Vui lòng nhập mã PIN để phê duyệt');
+        }
+
+        // Approve with PIN using ApprovalService
         $model = $this->getModel($id, $modelType);
         if (!$model) {
             throw new \Exception('Request not found');
         }
 
-        // Use ApprovalController logic
-        $controller = app(\Modules\ApprovalWorkflow\Http\Controllers\ApprovalController::class);
-
-        $needsPin = true;
-        if ($modelType === 'leave' && $model instanceof EmployeeLeave) {
-            $isReviewerStep = $model->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
-            $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
-
-            if ($isReviewerStep && $hasReviewPermission) {
-                if (empty($model->selected_approvers)) {
-                    throw new \Exception('Vui lòng chọn người phê duyệt trước khi chuyển đơn lên Ban Giám đốc');
-                }
-                $needsPin = false;
-            }
-        } elseif ($modelType === 'vehicle' && $model instanceof VehicleRegistration) {
-            $isDepartmentHeadStep = $model->workflow_status === 'dept_review' && $model->vehicle_id && !$model->department_approved_at;
-            $hasDepartmentHeadPermission = PermissionHelper::can($user, 'vehicle_registration.approve');
-
-            if ($isDepartmentHeadStep && $hasDepartmentHeadPermission) {
-                if (empty($model->selected_approvers)) {
-                    throw new \Exception('Vui lòng chọn người phê duyệt trước khi chuyển đơn lên Ban Giám đốc');
-                }
-            }
-        }
-
-        // If reviewer step, always use approveWithoutPin (no PIN needed)
-        if (!$needsPin) {
-            // Approve without PIN (for reviewer step - just forward to BGD)
-            $request = new \Illuminate\Http\Request();
-            $request->merge(['comment' => $comment]);
-
-            $modelClass = base64_encode(get_class($model));
-            $response = $controller->approveWithoutPin($request, $modelClass, $id);
-
-            // Convert response to array format
-            if ($response instanceof \Illuminate\Http\JsonResponse) {
-                $data = $response->getData(true);
-                return [
-                    'success' => $data['success'] ?? true,
-                    'message' => $data['message'] ?? 'Đã chuyển lên BGD',
-                    'data' => $data['data'] ?? null,
-                ];
-            }
-
-            return [
-                'success' => true,
-                'message' => 'Đã chuyển lên BGD',
-                'data' => null,
-            ];
-        }
-
-        // For other steps, require PIN
-        if (!$certificatePin) {
-            throw new \Exception('Vui lòng nhập mã PIN để phê duyệt');
-        }
-
-        // Approve with PIN
-        $request = new \Illuminate\Http\Request();
-        $request->merge([
-            'certificate_pin' => $certificatePin,
-            'comment' => $comment,
-        ]);
-
-        $modelClass = base64_encode(get_class($model));
-        $response = $controller->approveWithPin($request, $modelClass, $id);
-
-        // Convert response to array format
-        if ($response instanceof \Illuminate\Http\JsonResponse) {
-            $data = $response->getData(true);
-            return [
-                'success' => $data['success'] ?? true,
-                'message' => $data['message'] ?? 'Phê duyệt thành công',
-                'data' => $data['data'] ?? null,
-            ];
-        }
+        $approvalService = app(\Modules\ApprovalWorkflow\Services\ApprovalService::class);
+        $result = $approvalService->approveWithSignature(
+            $model,
+            $user,
+            $certificatePin,
+            ['comment' => $comment]
+        );
 
         return [
             'success' => true,
             'message' => 'Phê duyệt thành công',
-            'data' => null,
+            'data' => $result,
         ];
+    }
+
+    /**
+     * Check if step needs PIN
+     */
+    protected function needsPinForStep(\Modules\ApprovalWorkflow\Models\ApprovalRequest $approvalRequest, $user): bool
+    {
+        // Steps that don't need PIN (intermediate steps)
+        $noPinSteps = ['review', 'department_head_approval'];
+        
+        if (in_array($approvalRequest->current_step, $noPinSteps)) {
+            return false;
+        }
+
+        // Last step (director_approval) needs PIN
+        return true;
+    }
+
+    /**
+     * Get model class from model type (helper method)
+     */
+    protected function getModelClassFromType(string $modelType): string
+    {
+        $map = [
+            'leave' => \Modules\PersonnelReport\Models\EmployeeLeave::class,
+            'vehicle' => \Modules\VehicleRegistration\Models\VehicleRegistration::class,
+            'material_plan' => \Modules\ProductionManagement\Models\MaterialPlan::class,
+        ];
+
+        return $map[$modelType] ?? '';
     }
 
     /**
@@ -819,6 +1128,8 @@ class ApprovalCenterService
                 return EmployeeLeave::find($id);
             case 'vehicle':
                 return VehicleRegistration::find($id);
+            case 'material_plan':
+                return MaterialPlan::find($id);
             default:
                 return null;
         }
@@ -831,6 +1142,8 @@ class ApprovalCenterService
                 return EmployeeLeave::class;
             case 'vehicle':
                 return VehicleRegistration::class;
+            case 'material_plan':
+                return MaterialPlan::class;
             default:
                 return null;
         }
@@ -1048,36 +1361,71 @@ class ApprovalCenterService
             return false;
         }
 
-        $status = $vehicle->workflow_status;
+        // Get approval request to check current step
+        $approvalRequest = $vehicle->approvalRequest;
+        if (!$approvalRequest) {
+            return false;
+        }
+
+        $currentStep = $approvalRequest->current_step;
+        $status = $approvalRequest->status;
         
-        if ($status === 'director_review' || ($status === 'approved' && !$vehicle->director_approved_by)) {
+        // Step 1: vehicle_picked - Đội trưởng xe phân công (handled separately)
+        // Step 2: department_head_approval - Trưởng phòng kế hoạch duyệt
+        if ($currentStep === 'department_head_approval' && $status === 'in_review') {
+            $isDepartmentHead = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban', 'Trưởng phòng kế hoạch']);
+            return $isDepartmentHead;
+        }
+        
+        // Step 3: director_approval - Ban Giám đốc duyệt
+        if ($currentStep === 'director_approval' && $status === 'in_review') {
             $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
             if (!$isDirector) {
                 return false;
             }
             
-            if (!$vehicle->selected_approvers) {
-                return false;
-            }
-            
+            // Check if user is in selected_approvers
             if (method_exists($vehicle, 'isUserSelectedApprover')) {
                 return $vehicle->isUserSelectedApprover($user->id);
             }
             
-            $approverIds = is_array($vehicle->selected_approvers)
-                ? $vehicle->selected_approvers
-                : json_decode($vehicle->selected_approvers, true);
+            // Fallback: check selected_approvers from approvalRequest
+            $selectedApprovers = $approvalRequest->selected_approvers;
+            if (!$selectedApprovers) {
+                return false;
+            }
+            
+            $approverIds = is_array($selectedApprovers)
+                ? $selectedApprovers
+                : json_decode($selectedApprovers, true);
             
             if (!is_array($approverIds)) {
                 return false;
             }
             
-            return in_array((int)$user->id, array_map('intval', $approverIds));
+            // Flatten if nested by step
+            $allApprovers = [];
+            foreach ($approverIds as $stepApprovers) {
+                if (is_array($stepApprovers)) {
+                    $allApprovers = array_merge($allApprovers, $stepApprovers);
+                } else {
+                    $allApprovers[] = $stepApprovers;
+                }
+            }
+            
+            return in_array((int)$user->id, array_map('intval', $allApprovers));
         }
         
-        if ($status === 'dept_review') {
+        // Legacy support: check old workflow_status if approvalRequest doesn't have current_step
+        $oldStatus = $vehicle->workflow_status ?? null;
+        if ($oldStatus === 'dept_review') {
             $isDepartmentHead = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban']);
             return $isDepartmentHead;
+        }
+        
+        if ($oldStatus === 'director_review') {
+            $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+            return $isDirector;
         }
         
         return false;
@@ -1346,13 +1694,26 @@ class ApprovalCenterService
                 }
                 break;
             case 'rejected':
-                if ($model->director_approved_at) {
+                // Use rejection_level to determine which step was rejected
+                // rejection_level: 'department' = rejected at dept_review step, 'director' = rejected at director_review step
+                if ($model->rejection_level === 'director') {
+                    // Rejected at director_review step (BGD duyệt)
+                    $currentStepIndex = 3;
+                } elseif ($model->rejection_level === 'department') {
+                    // Rejected at dept_review step (Trưởng phòng KH duyệt)
+                    $currentStepIndex = 2;
+                } elseif ($model->director_approved_at) {
+                    // If director_approved_at exists, it means it was rejected at director_review step
                     $currentStepIndex = 3;
                 } elseif ($model->department_approved_at) {
-                    $currentStepIndex = 2;
+                    // If department_approved_at exists but no director_approved_at, rejected at director_review step
+                    $currentStepIndex = 3;
                 } elseif ($model->vehicle_id) {
-                    $currentStepIndex = 1;
+                    // If vehicle_id exists but no department_approved_at, rejected at dept_review step (Trưởng phòng KH duyệt)
+                    // This is the most common case: vehicle assigned but rejected by department head
+                    $currentStepIndex = 2;
                 } else {
+                    // Rejected at submitted step (before vehicle assignment)
                     $currentStepIndex = 0;
                 }
                 break;
@@ -1374,9 +1735,12 @@ class ApprovalCenterService
             'currentStatus' => $currentStatusKey,
             'currentStepIndex' => $currentStepIndex,
             'rejected' => $model->workflow_status === 'rejected',
+            'rejection_level' => $model->rejection_level ?? null,
+            'rejection_reason' => $model->rejection_reason ?? null,
             'stepDates' => $stepDates,
             'stepUsers' => $stepUsers
         ];
     }
 }
+
 

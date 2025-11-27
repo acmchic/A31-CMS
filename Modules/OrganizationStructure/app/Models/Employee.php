@@ -93,6 +93,14 @@ class Employee extends Model
         return $this->belongsTo(Position::class, 'position_id');
     }
 
+    /**
+     * Relationship: Vehicle registrations where this employee is the driver
+     */
+    public function driverRegistrations()
+    {
+        return $this->hasMany(\Modules\VehicleRegistration\Models\VehicleRegistration::class, 'driver_id');
+    }
+
     // Scopes
     public function scopeActive($query)
     {
@@ -102,6 +110,47 @@ class Employee extends Model
     public function scopeInDepartment($query, $departmentId)
     {
         return $query->where('department_id', $departmentId);
+    }
+
+    /**
+     * Scope to get drivers available for a date range
+     * A driver is NOT available if they're already assigned to another registration
+     * that overlaps with the given date range and is in a submitted state
+     */
+    public function scopeForDateRange($query, $startDate, $endDate, $excludeRegistrationId = null)
+    {
+        return $query->whereDoesntHave('driverRegistrations', function($q) use ($startDate, $endDate, $excludeRegistrationId) {
+            // Exclude the current registration if editing
+            if ($excludeRegistrationId) {
+                $q->where('id', '!=', $excludeRegistrationId);
+            }
+            
+            // Only check registrations that are in active workflow (not rejected, not cancelled)
+            // Check via approval_requests table
+            $q->whereHas('approvalRequest', function($approvalQuery) {
+                $approvalQuery->whereIn('status', ['submitted', 'in_review', 'approved']);
+            })
+              ->where(function($dateQuery) use ($startDate, $endDate) {
+                  // Check date overlap: two date ranges overlap if:
+                  // - start1 <= end2 AND start2 <= end1
+                  
+                  // Check both old date fields and new datetime fields
+                  $dateQuery->where(function($oldFields) use ($startDate, $endDate) {
+                      // Overlap condition: departure_date <= $endDate AND return_date >= $startDate
+                      $oldFields->where(function($overlap) use ($startDate, $endDate) {
+                          $overlap->where('departure_date', '<=', $endDate)
+                                  ->where('return_date', '>=', $startDate);
+                      });
+                  })
+                  ->orWhere(function($newFields) use ($startDate, $endDate) {
+                      // Overlap condition: departure_datetime <= $endDate AND return_datetime >= $startDate
+                      $newFields->where(function($overlap) use ($startDate, $endDate) {
+                          $overlap->whereDate('departure_datetime', '<=', $endDate)
+                                  ->whereDate('return_datetime', '>=', $startDate);
+                      });
+                  });
+              });
+        });
     }
 
     // Accessors

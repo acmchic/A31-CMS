@@ -103,13 +103,17 @@ class MaterialSeeder extends Seeder
         foreach ($materials as $material) {
             Material::updateOrCreate(
                 ['code' => $material['code']],
-                array_merge($material, [
+                [
+                    'code' => $material['code'],
+                    'ten_vat_tu' => $material['name'],
+                    'don_vi_tinh' => $material['unit'],
+                    'mo_ta' => $material['description'] ?? null,
                     'status' => 'active',
                     'can_import' => true,
                     'can_export' => true,
                     'min_stock_level' => 0.00,
                     'max_stock_level' => null,
-                ])
+                ]
             );
         }
 

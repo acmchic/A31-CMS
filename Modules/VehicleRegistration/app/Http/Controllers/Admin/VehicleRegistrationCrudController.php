@@ -14,8 +14,8 @@ use Illuminate\Support\Facades\Storage;
 class VehicleRegistrationCrudController extends CrudController
 {
     use \Backpack\CRUD\app\Http\Controllers\Operations\ListOperation;
-    use \Backpack\CRUD\app\Http\Controllers\Operations\CreateOperation;
-    use \Backpack\CRUD\app\Http\Controllers\Operations\UpdateOperation;
+    use \Backpack\CRUD\app\Http\Controllers\Operations\CreateOperation { store as traitStore; }
+    use \Backpack\CRUD\app\Http\Controllers\Operations\UpdateOperation { update as traitUpdate; }
     use \Backpack\CRUD\app\Http\Controllers\Operations\DeleteOperation;
     use \Backpack\CRUD\app\Http\Controllers\Operations\ShowOperation;
 
@@ -166,6 +166,50 @@ class VehicleRegistrationCrudController extends CrudController
         $this->addBasicFields();
     }
 
+    /**
+     * Override store to sync with ApprovalRequest
+     */
+    public function store()
+    {
+        $response = $this->traitStore();
+
+        // Sync với ApprovalRequest sau khi create
+        if ($this->crud->entry && class_exists(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class)) {
+            $service = new \Modules\ApprovalWorkflow\Services\ApprovalRequestService();
+            $entry = $this->crud->entry;
+            $title = $entry->vehicle 
+                ? "Đăng ký xe - {$entry->vehicle->name}" 
+                : "Đăng ký xe #{$entry->id}";
+            $service->syncFromModel($entry, 'vehicle', [
+                'title' => $title,
+            ]);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Override update to sync with ApprovalRequest
+     */
+    public function update()
+    {
+        $response = $this->traitUpdate();
+
+        // Sync với ApprovalRequest sau khi update
+        if ($this->crud->entry && class_exists(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class)) {
+            $service = new \Modules\ApprovalWorkflow\Services\ApprovalRequestService();
+            $entry = $this->crud->entry;
+            $title = $entry->vehicle 
+                ? "Đăng ký xe - {$entry->vehicle->name}" 
+                : "Đăng ký xe #{$entry->id}";
+            $service->syncFromModel($entry, 'vehicle', [
+                'title' => $title,
+            ]);
+        }
+
+        return $response;
+    }
+
     protected function setupShowOperation()
     {
         // Use custom view for show operation
@@ -242,30 +286,11 @@ class VehicleRegistrationCrudController extends CrudController
         CRUD::field('driver_license')->label('Số bằng lái')->type('text');
     }
 
-    private function addApprovalFields()
-    {
-        $this->addAssignmentFields();
-
-        // Approval fields
-        CRUD::field('status')->label('Trạng thái')->type('select_from_array')
-            ->options([
-                'pending' => 'Chờ duyệt',
-                'dept_approved' => 'Phòng ban đã duyệt',
-                'approved' => 'Đã phê duyệt',
-                'rejected' => 'Đã từ chối'
-            ]);
-
-        CRUD::field('workflow_status')->label('Tình trạng duyệt')->type('select_from_array')
-            ->options([
-                'submitted' => 'Đã gửi',
-                'dept_review' => 'Phòng ban xem xét',
-                'director_review' => 'Ban giám đốc xem xét',
-                'approved' => 'Đã duyệt',
-                'rejected' => 'Đã từ chối'
-            ]);
-
-        CRUD::field('rejection_reason')->label('Lý do từ chối')->type('textarea');
-    }
+    /**
+     * ❌ REMOVED: addApprovalFields()
+     * ✅ Approval fields are now managed in approval_requests table
+     * Use ApprovalController for approve/reject actions
+     */
 
     /**
      * TODO: Show vehicle assignment form (for Đội trưởng đội xe)
@@ -277,38 +302,48 @@ class VehicleRegistrationCrudController extends CrudController
 
         // Permission is already checked by route middleware
 
-        // Check if can be assigned
-        if ($registration->workflow_status !== 'submitted') {
+        // Check if can be assigned - check from approval_requests
+        $approvalRequest = $registration->approvalRequest;
+        if (!$approvalRequest || $approvalRequest->status !== 'submitted') {
             abort(403, 'Đăng ký này không thể phân xe.');
         }
 
         // Extract dates from datetime fields for compatibility
         $departureDate = $registration->departure_datetime ?
             \Carbon\Carbon::parse($registration->departure_datetime)->toDateString() :
-            $registration->departure_date;
+            ($registration->departure_date ? $registration->departure_date->toDateString() : null);
         $returnDate = $registration->return_datetime ?
             \Carbon\Carbon::parse($registration->return_datetime)->toDateString() :
-            $registration->return_date;
+            ($registration->return_date ? $registration->return_date->toDateString() : null);
 
-        // Get available vehicles and drivers for the dates
-        $availableVehicles = $this->getAvailableVehicles($departureDate, $returnDate);
-        $availableDrivers = $this->getAvailableDrivers($departureDate, $returnDate);
+        if (!$departureDate || !$returnDate) {
+            abort(400, 'Đăng ký này chưa có ngày đi/ngày về.');
+        }
 
-        // Get available vehicles and drivers (employees with driver role)
-        $availableVehicles = \Modules\VehicleRegistration\Models\Vehicle::available()
-            ->forDateRange($departureDate, $returnDate)
-            ->get();
-
-        // Get drivers - employees with position_id = 19 (Lái xe) or fallback to some employees
-        $availableDrivers = \Modules\OrganizationStructure\Models\Employee::where('position_id', 19) // Lái xe position
-            ->orWhere(function($query) {
-                // Fallback: get some employees for demo (first 10)
-                $query->limit(10);
-            })
+        // Get all vehicles and drivers, then filter by availability
+        $allVehicles = \Modules\VehicleRegistration\Models\Vehicle::available()->get();
+        $allDrivers = \Modules\OrganizationStructure\Models\Employee::where('position_id', 19) // Lái xe position
+            ->active()
             ->with(['department', 'position'])
             ->get();
 
-        return view('vehicleregistration::assign', compact('registration', 'availableVehicles', 'availableDrivers'));
+        // Get available vehicles and drivers for the dates (excluding current registration)
+        $availableVehicles = $this->getAvailableVehicles($departureDate, $returnDate, $registration->id);
+        $availableDrivers = $this->getAvailableDrivers($departureDate, $returnDate, $registration->id);
+
+        // Get unavailable IDs for display in view (to disable them)
+        $unavailableVehicleIds = $allVehicles->pluck('id')->diff($availableVehicles->pluck('id'))->toArray();
+        $unavailableDriverIds = $allDrivers->pluck('id')->diff($availableDrivers->pluck('id'))->toArray();
+
+        return view('vehicleregistration::assign', compact(
+            'registration', 
+            'availableVehicles', 
+            'availableDrivers',
+            'allVehicles',
+            'allDrivers',
+            'unavailableVehicleIds',
+            'unavailableDriverIds'
+        ));
     }
 
     /**
@@ -335,91 +370,65 @@ class VehicleRegistrationCrudController extends CrudController
             'driver_id' => 'required|exists:employees,id',
         ]);
 
+        // Extract dates from registration
+        $departureDate = $registration->departure_datetime ?
+            \Carbon\Carbon::parse($registration->departure_datetime)->toDateString() :
+            ($registration->departure_date ? $registration->departure_date->toDateString() : null);
+        $returnDate = $registration->return_datetime ?
+            \Carbon\Carbon::parse($registration->return_datetime)->toDateString() :
+            ($registration->return_date ? $registration->return_date->toDateString() : null);
+
+        if (!$departureDate || !$returnDate) {
+            return redirect()->back()->withErrors(['error' => 'Đăng ký này chưa có ngày đi/ngày về.']);
+        }
+
+        // Check if vehicle is available
+        $availableVehicles = $this->getAvailableVehicles($departureDate, $returnDate, $registration->id);
+        if (!$availableVehicles->contains('id', $request->vehicle_id)) {
+            return redirect()->back()->withErrors(['vehicle_id' => 'Xe này đã được phân công cho đơn khác trong khoảng thời gian này.']);
+        }
+
+        // Check if driver is available
+        $availableDrivers = $this->getAvailableDrivers($departureDate, $returnDate, $registration->id);
+        if (!$availableDrivers->contains('id', $request->driver_id)) {
+            return redirect()->back()->withErrors(['driver_id' => 'Lái xe này đã được phân công cho đơn khác trong khoảng thời gian này.']);
+        }
+
         // Get driver info
         $driver = \Modules\OrganizationStructure\Models\Employee::find($request->driver_id);
 
-        // Update registration
+        // Update registration - chỉ update business fields
         $registration->update([
             'vehicle_id' => $request->vehicle_id,
             'driver_id' => $request->driver_id,
             'driver_name' => $driver ? $driver->name : null,
-            'workflow_status' => 'dept_review',
             'updated_by' => backpack_user()->name
         ]);
+
+        // Sync với ApprovalRequest sau khi assign vehicle
+        // ApprovalRequestService sẽ tự động update status và current_step
+        if (class_exists(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class)) {
+            $service = new \Modules\ApprovalWorkflow\Services\ApprovalRequestService();
+            $service->syncFromModel($registration, 'vehicle');
+            
+            // Update approval_requests để chuyển sang step tiếp theo (department_head_approval)
+            $approvalRequest = $registration->approvalRequest;
+            if ($approvalRequest) {
+                $approvalRequest->update([
+                    'current_step' => 'department_head_approval',
+                    'status' => 'in_review'
+                ]);
+            }
+        }
 
         return redirect(backpack_url('vehicle-registration'))->with('success', 'Đã phân công xe thành công!');
     }
 
     /**
-     * Approve by department
+     * ❌ REMOVED: processApproveDepartment, processApproveDirector, processReject
+     * ✅ These are now handled by ApprovalService via ApprovalController
+     * Use /approval/approve/{modelClass}/{id} or /approval/reject/{modelClass}/{id}
      */
-    public function processApproveDepartment(Request $request, $id)
-    {
-        $registration = VehicleRegistration::findOrFail($id);
-
-        if (!PermissionHelper::userCan('vehicle_registration.approve')) {
-            abort(403, getUserTitle() . ' không có quyền phê duyệt.');
-        }
-
-        $registration->update([
-            'workflow_status' => 'director_review',
-            'department_approved_by' => backpack_user()->id,
-            'department_approved_at' => now(),
-            'digital_signature_dept' => backpack_user()->signature_path // If available
-        ]);
-
-        return redirect()->back()->with('success', 'Đã duyệt cấp phòng ban!');
-    }
-
-    /**
-     * Approve by director (final approval)
-     */
-    public function processApproveDirector(Request $request, $id)
-    {
-        $registration = VehicleRegistration::findOrFail($id);
-
-        if (!PermissionHelper::userCan('vehicle_registration.approve')) {
-            abort(403, getUserTitle() . ' không có quyền phê duyệt.');
-        }
-
-        $registration->update([
-            'status' => 'approved',
-            'workflow_status' => 'approved',
-            'director_approved_by' => backpack_user()->id,
-            'director_approved_at' => now(),
-            'digital_signature_director' => backpack_user()->signature_path
-        ]);
-
-        // Generate PDF with digital signature here using lsnepomuceno/laravel-a1-pdf-sign
-        // TODO: Implement PDF generation with signatures
-
-        return redirect()->back()->with('success', 'Đã phê duyệt! PDF đang được tạo.');
-    }
-
-    /**
-     * Reject registration
-     */
-    public function processReject(Request $request, $id)
-    {
-        $registration = VehicleRegistration::findOrFail($id);
-
-        if (!PermissionHelper::userCan('vehicle_registration.approve')) {
-            abort(403, getUserTitle() . ' không có quyền từ chối.');
-        }
-
-        $request->validate([
-            'rejection_reason' => 'required|string'
-        ]);
-
-        $registration->update([
-            'status' => 'rejected',
-            'workflow_status' => 'rejected',
-            'rejection_reason' => $request->rejection_reason,
-            'rejection_level' => $registration->workflow_status === 'submitted' ? 'department' : 'director'
-        ]);
-
-        return redirect()->back()->with('success', 'Đã từ chối đăng ký.');
-    }
 
     /**
      * Approve with digital signature
@@ -477,9 +486,13 @@ class VehicleRegistrationCrudController extends CrudController
         }
 
         try {
+            // Get signed_pdf_path from approval_requests
+            $approvalRequest = $registration->approvalRequest;
+            $signedPdfPath = $approvalRequest ? $approvalRequest->signed_pdf_path : null;
+            
             // Check if PDF already exists
-            if ($registration->signed_pdf_path && Storage::disk('public')->exists($registration->signed_pdf_path)) {
-                return Storage::disk('public')->download($registration->signed_pdf_path, 'Dang_ky_xe_' . $registration->id . '.pdf');
+            if ($signedPdfPath && Storage::disk('public')->exists($signedPdfPath)) {
+                return Storage::disk('public')->download($signedPdfPath, 'Dang_ky_xe_' . $registration->id . '.pdf');
             }
 
             // Generate PDF on-the-fly if not exists
@@ -507,7 +520,11 @@ class VehicleRegistrationCrudController extends CrudController
     {
         $registration = VehicleRegistration::findOrFail($id);
 
-        if (!$registration->signed_pdf_path) {
+        // Get signed_pdf_path from approval_requests
+        $approvalRequest = $registration->approvalRequest;
+        $signedPdfPath = $approvalRequest ? $approvalRequest->signed_pdf_path : null;
+
+        if (!$signedPdfPath) {
             return response()->json([
                 'success' => false,
                 'message' => 'Không tìm thấy PDF đã ký'
@@ -515,7 +532,7 @@ class VehicleRegistrationCrudController extends CrudController
         }
 
         try {
-            $validation = VehicleRegistrationPdfService::validatePdfSignature($registration->signed_pdf_path);
+            $validation = VehicleRegistrationPdfService::validatePdfSignature($signedPdfPath);
 
             return response()->json([
                 'success' => true,
@@ -533,21 +550,27 @@ class VehicleRegistrationCrudController extends CrudController
 
     /**
      * Get available vehicles for date range
+     * Vehicles are available if they're not already assigned to another registration
+     * that overlaps with the given date range
      */
-    private function getAvailableVehicles($startDate, $endDate)
+    private function getAvailableVehicles($startDate, $endDate, $excludeRegistrationId = null)
     {
-        // TODO: Query vehicles table for available vehicles
-        // For now return empty array
-        return [];
+        return \Modules\VehicleRegistration\Models\Vehicle::available()
+            ->forDateRange($startDate, $endDate, $excludeRegistrationId)
+            ->get();
     }
 
     /**
      * Get available drivers for date range
+     * Drivers are available if they're not already assigned to another registration
+     * that overlaps with the given date range
      */
-    private function getAvailableDrivers($startDate, $endDate)
+    private function getAvailableDrivers($startDate, $endDate, $excludeRegistrationId = null)
     {
-        // TODO: Query drivers table for available drivers
-        // For now return empty array
-        return [];
+        return \Modules\OrganizationStructure\Models\Employee::where('position_id', 19) // Lái xe position
+            ->active()
+            ->forDateRange($startDate, $endDate, $excludeRegistrationId)
+            ->with(['department', 'position'])
+            ->get();
     }
 }

@@ -12,6 +12,7 @@ use Modules\PersonnelReport\Models\DailyPersonnelReport;
 use Modules\VehicleRegistration\Models\VehicleRegistration;
 use Modules\RecordManagement\Models\RecordType;
 use Modules\FileSharing\Models\SharedFile;
+use Modules\ProductionManagement\Models\MaterialPlan;
 use App\Helpers\PermissionHelper;
 
 class DashboardController extends Controller
@@ -30,6 +31,7 @@ class DashboardController extends Controller
             'vehicle_registrations' => VehicleRegistration::count(),
             'shared_files' => SharedFile::count(),
             'users' => User::count(),
+            'material_plans' => MaterialPlan::count(),
         ];
 
         // Base modules that all users can see - Sắp xếp theo thứ tự ưu tiên
@@ -127,6 +129,19 @@ class DashboardController extends Controller
                 'status' => 'active',
                 'count' => $stats['vehicle_registrations'],
                 'color' => 'secondary'
+            ];
+        }
+
+        // 4.5. Production Management
+        if (PermissionHelper::userCan('material_plan.view') || backpack_user()->hasRole('Admin')) {
+            $modules[] = [
+                'name' => 'Quản lý sản xuất',
+                'description' => 'Quản lý phương án vật tư và sản xuất',
+                'icon' => 'la la-clipboard-list',
+                'url' => backpack_url('material-plan'),
+                'status' => 'active',
+                'count' => $stats['material_plans'],
+                'color' => 'primary'
             ];
         }
 

@@ -106,12 +106,29 @@ class ApprovalController extends Controller
             // Find model
             $model = $modelClass::findOrFail($id);
 
-            // Check permission - allow leave.review permission
+            // Get ApprovalRequest
+            $approvalRequest = \Modules\ApprovalWorkflow\Models\ApprovalRequest::where('model_type', $modelClass)
+                ->where('model_id', $id)
+                ->first();
+
+            if (!$approvalRequest) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Không tìm thấy yêu cầu phê duyệt'
+                ], 404);
+            }
+
+            // Check permission
             $user = backpack_user();
             $modulePermission = $this->getModulePermission($modelClass);
 
             $hasApprovePermission = PermissionHelper::can($user, "{$modulePermission}.approve");
-            $hasReviewPermission = PermissionHelper::can($user, "{$modulePermission}.review");
+            
+            // Only check review permission for Leave requests
+            $hasReviewPermission = false;
+            if ($modelClass === \Modules\PersonnelReport\Models\EmployeeLeave::class) {
+                $hasReviewPermission = PermissionHelper::can($user, "{$modulePermission}.review");
+            }
 
             if (!$hasApprovePermission && !$hasReviewPermission) {
                 return response()->json([
@@ -120,36 +137,30 @@ class ApprovalController extends Controller
                 ], 403);
             }
 
-            // Check if current step is reviewer step
-            if ($model instanceof \Modules\PersonnelReport\Models\EmployeeLeave) {
-                if ($model->workflow_status !== \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Chỉ có thể gửi lên BGD khi đơn ở trạng thái đã được Trưởng phòng xác nhận'
-                    ], 400);
-                }
-                
-                // Validate: must have selected_approvers before sending to BGD
-                if (empty($model->selected_approvers)) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Vui lòng chọn người phê duyệt (Ban Giám đốc) trước khi chuyển đơn lên BGD'
-                    ], 400);
-                }
+            // Check if user can approve at current step
+            if (!$approvalRequest->canBeApprovedBy($user)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bạn không có quyền phê duyệt ở bước này'
+                ], 403);
             }
 
-            // Approve without signature (just workflow update)
-            $this->approvalService->approve(
-                $model,
+            // Approve using ApprovalRequest
+            $this->approvalService->approveRequest(
+                $approvalRequest,
                 $user,
                 $request->only(['comment', 'metadata'])
             );
+
+            // Reload approvalRequest to get updated status
+            $approvalRequest->refresh();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Đã gửi lên BGD thành công!',
                 'data' => [
-                    'workflow_status' => $model->workflow_status
+                    'status' => $approvalRequest->status,
+                    'current_step' => $approvalRequest->current_step,
                 ]
             ]);
 
@@ -187,12 +198,29 @@ class ApprovalController extends Controller
             // Find model
             $model = $modelClass::findOrFail($id);
 
+            // Get ApprovalRequest
+            $approvalRequest = \Modules\ApprovalWorkflow\Models\ApprovalRequest::where('model_type', $modelClass)
+                ->where('model_id', $id)
+                ->first();
+
+            if (!$approvalRequest) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Không tìm thấy yêu cầu phê duyệt'
+                ], 404);
+            }
+
             // Check permission
             $user = backpack_user();
             $modulePermission = $this->getModulePermission($modelClass);
 
             $hasApprovePermission = PermissionHelper::can($user, "{$modulePermission}.approve");
-            $hasReviewPermission = PermissionHelper::can($user, "{$modulePermission}.review");
+            
+            // Only check review permission for Leave requests
+            $hasReviewPermission = false;
+            if ($modelClass === \Modules\PersonnelReport\Models\EmployeeLeave::class) {
+                $hasReviewPermission = PermissionHelper::can($user, "{$modulePermission}.review");
+            }
 
             if (!$hasApprovePermission && !$hasReviewPermission) {
                 return response()->json([
@@ -201,22 +229,37 @@ class ApprovalController extends Controller
                 ], 403);
             }
 
+            // Check if user can reject at current step
+            if (!$approvalRequest->canBeApprovedBy($user)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bạn không có quyền từ chối ở bước này'
+                ], 403);
+            }
+
             // Validate reason
             $request->validate([
                 'reason' => 'required|string'
             ]);
 
-            // Reject
-            $this->approvalService->reject(
-                $model,
+            // Reject using ApprovalRequest
+            $this->approvalService->rejectRequest(
+                $approvalRequest,
                 $user,
                 $request->reason,
                 $request->only(['comment', 'metadata'])
             );
 
+            // Reload approvalRequest to get updated status
+            $approvalRequest->refresh();
+
             return response()->json([
                 'success' => true,
-                'message' => 'Đã từ chối thành công'
+                'message' => 'Đã từ chối thành công',
+                'data' => [
+                    'status' => $approvalRequest->status,
+                    'rejection_reason' => $approvalRequest->rejection_reason,
+                ]
             ]);
 
         } catch (\Exception $e) {

@@ -3,18 +3,20 @@
 namespace Modules\ProductionManagement\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Backpack\CRUD\app\Models\Traits\CrudTrait;
 
 class Material extends Model
 {
-    use HasFactory, CrudTrait;
+    use CrudTrait, SoftDeletes;
 
     protected $fillable = [
         'code',
-        'name',
-        'unit',
-        'description',
+        'ten_vat_tu',
+        'quy_cach',
+        'ky_hieu',
+        'don_vi_tinh',
+        'mo_ta',
         'min_stock_level',
         'max_stock_level',
         'status',
@@ -23,63 +25,26 @@ class Material extends Model
     ];
 
     protected $casts = [
-        'min_stock_level' => 'float',
-        'max_stock_level' => 'float',
+        'min_stock_level' => 'decimal:2',
+        'max_stock_level' => 'decimal:2',
         'can_import' => 'boolean',
         'can_export' => 'boolean',
     ];
 
-    // Relationships
-    public function warehouseStocks()
+    /**
+     * Get full name (ten_vat_tu + quy_cach + ky_hieu)
+     */
+    public function getFullNameAttribute()
     {
-        return $this->hasMany(WarehouseStock::class);
+        $parts = array_filter([$this->ten_vat_tu, $this->quy_cach, $this->ky_hieu]);
+        return implode(' - ', $parts);
     }
 
-    public function materialPlanItems()
+    /**
+     * Get display name for select2
+     */
+    public function getDisplayNameAttribute()
     {
-        return $this->hasMany(MaterialPlanItem::class);
-    }
-
-    public function stockTransactions()
-    {
-        return $this->hasMany(StockTransaction::class);
-    }
-
-    public function stockMovements()
-    {
-        return $this->hasMany(StockMovement::class);
-    }
-
-    // Scopes
-    public function scopeActive($query)
-    {
-        return $query->where('status', 'active');
-    }
-
-    public function scopeCanImport($query)
-    {
-        return $query->where('can_import', true);
-    }
-
-    public function scopeCanExport($query)
-    {
-        return $query->where('can_export', true);
-    }
-
-    // Accessors
-    public function getStatusDisplayAttribute()
-    {
-        return $this->status === 'active' ? 'Hoạt động' : 'Ngừng hoạt động';
-    }
-
-    public function getCanImportDisplayAttribute()
-    {
-        return $this->can_import ? 'Cho phép' : 'Dừng nhập';
-    }
-
-    public function getCanExportDisplayAttribute()
-    {
-        return $this->can_export ? 'Cho phép' : 'Cấm xuất';
+        return $this->full_name . ' (' . $this->don_vi_tinh . ')';
     }
 }
-

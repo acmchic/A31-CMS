@@ -309,10 +309,24 @@ class ApprovalCenterController extends Controller
             } elseif ($modelType === 'vehicle') {
                 $vehicle = VehicleRegistration::findOrFail($id);
                 
-                $isDepartmentHeadStep = $vehicle->workflow_status === 'dept_review' && $vehicle->vehicle_id && !$vehicle->department_approved_at;
-                $hasDepartmentHeadPermission = PermissionHelper::can($user, 'vehicle_registration.approve');
+                // Check via approval_requests
+                $approvalRequest = $vehicle->approvalRequest;
+                if (!$approvalRequest) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Không tìm thấy yêu cầu phê duyệt',
+                    ], 404);
+                }
                 
-                if (!$isDepartmentHeadStep || !$hasDepartmentHeadPermission) {
+                // Check if at department_head_approval step
+                $isDepartmentHeadStep = $approvalRequest->status === 'in_review' && 
+                                       $approvalRequest->current_step === 'department_head_approval' &&
+                                       $vehicle->vehicle_id;
+                
+                $hasDepartmentHeadPermission = PermissionHelper::can($user, 'vehicle_registration.approve');
+                $isDepartmentHead = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban', 'Trưởng phòng kế hoạch']);
+                
+                if (!$isDepartmentHeadStep || !$hasDepartmentHeadPermission || !$isDepartmentHead) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Bạn không có quyền thực hiện thao tác này',
@@ -326,7 +340,10 @@ class ApprovalCenterController extends Controller
                     ], 400);
                 }
                 
-                $directors = VehicleRegistration::getDirectors();
+                // Get directors
+                $directors = \App\Models\User::whereHas('roles', function($q) {
+                    $q->whereIn('name', ['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+                })->get();
                 $directorIds = $directors->pluck('id')->toArray();
                 $invalidIds = array_diff($approverIds, $directorIds);
                 
@@ -338,27 +355,52 @@ class ApprovalCenterController extends Controller
                 }
                 
                 $approverIds = array_map('intval', $approverIds);
-                $vehicle->selected_approvers = $approverIds;
-                $vehicle->workflow_status = 'director_review';
-                $vehicle->department_approved_by = $user->id;
-                $vehicle->department_approved_at = now();
                 
-                if ($user->signature_path) {
-                    $vehicle->digital_signature_dept = $user->signature_path;
+                // Update approval_requests
+                $selectedApprovers = $approvalRequest->selected_approvers ?? [];
+                if (!is_array($selectedApprovers)) {
+                    $selectedApprovers = json_decode($selectedApprovers, true) ?? [];
                 }
                 
-                $vehicle->save();
+                // Map selected_approvers by step
+                $selectedApprovers['director_approval'] = $approverIds;
+                $approvalRequest->selected_approvers = $selectedApprovers;
                 
+                // Update approval history
+                $approvalHistory = $approvalRequest->approval_history ?? [];
+                if (!is_array($approvalHistory)) {
+                    $approvalHistory = json_decode($approvalHistory, true) ?? [];
+                }
+                
+                $approvalHistory['department_head_approval'] = [
+                    'approved_by' => $user->id,
+                    'approved_at' => now()->toIso8601String(),
+                    'comment' => 'Đã chọn người phê duyệt: ' . implode(', ', \App\Models\User::whereIn('id', $approverIds)->pluck('name')->toArray()),
+                ];
+                $approvalRequest->approval_history = $approvalHistory;
+                
+                // Move to next step: director_approval
+                $approvalRequest->current_step = 'director_approval';
+                $approvalRequest->status = 'in_review';
+                $approvalRequest->save();
+                
+                // Create approval history record
                 \Modules\ApprovalWorkflow\Models\ApprovalHistory::create([
                     'approvable_type' => get_class($vehicle),
                     'approvable_id' => $vehicle->id,
                     'user_id' => $user->id,
                     'action' => 'approved',
                     'level' => 2,
-                    'workflow_status_before' => 'dept_review',
-                    'workflow_status_after' => 'director_review',
+                    'workflow_status_before' => 'department_head_approval',
+                    'workflow_status_after' => 'director_approval',
                     'comment' => 'Đã chọn người phê duyệt: ' . implode(', ', \App\Models\User::whereIn('id', $approverIds)->pluck('name')->toArray()),
                 ]);
+                
+                // Sync với ApprovalRequestService
+                if (class_exists(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class)) {
+                    $service = new \Modules\ApprovalWorkflow\Services\ApprovalRequestService();
+                    $service->syncFromModel($vehicle, 'vehicle');
+                }
                 
                 return response()->json([
                     'success' => true,
@@ -595,6 +637,28 @@ class ApprovalCenterController extends Controller
             'errors' => array_slice($errors, 0, 10), // Limit errors to first 10
             'message' => "Đã phê duyệt {$approvedCount} đơn" . ($failedCount > 0 ? ", {$failedCount} đơn thất bại" : ""),
         ]);
+    }
+
+    /**
+     * Get pending count for sidebar badge (AJAX endpoint)
+     */
+    public function getPendingCount(Request $request)
+    {
+        try {
+            $user = backpack_user();
+            $count = $this->service->getTotalPendingCountForUser($user);
+            
+            return response()->json([
+                'success' => true,
+                'count' => $count,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'count' => 0,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 }
 

@@ -103,13 +103,11 @@ class DailyPersonnelReportCrudController extends CrudController
         $reports = DailyPersonnelReport::whereDate('report_date', $selectedDate)->get();
         
         // ✅ Get all approved leave requests for this date
-        // Only use workflow_status as source of truth
+        // Use approval_requests as source of truth
         // Include both level 1 and level 2 approvals
-        $approvedLeaves = \Modules\PersonnelReport\Models\EmployeeLeave::whereIn('workflow_status', [
-                'approved_by_approver',  // Approved by level 1 (still valid for tracking)
-                'approved_by_director',  // Final approval by level 2
-                'approved'               // Alternative final status
-            ])
+        $approvedLeaves = \Modules\PersonnelReport\Models\EmployeeLeave::whereHas('approvalRequest', function($q) {
+                $q->where('status', 'approved');
+            })
             ->where('from_date', '<=', $selectedDate)
             ->where('to_date', '>=', $selectedDate)
             ->with('employee.department')
@@ -520,13 +518,11 @@ class DailyPersonnelReportCrudController extends CrudController
         }
         
         // ✅ Auto-load approved leave requests for this date
-        // Only use workflow_status as source of truth
+        // Use approval_requests as source of truth
         // Include both level 1 and level 2 approvals (both are considered "approved" for attendance tracking)
-        $approvedLeaves = \Modules\PersonnelReport\Models\EmployeeLeave::whereIn('workflow_status', [
-                'approved_by_approver',  // Approved by level 1 (still valid for tracking)
-                'approved_by_director',  // Final approval by level 2
-                'approved'               // Alternative final status
-            ])
+        $approvedLeaves = \Modules\PersonnelReport\Models\EmployeeLeave::whereHas('approvalRequest', function($q) {
+                $q->where('status', 'approved');
+            })
             ->where('from_date', '<=', $reportDate)
             ->where('to_date', '>=', $reportDate)
             ->whereHas('employee', function($q) use ($departmentId) {

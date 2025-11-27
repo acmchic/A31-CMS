@@ -1,0 +1,11 @@
+{
+    "name": "ProductionManagement",
+    "alias": "productionmanagement",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\ProductionManagement\\Providers\\ProductionManagementServiceProvider"
+    ],
+    "files": []
+}

@@ -118,28 +118,39 @@
         @endif
     </table>
 
-    @if($registration->isApproved() || $registration->workflow_status === 'approved')
+    @php
+        $approvalRequest = $registration->approvalRequest;
+        $isApproved = $approvalRequest && $approvalRequest->status === 'approved';
+        $approvalHistory = $approvalRequest ? ($approvalRequest->approval_history ?? []) : [];
+    @endphp
+    @if($isApproved)
     <h2>III. PHÊ DUYỆT</h2>
     <table border="1" cellpadding="6" cellspacing="0" style="width: 100%; border-collapse: collapse; margin: 6px 0 10px 0;">
-        @if($registration->level1Approver || $registration->departmentApprover)
+        @php
+            $deptApproval = $approvalHistory['department_head_approval'] ?? null;
+            $directorApproval = $approvalHistory['director_approval'] ?? null;
+            $deptApprover = $deptApproval && isset($deptApproval['approved_by']) ? \App\Models\User::find($deptApproval['approved_by']) : null;
+            $directorApprover = $directorApproval && isset($directorApproval['approved_by']) ? \App\Models\User::find($directorApproval['approved_by']) : null;
+        @endphp
+        @if($deptApprover)
         <tr>
             <td style="width: 30%; background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Phòng ban - Người duyệt:</td>
-            <td style="width: 70%; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->level1Approver ? $registration->level1Approver->name : ($registration->departmentApprover ? $registration->departmentApprover->name : 'N/A') }}</td>
+            <td style="width: 70%; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $deptApprover->name ?? 'N/A' }}</td>
         </tr>
         <tr>
             <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Phòng ban - Thời gian:</td>
-            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->workflow_level1_at ? \Carbon\Carbon::parse($registration->workflow_level1_at)->format('d/m/Y H:i') : ($registration->department_approved_at ? \Carbon\Carbon::parse($registration->department_approved_at)->format('d/m/Y H:i') : '--') }}</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ isset($deptApproval['approved_at']) ? \Carbon\Carbon::parse($deptApproval['approved_at'])->format('d/m/Y H:i') : '--' }}</td>
         </tr>
         @endif
 
-        @if($registration->level2Approver || $registration->directorApprover)
+        @if($directorApprover)
         <tr>
             <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Ban giám đốc - Người duyệt:</td>
-            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->level2Approver ? $registration->level2Approver->name : ($registration->directorApprover ? $registration->directorApprover->name : 'N/A') }}</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $directorApprover->name ?? 'N/A' }}</td>
         </tr>
         <tr>
             <td style="background-color: #f5f5f5; border: 1px solid #333; padding: 6px 8px; font-size: 10px;">Ban giám đốc - Thời gian:</td>
-            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ $registration->workflow_level2_at ? \Carbon\Carbon::parse($registration->workflow_level2_at)->format('d/m/Y H:i') : ($registration->director_approved_at ? \Carbon\Carbon::parse($registration->director_approved_at)->format('d/m/Y H:i') : '--') }}</td>
+            <td style="border: 1px solid #333; padding: 6px 8px; font-size: 10px;">{{ isset($directorApproval['approved_at']) ? \Carbon\Carbon::parse($directorApproval['approved_at'])->format('d/m/Y H:i') : '--' }}</td>
         </tr>
         @endif
     </table>
@@ -155,14 +166,10 @@
                 <td style="width: 50%; border: none; text-align: center; vertical-align: top;">
                     <p style="font-weight: bold; font-size: 10px; margin: 0;">{{ $approver ? $approver->getApproverTitle() : 'BAN GIÁM ĐỐC' }}</p>
                     <p style="font-style: italic; font-size: 8px; color: #666; margin: 3px 0;">
-                        @if($registration->workflow_level2_at)
-                        Ngày {{ \Carbon\Carbon::parse($registration->workflow_level2_at)->format('d/m/Y') }}
-                        @elseif($registration->director_approved_at)
-                        Ngày {{ \Carbon\Carbon::parse($registration->director_approved_at)->format('d/m/Y') }}
-                        @elseif($registration->workflow_level1_at)
-                        Ngày {{ \Carbon\Carbon::parse($registration->workflow_level1_at)->format('d/m/Y') }}
-                        @elseif($registration->department_approved_at)
-                        Ngày {{ \Carbon\Carbon::parse($registration->department_approved_at)->format('d/m/Y') }}
+                        @if(isset($directorApproval['approved_at']))
+                        Ngày {{ \Carbon\Carbon::parse($directorApproval['approved_at'])->format('d/m/Y') }}
+                        @elseif(isset($deptApproval['approved_at']))
+                        Ngày {{ \Carbon\Carbon::parse($deptApproval['approved_at'])->format('d/m/Y') }}
                         @endif
                     </p>
                     <p style="font-weight: bold; font-size: 10px; margin: 35px 0 0 0;">{{ $approver ? $approver->name : '' }}</p>
@@ -172,10 +179,14 @@
     </div>
     @endif
 
-    @if($registration->isRejected() && $registration->rejection_reason)
+    @php
+        $isRejected = $approvalRequest && $approvalRequest->status === 'rejected';
+        $rejectionReason = $approvalRequest ? $approvalRequest->rejection_reason : null;
+    @endphp
+    @if($isRejected && $rejectionReason)
     <h2>III. TỪ CHỐI</h2>
     <div class="rejection-box">
-        <strong>Lý do:</strong> {{ $registration->rejection_reason }}
+        <strong>Lý do:</strong> {{ $rejectionReason }}
     </div>
     @endif
 

@@ -7,5 +7,6 @@
     "ApprovalWorkflow": true,
     "RecordManagement": true,
     "SalaryManagement": true,
-    "FileSharing": true
+    "FileSharing": true,
+    "ProductionManagement": true
 }

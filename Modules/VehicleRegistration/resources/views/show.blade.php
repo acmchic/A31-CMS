@@ -72,13 +72,18 @@
         </div>
         @endif
 
-        @if($entry->status === 'rejected' && $entry->rejection_reason)
+        @php
+            $approvalRequest = $entry->approvalRequest;
+            $isRejected = $approvalRequest && $approvalRequest->status === 'rejected';
+            $rejectionReason = $approvalRequest ? $approvalRequest->rejection_reason : null;
+        @endphp
+        @if($isRejected && $rejectionReason)
         <div class="card mt-3">
             <div class="card-header bg-danger text-white">
-                <h5>Lý do từ chối</h5>
+                <h5><i class="la la-times-circle"></i> Lý do từ chối</h5>
             </div>
             <div class="card-body">
-                <p>{{ $entry->rejection_reason }}</p>
+                <p class="mb-0">{{ $rejectionReason }}</p>
             </div>
         </div>
         @endif
@@ -108,17 +113,26 @@
                 <p><strong>Ngày tạo:</strong><br>{{ $entry->created_at->format('d/m/Y') }}</p>
                 @endif
 
-                @if($entry->department_approved_at)
+                @php
+                    $approvalRequest = $entry->approvalRequest;
+                    $approvalHistory = $approvalRequest ? ($approvalRequest->approval_history ?? []) : [];
+                @endphp
+
+                @if($approvalRequest && isset($approvalHistory['department_head_approval']))
                 <hr>
-                <p><strong>Phòng ban duyệt:</strong><br>{{ $entry->department_approved_at->format('d/m/Y H:i') }}</p>
+                <p><strong>Phòng ban duyệt:</strong><br>
+                    {{ isset($approvalHistory['department_head_approval']['approved_at']) ? \Carbon\Carbon::parse($approvalHistory['department_head_approval']['approved_at'])->format('d/m/Y H:i') : 'N/A' }}
+                </p>
                 @endif
 
-                @if($entry->director_approved_at)
+                @if($approvalRequest && isset($approvalHistory['director_approval']))
                 <hr>
-                <p><strong>Ban Giám Đốc duyệt:</strong><br>{{ $entry->director_approved_at->format('d/m/Y H:i') }}</p>
+                <p><strong>Ban Giám Đốc duyệt:</strong><br>
+                    {{ isset($approvalHistory['director_approval']['approved_at']) ? \Carbon\Carbon::parse($approvalHistory['director_approval']['approved_at'])->format('d/m/Y H:i') : 'N/A' }}
+                </p>
                 @endif
 
-                @if($entry->signed_pdf_path && $entry->status === 'approved')
+                @if($approvalRequest && $approvalRequest->signed_pdf_path && $approvalRequest->status === 'approved')
                 <hr>
                 <a href="{{ route('vehicle-registration.download-pdf', $entry->id) }}" class="btn btn-success btn-sm w-100">
                     <i class="la la-download"></i> Tải về đã ký

@@ -35,35 +35,30 @@ class EmployeeLeave extends Model
         'status',
         'approved_by',
         'approved_at',
-        'rejection_reason',
         'digital_signature',
         'signed_pdf_path',
         'template_pdf_path',
         'signature_certificate',
-        'workflow_status',
         'reviewer_id',
         'reviewed_at',
         'is_authorized',
         'is_checked',
-        'approved_by_approver',
-        'approved_at_approver',
-        'approver_comment',
-        'approver_signature_path',
-        'approved_by_department_head',
-        'approved_at_department_head',
-        'approved_by_reviewer',
-        'approved_at_reviewer',
-        'approved_by_director',
-        'approved_at_director',
-        'director_comment',
-        'director_signature_path',
-        'selected_approvers',
         'created_by',
         'updated_by',
         'deleted_by'
+        // Removed workflow-related fields (moved to approval_requests):
+        // - workflow_status
+        // - selected_approvers
+        // - approved_by_department_head, approved_at_department_head
+        // - approved_by_reviewer, approved_at_reviewer
+        // - approved_by_director, approved_at_director
+        // - approver_signature_path, director_signature_path
+        // - rejection_reason
+        // - approved_by_approver, approved_at_approver, approver_comment
+        // - director_comment
     ];
 
-    protected $dates = ['deleted_at', 'from_date', 'to_date', 'start_at', 'end_at', 'approved_at', 'reviewed_at', 'approved_at_department_head', 'approved_at_reviewer', 'approved_at_director'];
+    protected $dates = ['deleted_at', 'from_date', 'to_date', 'start_at', 'end_at', 'approved_at', 'reviewed_at'];
 
     protected $casts = [
         'from_date' => 'date',
@@ -72,13 +67,12 @@ class EmployeeLeave extends Model
         'end_at' => 'datetime',
         'approved_at' => 'datetime',
         'reviewed_at' => 'datetime',
-        'approved_at_department_head' => 'datetime',
-        'approved_at_reviewer' => 'datetime',
-        'approved_at_director' => 'datetime',
         'is_authorized' => 'boolean',
         'is_checked' => 'boolean',
-        'workflow_status' => 'string',
-        'selected_approvers' => 'array'
+        // Removed workflow-related casts (moved to approval_requests):
+        // - workflow_status
+        // - selected_approvers
+        // - approved_at_department_head, approved_at_reviewer, approved_at_director
     ];
 
     // Leave status constants
@@ -144,6 +138,80 @@ class EmployeeLeave extends Model
     public function reviewerUser()
     {
         return $this->belongsTo(\App\Models\User::class, 'approved_by_reviewer');
+    }
+
+    /**
+     * Relationship với ApprovalRequest (centralized approval system)
+     */
+    public function approvalRequest()
+    {
+        return $this->morphOne(\Modules\ApprovalWorkflow\Models\ApprovalRequest::class, 'model');
+    }
+
+    /**
+     * Get workflow_status from approval_requests (accessor)
+     */
+    public function getWorkflowStatusAttribute()
+    {
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest) {
+            // Map approval_requests.status to old workflow_status values for backward compatibility
+            $statusMap = [
+                'submitted' => self::WORKFLOW_PENDING,
+                'in_review' => $this->mapInReviewStatus($approvalRequest),
+                'approved' => self::WORKFLOW_APPROVED_BY_DIRECTOR,
+                'rejected' => self::WORKFLOW_REJECTED,
+            ];
+            
+            return $statusMap[$approvalRequest->status] ?? $approvalRequest->status;
+        }
+        
+        // Backward compatibility - return from attributes if exists
+        return $this->attributes['workflow_status'] ?? self::WORKFLOW_PENDING;
+    }
+
+    /**
+     * Map in_review status to specific workflow status based on current_step
+     */
+    protected function mapInReviewStatus($approvalRequest)
+    {
+        $step = $approvalRequest->current_step;
+        $map = [
+            'department_head_approval' => self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD,
+            'review' => self::WORKFLOW_APPROVED_BY_REVIEWER,
+            'director_approval' => self::WORKFLOW_APPROVED_BY_REVIEWER, // Before director approves
+        ];
+        
+        return $map[$step] ?? self::WORKFLOW_APPROVED_BY_REVIEWER;
+    }
+
+    /**
+     * Get current workflow step (override from trait)
+     */
+    public function getCurrentWorkflowStep(): string
+    {
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest) {
+            // Map approval_requests status/step to old workflow_status for backward compatibility
+            if ($approvalRequest->status === 'approved') {
+                return self::WORKFLOW_APPROVED_BY_DIRECTOR;
+            }
+            if ($approvalRequest->status === 'rejected') {
+                return self::WORKFLOW_REJECTED;
+            }
+            
+            $step = $approvalRequest->current_step;
+            $map = [
+                'department_head_approval' => self::WORKFLOW_PENDING,
+                'review' => self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD,
+                'director_approval' => self::WORKFLOW_APPROVED_BY_REVIEWER,
+            ];
+            
+            return $map[$step] ?? self::WORKFLOW_PENDING;
+        }
+        
+        // Backward compatibility - return from attributes if exists
+        return $this->attributes['workflow_status'] ?? self::WORKFLOW_PENDING;
     }
 
     // ✅ Map old column names to ApprovalWorkflow convention
@@ -238,43 +306,101 @@ class EmployeeLeave extends Model
         ]);
     }
 
-    public function getWorkflowStatusDisplayAttribute(): string
+    /**
+     * Override hasSignedPdf to get from approval_requests
+     */
+    public function hasSignedPdf(): bool
     {
-        return $this->workflow_status_text;
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest && $approvalRequest->signed_pdf_path) {
+            return \Storage::disk('public')->exists($approvalRequest->signed_pdf_path);
+        }
+        
+        // Backward compatibility: check model field if exists
+        if (isset($this->attributes['signed_pdf_path']) && !empty($this->attributes['signed_pdf_path'])) {
+            return \Storage::disk('public')->exists($this->attributes['signed_pdf_path']);
+        }
+        
+        return false;
     }
 
-    // ✅ Override getNextWorkflowStep - 4 step workflow
+    /**
+     * Get signed PDF path from approval_requests (accessor)
+     */
+    public function getSignedPdfPathAttribute()
+    {
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest && $approvalRequest->signed_pdf_path) {
+            return $approvalRequest->signed_pdf_path;
+        }
+        
+        // Backward compatibility: return from attributes if exists
+        if (isset($this->attributes['signed_pdf_path'])) {
+            return $this->attributes['signed_pdf_path'];
+        }
+        
+        return null;
+    }
+
+    public function getWorkflowStatusDisplayAttribute(): string
+    {
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest) {
+            return $approvalRequest->status_label;
+        }
+        // Backward compatibility
+        return 'Nháp';
+    }
+
+    // ✅ Override getNextWorkflowStep - use approval_requests
     public function getNextWorkflowStep(): ?string
     {
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest) {
+            $currentStep = $approvalRequest->current_step;
+            $steps = $approvalRequest->approval_steps ?? [];
+            $currentIndex = array_search($currentStep, $steps);
+            
+            if ($currentIndex !== false && isset($steps[$currentIndex + 1])) {
+                return $steps[$currentIndex + 1];
+            }
+            
+            return null;
+        }
+        
+        // Backward compatibility - fallback to old logic
         $currentStep = $this->getCurrentWorkflowStep();
-
         $workflowMap = [
-            self::WORKFLOW_PENDING => self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD,              // Step 1 → Step 2
-            self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => self::WORKFLOW_APPROVED_BY_REVIEWER, // Step 2 → Step 3
-            self::WORKFLOW_APPROVED_BY_REVIEWER => self::WORKFLOW_APPROVED_BY_DIRECTOR,         // Step 3 → Step 4
-            self::WORKFLOW_APPROVED_BY_DIRECTOR => null,                                       // Step 4 → Done
-            self::WORKFLOW_REJECTED => null,                                                   // Rejected → Done
-            // Legacy support
+            self::WORKFLOW_PENDING => self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD,
+            self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => self::WORKFLOW_APPROVED_BY_REVIEWER,
+            self::WORKFLOW_APPROVED_BY_REVIEWER => self::WORKFLOW_APPROVED_BY_DIRECTOR,
+            self::WORKFLOW_APPROVED_BY_DIRECTOR => null,
+            self::WORKFLOW_REJECTED => null,
             'approved_by_approver' => self::WORKFLOW_APPROVED_BY_REVIEWER,
             'approved' => null,
         ];
-
         $nextStep = $workflowMap[$currentStep] ?? null;
-
-        // Ensure return value is always a string or null
         return $nextStep !== null ? (string) $nextStep : null;
     }
 
     public function canBeApproved(): bool
     {
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest) {
+            $user = backpack_user();
+            if (!$user) {
+                return false;
+            }
+            return $approvalRequest->canBeApprovedBy($user);
+        }
+        
+        // Backward compatibility - fallback to old logic
         if ($this->workflow_status === self::WORKFLOW_APPROVED_BY_DIRECTOR) {
             return false;
         }
-
         if ($this->workflow_status === self::WORKFLOW_REJECTED) {
             return false;
         }
-
         return in_array($this->workflow_status, [
             self::WORKFLOW_PENDING,
             self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD,
@@ -283,50 +409,73 @@ class EmployeeLeave extends Model
         ]);
     }
 
-    // ✅ Override canBeRejected - can reject at any step before final
+    // ✅ Override canBeRejected - use approval_requests
     public function canBeRejected(): bool
     {
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest) {
+            if (in_array($approvalRequest->status, [
+                \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_APPROVED,
+                \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_REJECTED,
+                \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_CANCELLED
+            ])) {
+                return false;
+            }
+            $user = backpack_user();
+            if (!$user) {
+                return false;
+            }
+            return $approvalRequest->canBeApprovedBy($user);
+        }
+        
+        // Backward compatibility - fallback to old logic
         if ($this->signed_pdf_path) {
             return false;
         }
-
         if ($this->workflow_status === self::WORKFLOW_APPROVED_BY_DIRECTOR) {
             return false;
         }
-
         if ($this->workflow_status === self::WORKFLOW_REJECTED) {
             return false;
         }
-
-        // Can reject at any step before final approval
         return in_array($this->workflow_status, [
             self::WORKFLOW_PENDING,
             self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD,
             self::WORKFLOW_APPROVED_BY_REVIEWER,
-            // Legacy support
             'approved_by_approver'
         ]);
     }
 
-    // ✅ Override getCurrentLevelApprover - 4 step workflow
+    // ✅ Override getCurrentLevelApprover - use approval_requests
     public function getCurrentLevelApprover()
     {
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest) {
+            $currentStep = $approvalRequest->current_step;
+            
+            switch ($currentStep) {
+                case 'department_head_approval':
+                    return $this->getDepartmentHead();
+                case 'review':
+                    return $this->getReviewer();
+                case 'director_approval':
+                    return $this->getDirector();
+                default:
+                    return null;
+            }
+        }
+        
+        // Backward compatibility - fallback to old logic
         $status = $this->workflow_status;
-
         switch ($status) {
             case self::WORKFLOW_PENDING:
                 return $this->getDepartmentHead();
-
             case self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD:
                 return $this->getReviewer();
-
             case self::WORKFLOW_APPROVED_BY_REVIEWER:
                 return $this->getDirector();
-
-            // Legacy support
             case 'approved_by_approver':
                 return $this->getReviewer();
-
             default:
                 return null;
         }
@@ -383,9 +532,25 @@ class EmployeeLeave extends Model
 
     /**
      * Get selected approvers (directors selected by reviewer)
+     * Get from approval_requests first, fallback to model field
      */
     public function getSelectedApprovers()
     {
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest && $approvalRequest->selected_approvers) {
+            $selectedApprovers = $approvalRequest->selected_approvers;
+            if (!is_array($selectedApprovers)) {
+                $selectedApprovers = json_decode($selectedApprovers, true) ?? [];
+            }
+            
+            // Get approvers for director_approval step
+            $directorApprovers = $selectedApprovers['director_approval'] ?? [];
+            if (!empty($directorApprovers)) {
+                return \App\Models\User::whereIn('id', $directorApprovers)->get();
+            }
+        }
+        
+        // Backward compatibility - fallback to model field
         if (!$this->selected_approvers) {
             return collect([]);
         }
@@ -786,19 +951,63 @@ class EmployeeLeave extends Model
         });
     }
 
+    /**
+     * Scope: Filter by workflow status (using approval_requests)
+     */
+    public function scopeByWorkflowStatus($query, $status)
+    {
+        // Map old workflow_status values to approval_requests status/step
+        $statusMap = [
+            self::WORKFLOW_PENDING => ['status' => 'submitted', 'step' => 'department_head_approval'],
+            self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => ['status' => 'in_review', 'step' => 'review'],
+            self::WORKFLOW_APPROVED_BY_REVIEWER => ['status' => 'in_review', 'step' => 'director_approval'],
+            self::WORKFLOW_APPROVED_BY_DIRECTOR => ['status' => 'approved', 'step' => null],
+            self::WORKFLOW_REJECTED => ['status' => 'rejected', 'step' => null],
+        ];
+
+        $mapped = $statusMap[$status] ?? null;
+        if (!$mapped) {
+            return $query->whereRaw('1 = 0'); // No results
+        }
+
+        return $query->whereHas('approvalRequest', function($q) use ($mapped) {
+            $q->where('status', $mapped['status']);
+            if ($mapped['step'] !== null) {
+                $q->where('current_step', $mapped['step']);
+            } else {
+                $q->whereNull('current_step');
+            }
+        });
+    }
+
     public function scopePending($query)
     {
-        return $query->where('status', self::STATUS_PENDING);
+        return $this->scopeByWorkflowStatus($query, self::WORKFLOW_PENDING);
     }
 
     public function scopeApproved($query)
     {
-        return $query->where('status', self::STATUS_APPROVED);
+        return $this->scopeByWorkflowStatus($query, self::WORKFLOW_APPROVED_BY_DIRECTOR);
     }
 
     public function scopeRejected($query)
     {
-        return $query->where('status', self::STATUS_REJECTED);
+        return $this->scopeByWorkflowStatus($query, self::WORKFLOW_REJECTED);
+    }
+
+    /**
+     * Scope: Filter by approval_requests status directly
+     */
+    public function scopeByApprovalStatus($query, $status, $step = null)
+    {
+        return $query->whereHas('approvalRequest', function($q) use ($status, $step) {
+            $q->where('status', $status);
+            if ($step !== null) {
+                $q->where('current_step', $step);
+            } elseif ($status === 'approved' || $status === 'rejected') {
+                $q->whereNull('current_step');
+            }
+        });
     }
 
     // Accessors

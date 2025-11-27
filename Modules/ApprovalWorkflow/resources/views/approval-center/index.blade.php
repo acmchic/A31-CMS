@@ -42,6 +42,16 @@
                 } else {
                     $vehicleCount = $pendingCounts['vehicle']['pending'] ?? 0;
                 }
+
+                $materialPlanCount = 0;
+                $hasMaterialPlanPermission = \App\Helpers\PermissionHelper::can($user, 'material_plan.approve');
+                if ($user->hasRole('Admin') || $hasMaterialPlanPermission) {
+                    $materialPlanCount = ($pendingCounts['material_plan']['pending'] ?? 0) + ($pendingCounts['material_plan']['review'] ?? 0);
+                } elseif ($user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc'])) {
+                    $materialPlanCount = $pendingCounts['material_plan']['director'] ?? 0;
+                } else {
+                    $materialPlanCount = $pendingCounts['material_plan']['pending'] ?? 0;
+                }
             @endphp
 
             <div class="type-item {{ $filters['type'] === 'leave' ? 'active' : '' }}"
@@ -73,6 +83,23 @@
                     @if($vehicleCount > 0)
                         <span class="badge bg-danger rounded-pill type-badge">
                             {{ $vehicleCount }}
+                        </span>
+                    @endif
+                </div>
+            </div>
+
+            <div class="type-item {{ $filters['type'] === 'material_plan' ? 'active' : '' }}"
+                 data-type="material_plan">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="type-icon-wrapper">
+                            <i class="la la-clipboard-list type-icon"></i>
+                        </div>
+                        <span class="type-label">Phương án vật tư</span>
+                    </div>
+                    @if($materialPlanCount > 0)
+                        <span class="badge bg-danger rounded-pill type-badge">
+                            {{ $materialPlanCount }}
                         </span>
                     @endif
                 </div>
@@ -1737,6 +1764,15 @@ $(document).ready(function() {
         const id = $(this).data('id');
         const modelType = $(this).data('model-type');
         const needsPin = $(this).data('needs-pin') == '1' || $(this).data('needs-pin') === '1';
+        const isDepartmentHeadStep = $(this).data('is-department-head-step') == '1' || $(this).data('is-department-head-step') === '1';
+        const hasSelectedApprovers = $(this).data('has-selected-approvers') == '1' || $(this).data('has-selected-approvers') === '1';
+
+        // For Vehicle at department_head_approval step: check if need to select approvers first
+        if (modelType === 'vehicle' && isDepartmentHeadStep && !hasSelectedApprovers) {
+            // Show assign approvers modal first
+            showAssignApproversModal(id, modelType);
+            return;
+        }
 
         if (needsPin) {
             // Show PIN modal for steps that require signature
@@ -2295,7 +2331,8 @@ $(document).ready(function() {
                         alert('Thẩm định thành công\n\n' + (response.message || 'Đã thẩm định và gửi lên Ban Giám đốc thành công'));
                     }
 
-                    // Reload page after a short delay to show notification
+                    // Update badge in sidebar and reload page after a short delay
+                    updateSidebarBadge();
                     setTimeout(function() {
                         location.reload();
                     }, 500);
@@ -2477,6 +2514,39 @@ $(document).ready(function() {
             }
         });
     };
+
+    /**
+     * Update sidebar badge count
+     */
+    function updateSidebarBadge() {
+        // Get current badge element
+        const badgeElement = document.querySelector('a[href*="approval-center"] .badge');
+        if (!badgeElement) {
+            return;
+        }
+
+        // Fetch updated count from server
+        $.ajax({
+            url: '{{ route("approval-center.get-pending-count") }}',
+            method: 'GET',
+            success: function(response) {
+                if (response.success && typeof response.count !== 'undefined') {
+                    const count = parseInt(response.count);
+                    if (count > 0) {
+                        badgeElement.textContent = count;
+                        badgeElement.style.display = '';
+                    } else {
+                        // Hide badge if count is 0
+                        badgeElement.style.display = 'none';
+                    }
+                }
+            },
+            error: function() {
+                // On error, just reload page to get fresh count
+                console.log('Failed to update badge, will reload page');
+            }
+        });
+    }
 });
 </script>
 @endpush

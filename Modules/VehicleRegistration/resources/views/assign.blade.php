@@ -58,11 +58,22 @@
                                 <label for="vehicle_id" class="form-label">Chọn xe <span class="text-danger">*</span></label>
                                 <select name="vehicle_id" id="vehicle_id" class="form-control" required>
                                     <option value="">-- Chọn xe --</option>
-                                    @foreach($availableVehicles as $vehicle)
-                                    <option value="{{ $vehicle->id }}">{{ $vehicle->full_name }}</option>
+                                    @foreach($allVehicles as $vehicle)
+                                    <option value="{{ $vehicle->id }}" 
+                                            @if(in_array($vehicle->id, $unavailableVehicleIds)) disabled @endif
+                                            @if($registration->vehicle_id == $vehicle->id) selected @endif>
+                                        {{ $vehicle->full_name }}
+                                        @if(in_array($vehicle->id, $unavailableVehicleIds))
+                                            (Đã được phân công)
+                                        @endif
+                                    </option>
                                     @endforeach
                                 </select>
-
+                                @if(count($unavailableVehicleIds) > 0)
+                                <small class="text-muted">
+                                    <i class="la la-info-circle"></i> Các xe đã được phân công cho đơn khác trong khoảng thời gian này sẽ bị vô hiệu hóa.
+                                </small>
+                                @endif
                             </div>
                         </div>
 
@@ -71,10 +82,22 @@
                                 <label for="driver_id" class="form-label">Lái xe <span class="text-danger">*</span></label>
                                 <select name="driver_id" id="driver_id" class="form-control" required>
                                     <option value="">-- Chọn lái xe --</option>
-                                    @foreach($availableDrivers as $driver)
-                                    <option value="{{ $driver->id }}">{{ $driver->name }} - {{ $driver->position->name ?? 'N/A' }} ({{ $driver->department->name ?? 'N/A' }})</option>
+                                    @foreach($allDrivers as $driver)
+                                    <option value="{{ $driver->id }}"
+                                            @if(in_array($driver->id, $unavailableDriverIds)) disabled @endif
+                                            @if($registration->driver_id == $driver->id) selected @endif>
+                                        {{ $driver->name }} - {{ $driver->position->name ?? 'N/A' }} ({{ $driver->department->name ?? 'N/A' }})
+                                        @if(in_array($driver->id, $unavailableDriverIds))
+                                            (Đã được phân công)
+                                        @endif
+                                    </option>
                                     @endforeach
                                 </select>
+                                @if(count($unavailableDriverIds) > 0)
+                                <small class="text-muted">
+                                    <i class="la la-info-circle"></i> Các lái xe đã được phân công cho đơn khác trong khoảng thời gian này sẽ bị vô hiệu hóa.
+                                </small>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -101,8 +124,11 @@
                 <p><strong>Trạng thái:</strong>
                     <span class="badge bg-warning">{{ $registration->status_display }}</span>
                 </p>
+                @php
+                    $approvalRequest = $registration->approvalRequest;
+                @endphp
                 <p><strong>Quy trình:</strong>
-                    <span class="badge bg-info">{{ $registration->workflow_status_display }}</span>
+                    <span class="badge bg-info">{{ $approvalRequest ? $approvalRequest->status_label : 'Nháp' }}</span>
                 </p>
 
                 @if($registration->vehicle_id)

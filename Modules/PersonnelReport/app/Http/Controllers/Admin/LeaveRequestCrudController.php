@@ -51,7 +51,7 @@ class LeaveRequestCrudController extends CrudController
         // Admin sees everything (with or without status filter)
         if ($user->hasRole('Admin')) {
             if ($statusFilter && $statusFilter !== 'all') {
-                CRUD::addClause('where', 'workflow_status', $statusFilter);
+                CRUD::addClause('byWorkflowStatus', $statusFilter);
             }
             return;
         }
@@ -59,7 +59,7 @@ class LeaveRequestCrudController extends CrudController
         // User with leave.review permission sees everything (like admin, with or without status filter)
         if (PermissionHelper::can($user, 'leave.review')) {
             if ($statusFilter && $statusFilter !== 'all') {
-                CRUD::addClause('where', 'workflow_status', $statusFilter);
+                CRUD::addClause('byWorkflowStatus', $statusFilter);
             }
             return;
         }
@@ -134,6 +134,33 @@ class LeaveRequestCrudController extends CrudController
     }
 
     /**
+     * Helper: Apply workflow status filter to approval_requests query
+     */
+    private function applyWorkflowStatusFilter($query, $status)
+    {
+        $statusMap = [
+            EmployeeLeave::WORKFLOW_PENDING => ['status' => 'submitted', 'step' => 'department_head_approval'],
+            EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD => ['status' => 'in_review', 'step' => 'review'],
+            EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER => ['status' => 'in_review', 'step' => 'director_approval'],
+            EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR => ['status' => 'approved', 'step' => null],
+            EmployeeLeave::WORKFLOW_REJECTED => ['status' => 'rejected', 'step' => null],
+        ];
+
+        $mapped = $statusMap[$status] ?? null;
+        if (!$mapped) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        $query->where('status', $mapped['status']);
+        if ($mapped['step'] !== null) {
+            $query->where('current_step', $mapped['step']);
+        } else {
+            $query->whereNull('current_step');
+        }
+    }
+
+    /**
      * Filter by workflow step - only show requests at current user's approval step
      */
     private function applyWorkflowStepFilter($user)
@@ -167,7 +194,9 @@ class LeaveRequestCrudController extends CrudController
                 $q->where(function($subQ) use ($user, $statusFilter) {
                     $subQ->where('employee_id', $user->employee_id);
                     if ($statusFilter && $statusFilter !== 'all') {
-                        $subQ->where('workflow_status', $statusFilter);
+                        $subQ->whereHas('approvalRequest', function($arQ) use ($statusFilter) {
+                            $this->applyWorkflowStatusFilter($arQ, $statusFilter);
+                        });
                     }
                 });
                 $hasCondition = true;
@@ -181,14 +210,18 @@ class LeaveRequestCrudController extends CrudController
                         $q->orWhere(function($subQ) use ($employeeIds, $statusFilter) {
                             $subQ->whereIn('employee_id', $employeeIds);
                             if ($statusFilter && $statusFilter !== 'all') {
-                                $subQ->where('workflow_status', $statusFilter);
+                                $subQ->whereHas('approvalRequest', function($arQ) use ($statusFilter) {
+                                    $this->applyWorkflowStatusFilter($arQ, $statusFilter);
+                                });
                             }
                         });
                     } else {
                         $q->where(function($subQ) use ($employeeIds, $statusFilter) {
                             $subQ->whereIn('employee_id', $employeeIds);
                             if ($statusFilter && $statusFilter !== 'all') {
-                                $subQ->where('workflow_status', $statusFilter);
+                                $subQ->whereHas('approvalRequest', function($arQ) use ($statusFilter) {
+                                    $this->applyWorkflowStatusFilter($arQ, $statusFilter);
+                                });
                             }
                         });
                         $hasCondition = true;
@@ -202,17 +235,29 @@ class LeaveRequestCrudController extends CrudController
                     // If filtering by specific status, only show if it's reviewer's status
                     if ($statusFilter === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD) {
                         if ($hasCondition) {
-                            $q->orWhere('workflow_status', $statusFilter);
+                            $q->orWhereHas('approvalRequest', function($arQ) {
+                                $arQ->where('status', 'in_review')
+                                    ->where('current_step', 'review');
+                            });
                         } else {
-                            $q->where('workflow_status', $statusFilter);
+                            $q->whereHas('approvalRequest', function($arQ) {
+                                $arQ->where('status', 'in_review')
+                                    ->where('current_step', 'review');
+                            });
                             $hasCondition = true;
                         }
                     }
                 } else {
                     if ($hasCondition) {
-                        $q->orWhere('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD);
+                        $q->orWhereHas('approvalRequest', function($arQ) {
+                            $arQ->where('status', 'in_review')
+                                ->where('current_step', 'review');
+                        });
                     } else {
-                        $q->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD);
+                        $q->whereHas('approvalRequest', function($arQ) {
+                            $arQ->where('status', 'in_review')
+                                ->where('current_step', 'review');
+                        });
                         $hasCondition = true;
                     }
                 }
@@ -223,76 +268,77 @@ class LeaveRequestCrudController extends CrudController
             if ($isDirector) {
                 if ($hasCondition) {
                     $q->orWhere(function($subQ) use ($user, $statusFilter) {
-                        // Show requests at approved_by_reviewer step where user is in selected_approvers
-                        $subQ->where(function($directorQ) use ($user) {
-                            $directorQ->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER)
-                                      ->where(function($jsonQ) use ($user) {
-                                          // Check if user ID is in selected_approvers JSON array
-                                          $userId = (int)$user->id;
-                                          $jsonQ->whereJsonContains('selected_approvers', $userId)
-                                                ->orWhereJsonContains('selected_approvers', (string)$userId)
-                                                ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode($userId)])
-                                                ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode((string)$userId)]);
-                                      });
+                        $userId = (int)$user->id;
+                        
+                        // Show requests at director_approval step where user is in selected_approvers
+                        $subQ->whereHas('approvalRequest', function($arQ) use ($userId) {
+                            $arQ->where('status', 'in_review')
+                                ->where('current_step', 'director_approval')
+                                ->where(function($jsonQ) use ($userId) {
+                                    // Check if user ID is in selected_approvers['director_approval'] JSON array
+                                    $jsonQ->whereJsonContains('selected_approvers->director_approval', $userId)
+                                          ->orWhereJsonContains('selected_approvers->director_approval', (string)$userId);
+                                });
                         })
                         // Also show requests already approved by this user (for history)
-                        ->orWhere('approved_by_director', $user->id);
+                        ->orWhereHas('approvalRequest', function($arQ) use ($userId) {
+                            $arQ->where('status', 'approved')
+                                ->whereJsonContains('approval_history->director_approval->approved_by', $userId);
+                        });
 
                         // Apply status filter if specified
                         if ($statusFilter && $statusFilter !== 'all') {
-                            $subQ->where(function($statusQ) use ($statusFilter, $user) {
+                            $subQ->where(function($statusQ) use ($statusFilter, $userId) {
                                 if ($statusFilter === EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER) {
                                     // For approved_by_reviewer, must be in selected_approvers
-                                    $userId = (int)$user->id;
-                                    $statusQ->where('workflow_status', $statusFilter)
-                                            ->where(function($jsonQ) use ($userId) {
-                                                $jsonQ->whereJsonContains('selected_approvers', $userId)
-                                                      ->orWhereJsonContains('selected_approvers', (string)$userId)
-                                                      ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode($userId)])
-                                                      ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode((string)$userId)]);
-                                            });
+                                    $statusQ->whereHas('approvalRequest', function($arQ) use ($userId) {
+                                        $arQ->where('status', 'in_review')
+                                            ->where('current_step', 'director_approval')
+                                            ->whereJsonContains('selected_approvers->director_approval', $userId);
+                                    });
                                 } else {
                                     // For other statuses (like approved_by_director), must be approved by this user
-                                    $statusQ->where('workflow_status', $statusFilter)
-                                            ->where('approved_by_director', $user->id);
+                                    $statusQ->whereHas('approvalRequest', function($arQ) use ($userId) {
+                                        $arQ->where('status', 'approved')
+                                            ->whereJsonContains('approval_history->director_approval->approved_by', $userId);
+                                    });
                                 }
                             });
                         }
                     });
                 } else {
                     $q->where(function($subQ) use ($user, $statusFilter) {
-                        // Show requests at approved_by_reviewer step where user is in selected_approvers
-                        $subQ->where(function($directorQ) use ($user) {
-                            $directorQ->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER)
-                                      ->where(function($jsonQ) use ($user) {
-                                          // Check if user ID is in selected_approvers JSON array
-                                          $userId = (int)$user->id;
-                                          $jsonQ->whereJsonContains('selected_approvers', $userId)
-                                                ->orWhereJsonContains('selected_approvers', (string)$userId)
-                                                ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode($userId)])
-                                                ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode((string)$userId)]);
-                                      });
+                        $userId = (int)$user->id;
+                        
+                        // Show requests at director_approval step where user is in selected_approvers
+                        $subQ->whereHas('approvalRequest', function($arQ) use ($userId) {
+                            $arQ->where('status', 'in_review')
+                                ->where('current_step', 'director_approval')
+                                ->where(function($jsonQ) use ($userId) {
+                                    $jsonQ->whereJsonContains('selected_approvers->director_approval', $userId)
+                                          ->orWhereJsonContains('selected_approvers->director_approval', (string)$userId);
+                                });
                         })
                         // Also show requests already approved by this user (for history)
-                        ->orWhere('approved_by_director', $user->id);
+                        ->orWhereHas('approvalRequest', function($arQ) use ($userId) {
+                            $arQ->where('status', 'approved')
+                                ->whereJsonContains('approval_history->director_approval->approved_by', $userId);
+                        });
 
                         // Apply status filter if specified
                         if ($statusFilter && $statusFilter !== 'all') {
-                            $subQ->where(function($statusQ) use ($statusFilter, $user) {
+                            $subQ->where(function($statusQ) use ($statusFilter, $userId) {
                                 if ($statusFilter === EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER) {
-                                    // For approved_by_reviewer, must be in selected_approvers
-                                    $userId = (int)$user->id;
-                                    $statusQ->where('workflow_status', $statusFilter)
-                                            ->where(function($jsonQ) use ($userId) {
-                                                $jsonQ->whereJsonContains('selected_approvers', $userId)
-                                                      ->orWhereJsonContains('selected_approvers', (string)$userId)
-                                                      ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode($userId)])
-                                                      ->orWhereRaw('JSON_CONTAINS(selected_approvers, ?)', [json_encode((string)$userId)]);
-                                            });
+                                    $statusQ->whereHas('approvalRequest', function($arQ) use ($userId) {
+                                        $arQ->where('status', 'in_review')
+                                            ->where('current_step', 'director_approval')
+                                            ->whereJsonContains('selected_approvers->director_approval', $userId);
+                                    });
                                 } else {
-                                    // For other statuses (like approved_by_director), must be approved by this user
-                                    $statusQ->where('workflow_status', $statusFilter)
-                                            ->where('approved_by_director', $user->id);
+                                    $statusQ->whereHas('approvalRequest', function($arQ) use ($userId) {
+                                        $arQ->where('status', 'approved')
+                                            ->whereJsonContains('approval_history->director_approval->approved_by', $userId);
+                                    });
                                 }
                             });
                         }
@@ -455,8 +501,11 @@ class LeaveRequestCrudController extends CrudController
                        '</span>';
             })
             ->searchLogic(function ($query, $column, $searchTerm) {
-                // Search by workflow_status value
-                $query->orWhere('workflow_status', 'like', '%'.$searchTerm.'%');
+                // Search by workflow_status value (via approval_requests)
+                $query->orWhereHas('approvalRequest', function($arQ) use ($searchTerm) {
+                    $arQ->where('status', 'like', '%'.$searchTerm.'%')
+                        ->orWhere('current_step', 'like', '%'.$searchTerm.'%');
+                });
             });
 
         CRUD::column('note')
@@ -685,7 +734,6 @@ class LeaveRequestCrudController extends CrudController
         // Set additional fields
         $request->merge([
             'status' => EmployeeLeave::STATUS_PENDING,
-            'workflow_status' => EmployeeLeave::WORKFLOW_PENDING,
             'created_by' => $user->name ?: $user->username,
             'updated_by' => $user->name ?: $user->username
         ]);
@@ -694,6 +742,18 @@ class LeaveRequestCrudController extends CrudController
         $this->crud->unsetValidation();
 
         $response = $this->traitStore();
+
+        // Sync với ApprovalRequest
+        if ($this->crud->entry && class_exists(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class)) {
+            $service = new \Modules\ApprovalWorkflow\Services\ApprovalRequestService();
+            $entry = $this->crud->entry;
+            $title = $entry->employee 
+                ? "Đơn nghỉ phép - {$entry->employee->name}" 
+                : "Đơn nghỉ phép #{$entry->id}";
+            $service->syncFromModel($entry, 'leave', [
+                'title' => $title,
+            ]);
+        }
 
         if ($departmentHead) {
             \Log::info('Leave request created, assigned to department head', [
@@ -757,10 +817,7 @@ class LeaveRequestCrudController extends CrudController
             $request->merge([
                 'approved_by' => $user->id,
                 'approved_at' => now(),
-                'workflow_status' => EmployeeLeave::WORKFLOW_APPROVED
             ]);
-        } elseif ($request->input('status') == EmployeeLeave::STATUS_REJECTED) {
-            $request->merge(['workflow_status' => EmployeeLeave::WORKFLOW_REJECTED]);
         }
 
         $request->merge(['updated_by' => $user->name ?: $user->username]);
@@ -768,7 +825,21 @@ class LeaveRequestCrudController extends CrudController
         $this->crud->setRequest($request);
         $this->crud->unsetValidation(); // validation has already been run
 
-        return $this->traitUpdate();
+        $response = $this->traitUpdate();
+
+        // Sync với ApprovalRequest sau khi update
+        if ($this->crud->entry && class_exists(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class)) {
+            $service = new \Modules\ApprovalWorkflow\Services\ApprovalRequestService();
+            $entry = $this->crud->entry;
+            $title = $entry->employee 
+                ? "Đơn nghỉ phép - {$entry->employee->name}" 
+                : "Đơn nghỉ phép #{$entry->id}";
+            $service->syncFromModel($entry, 'leave', [
+                'title' => $title,
+            ]);
+        }
+
+        return $response;
     }
 
     // ❌ REMOVED: approve(), reject(), generateSignedPdf(), generatePdfContent()
@@ -868,11 +939,11 @@ class LeaveRequestCrudController extends CrudController
 
         // Get counts for each status
         $statusCounts = [
-            'pending' => (clone $baseQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_PENDING)->count(),
-            'approved_by_department_head' => (clone $baseQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD)->count(),
-            'approved_by_reviewer' => (clone $baseQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER)->count(),
-            'approved_by_director' => (clone $baseQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR)->count(),
-            'rejected' => (clone $baseQuery)->where('workflow_status', EmployeeLeave::WORKFLOW_REJECTED)->count(),
+            'pending' => (clone $baseQuery)->byWorkflowStatus(EmployeeLeave::WORKFLOW_PENDING)->count(),
+            'approved_by_department_head' => (clone $baseQuery)->byWorkflowStatus(EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD)->count(),
+            'approved_by_reviewer' => (clone $baseQuery)->byWorkflowStatus(EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER)->count(),
+            'approved_by_director' => (clone $baseQuery)->byWorkflowStatus(EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR)->count(),
+            'rejected' => (clone $baseQuery)->byWorkflowStatus(EmployeeLeave::WORKFLOW_REJECTED)->count(),
             'all' => (clone $baseQuery)->count(),
         ];
 

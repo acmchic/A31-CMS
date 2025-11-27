@@ -30,6 +30,7 @@ Route::group([
         Route::post('bulk-assign-approvers', [ApprovalCenterController::class, 'bulkAssignApprovers'])->name('bulk-assign-approvers');
         Route::post('reject', [ApprovalCenterController::class, 'reject'])->name('reject');
         Route::post('assign-approvers', [ApprovalCenterController::class, 'assignApprovers'])->name('assign-approvers');
+        Route::get('get-pending-count', [ApprovalCenterController::class, 'getPendingCount'])->name('get-pending-count');
     });
 });
 

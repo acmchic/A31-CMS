@@ -20,12 +20,7 @@ class VehicleRegistration extends Model
     protected $pdfView = 'vehicleregistration::pdf.registration';
     protected $pdfDirectory = 'vehicle_registrations';
 
-    // ✅ Set default workflow_status for VehicleRegistration
-    protected $attributes = [
-        'workflow_status' => 'submitted', // VehicleRegistration starts with 'submitted', not 'pending'
-        'status' => 'pending',
-    ];
-
+    // ✅ Business fields only - workflow is now managed in approval_requests table
     protected $fillable = [
         'user_id',
         'vehicle_id',
@@ -42,18 +37,6 @@ class VehicleRegistration extends Model
         'cargo_description',
         'driver_name',
         'driver_license',
-        'status',
-        'workflow_status',
-        'department_approved_by',
-        'department_approved_at',
-        'digital_signature_dept',
-        'director_approved_by',
-        'director_approved_at',
-        'digital_signature_director',
-        'rejection_reason',
-        'rejection_level',
-        'signed_pdf_path',
-        'selected_approvers',
         'created_by',
         'updated_by',
         'deleted_by'
@@ -61,14 +44,11 @@ class VehicleRegistration extends Model
 
     protected $casts = [
         'departure_date' => 'date',
-        'selected_approvers' => 'array',
         'return_date' => 'date',
         'departure_time' => 'datetime:H:i',
         'return_time' => 'datetime:H:i',
         'departure_datetime' => 'datetime',
         'return_datetime' => 'datetime',
-        'department_approved_at' => 'datetime',
-        'director_approved_at' => 'datetime',
         'passenger_count' => 'integer'
     ];
 
@@ -90,46 +70,42 @@ class VehicleRegistration extends Model
         return $this->belongsTo(\Modules\OrganizationStructure\Models\Employee::class, 'driver_id');
     }
 
-    public function departmentApprover()
+    /**
+     * Get ApprovalRequest for this registration
+     */
+    public function approvalRequest()
     {
-        return $this->belongsTo(\App\Models\User::class, 'department_approved_by');
+        return $this->morphOne(\Modules\ApprovalWorkflow\Models\ApprovalRequest::class, 'model', 'model_type', 'model_id');
     }
 
-    public function directorApprover()
+    /**
+     * Get workflow status from approval_requests (accessor)
+     */
+    public function getWorkflowStatusAttribute()
     {
-        return $this->belongsTo(\App\Models\User::class, 'director_approved_by');
+        // Check if column exists (for backward compatibility during migration)
+        if (isset($this->attributes['workflow_status'])) {
+            return $this->attributes['workflow_status'];
+        }
+        
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest) {
+            return $approvalRequest->status;
+        }
+        return 'draft';
     }
 
-    // ✅ Map old column names to ApprovalWorkflow convention
-    public function getWorkflowLevel1ByAttribute()
+    /**
+     * Get status (backward compatibility accessor)
+     */
+    public function getStatusAttribute()
     {
-        return $this->attributes['department_approved_by'] ?? null;
-    }
-
-    public function getWorkflowLevel1AtAttribute()
-    {
-        return isset($this->attributes['department_approved_at']) ? $this->attributes['department_approved_at'] : null;
-    }
-
-    public function getWorkflowLevel2ByAttribute()
-    {
-        return $this->attributes['director_approved_by'] ?? null;
-    }
-
-    public function getWorkflowLevel2AtAttribute()
-    {
-        return isset($this->attributes['director_approved_at']) ? $this->attributes['director_approved_at'] : null;
-    }
-
-    // ✅ Override relationships để dùng cột cũ
-    public function level1Approver()
-    {
-        return $this->belongsTo(\App\Models\User::class, 'department_approved_by');
-    }
-
-    public function level2Approver()
-    {
-        return $this->belongsTo(\App\Models\User::class, 'director_approved_by');
+        // Check if column exists (for backward compatibility during migration)
+        if (isset($this->attributes['status'])) {
+            return $this->attributes['status'];
+        }
+        
+        return $this->getWorkflowStatusAttribute();
     }
 
     // ✅ Override module permission
@@ -184,17 +160,50 @@ class VehicleRegistration extends Model
         ]);
     }
 
-    // Accessors
+    /**
+     * Override hasSignedPdf to get from approval_requests
+     */
+    public function hasSignedPdf(): bool
+    {
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest && $approvalRequest->signed_pdf_path) {
+            return \Storage::disk('public')->exists($approvalRequest->signed_pdf_path);
+        }
+        
+        // Backward compatibility: check model field if exists
+        if (isset($this->attributes['signed_pdf_path']) && !empty($this->attributes['signed_pdf_path'])) {
+            return \Storage::disk('public')->exists($this->attributes['signed_pdf_path']);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Get signed PDF path from approval_requests
+     */
+    public function getSignedPdfPathAttribute()
+    {
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest && $approvalRequest->signed_pdf_path) {
+            return $approvalRequest->signed_pdf_path;
+        }
+        
+        // Backward compatibility
+        if (isset($this->attributes['signed_pdf_path'])) {
+            return $this->attributes['signed_pdf_path'];
+        }
+        
+        return null;
+    }
+
+    // Accessors - get from approval_requests
     public function getStatusDisplayAttribute()
     {
-        $statuses = [
-            'pending' => 'Chờ duyệt',
-            'dept_approved' => 'Phòng ban đã duyệt',
-            'approved' => 'Đã phê duyệt',
-            'rejected' => 'Đã từ chối'
-        ];
-
-        return $statuses[$this->status] ?? $this->status;
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest) {
+            return $approvalRequest->status_label;
+        }
+        return 'Nháp';
     }
 
     // Backward compatibility - combine date and time into datetime
@@ -226,115 +235,98 @@ class VehicleRegistration extends Model
         return null;
     }
 
-    // ✅ Override workflow status mapping for VehicleRegistration
+    // ✅ Get workflow status display from approval_requests
     public function getWorkflowStatusDisplayAttribute(): string
     {
-        $workflows = [
-            'submitted' => 'Đã gửi',
-            'dept_review' => 'Phòng ban xem xét',
-            'director_review' => 'Ban giám đốc xem xét',
-            'approved' => 'Đã duyệt',
-            'rejected' => 'Đã từ chối'
-        ];
-
-        return $workflows[$this->workflow_status] ?? $this->workflow_status;
+        $approvalRequest = $this->approvalRequest;
+        if ($approvalRequest) {
+            return $approvalRequest->status_label;
+        }
+        return 'Nháp';
     }
 
+    // ✅ Override methods to use approval_requests
     public function getNextWorkflowStep(): ?string
     {
-        $currentStep = $this->getCurrentWorkflowStep();
-
-        if ($currentStep === 'approved' && !$this->director_approved_by) {
-            return 'approved';
+        $approvalRequest = $this->approvalRequest;
+        if (!$approvalRequest) {
+            return null;
         }
-
-        $workflowMap = [
-            'submitted' => 'dept_review',
-            'dept_review' => 'director_review',
-            'director_review' => 'approved',
-            'approved' => null,
-            'rejected' => null,
-        ];
-
-        return $workflowMap[$currentStep] ?? null;
+        
+        $currentStep = $approvalRequest->current_step;
+        $steps = $approvalRequest->approval_steps ?? [];
+        $currentIndex = array_search($currentStep, $steps);
+        
+        if ($currentIndex !== false && isset($steps[$currentIndex + 1])) {
+            return $steps[$currentIndex + 1];
+        }
+        
+        return null;
     }
 
     public function canBeApproved(): bool
     {
-        if ($this->workflow_status === 'approved' && $this->director_approved_by) {
+        $approvalRequest = $this->approvalRequest;
+        if (!$approvalRequest) {
             return false;
         }
-
-        if ($this->workflow_status === 'approved' && !$this->director_approved_by) {
-            return true;
-        }
-
-        if ($this->signed_pdf_path) {
+        
+        $user = backpack_user();
+        if (!$user) {
             return false;
         }
-
-        return in_array($this->workflow_status, ['dept_review', 'director_review']);
+        
+        return $approvalRequest->canBeApprovedBy($user);
     }
 
-    // ✅ Override canBeRejected
     public function canBeRejected(): bool
     {
-        // Cannot reject if already has PDF
-        if ($this->signed_pdf_path) {
+        $approvalRequest = $this->approvalRequest;
+        if (!$approvalRequest) {
             return false;
         }
-
-        if ($this->workflow_status === 'approved') {
-            return false;
-        }
-
-        // Can reject at submitted or dept_review
-        return in_array($this->workflow_status, ['submitted', 'dept_review', 'director_review']);
-    }
-
-    // Helper methods
-    public function canBeApprovedByDepartment()
-    {
-        return $this->workflow_status === 'submitted';
-    }
-
-    public function canBeApprovedByDirector()
-    {
-        return $this->workflow_status === 'dept_review';
+        
+        return in_array($approvalRequest->status, ['submitted', 'in_review']);
     }
 
     public function isApproved()
     {
-        return $this->status === 'approved' || $this->workflow_status === 'approved';
-    }
-
-    public static function getDirectors()
-    {
-        return \App\Models\User::whereHas('roles', function($q) {
-            $q->whereIn('name', ['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
-        })->get();
-    }
-
-    public function isUserSelectedApprover($userId)
-    {
-        if (!$this->selected_approvers) {
-            return false;
-        }
-
-        $approverIds = is_array($this->selected_approvers)
-            ? $this->selected_approvers
-            : json_decode($this->selected_approvers, true);
-
-        if (!is_array($approverIds)) {
-            return false;
-        }
-
-        return in_array((int)$userId, array_map('intval', $approverIds));
+        $approvalRequest = $this->approvalRequest;
+        return $approvalRequest && $approvalRequest->status === 'approved';
     }
 
     public function isRejected()
     {
-        return $this->status === 'rejected' || $this->workflow_status === 'rejected';
+        $approvalRequest = $this->approvalRequest;
+        return $approvalRequest && $approvalRequest->status === 'rejected';
+    }
+
+    public function isUserSelectedApprover($userId)
+    {
+        $approvalRequest = $this->approvalRequest;
+        if (!$approvalRequest || !$approvalRequest->selected_approvers) {
+            return false;
+        }
+
+        $selectedApprovers = is_array($approvalRequest->selected_approvers)
+            ? $approvalRequest->selected_approvers
+            : json_decode($approvalRequest->selected_approvers, true);
+
+        if (!is_array($selectedApprovers)) {
+            return false;
+        }
+
+        // Flatten selected_approvers if it's nested by step
+        $allApprovers = [];
+        foreach ($selectedApprovers as $stepApprovers) {
+            if (is_array($stepApprovers)) {
+                $allApprovers = array_merge($allApprovers, $stepApprovers);
+            } else {
+                $allApprovers[] = $stepApprovers;
+            }
+        }
+
+        return in_array((int)$userId, array_map('intval', $allApprovers));
     }
 
     // ✅ Keep assignVehicleButton - specific to VehicleRegistration
@@ -345,11 +337,28 @@ class VehicleRegistration extends Model
             return '';
         }
 
-        if ($this->workflow_status === 'submitted' && !$this->vehicle_id) {
-            return '<a class="btn btn-sm btn-warning" href="' . backpack_url('vehicle-registration/' . $this->id . '/assign-vehicle') . '">
-                <i class="la la-car"></i> lái xe
-            </a>';
+        $approvalRequest = $this->approvalRequest;
+        
+        // Hiển thị nút "Phân xe" khi:
+        // 1. Có approvalRequest với status = 'submitted' và current_step = 'vehicle_picked' (chờ phân xe)
+        // 2. HOẶC chưa có approvalRequest (draft) và chưa có vehicle_id (đơn mới tạo)
+        // 3. Và chưa có vehicle_id (chưa được phân xe)
+        if (!$this->vehicle_id) {
+            if ($approvalRequest) {
+                // Có approvalRequest: kiểm tra status và current_step
+                if ($approvalRequest->status === 'submitted' && $approvalRequest->current_step === 'vehicle_picked') {
+                    return '<a class="btn btn-sm btn-warning" href="' . backpack_url('vehicle-registration/' . $this->id . '/assign-vehicle') . '">
+                        <i class="la la-car"></i> Phân xe
+                    </a>';
+                }
+            } else {
+                // Chưa có approvalRequest: đơn mới tạo, cho phép phân xe
+                return '<a class="btn btn-sm btn-warning" href="' . backpack_url('vehicle-registration/' . $this->id . '/assign-vehicle') . '">
+                    <i class="la la-car"></i> Phân xe
+                </a>';
+            }
         }
+        
         return '';
     }
 

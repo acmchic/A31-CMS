@@ -4,62 +4,73 @@ namespace Modules\ApprovalWorkflow\Services;
 
 use Illuminate\Database\Eloquent\Model;
 use Modules\ApprovalWorkflow\Models\ApprovalHistory;
+use Modules\ApprovalWorkflow\Models\ApprovalRequest;
 use App\Models\User;
 
 /**
  * ApprovalService
  * 
  * Central service for handling approval workflows
+ * Refactored to use ApprovalRequest as single source of truth
  */
 class ApprovalService
 {
-    /**
-     * Approve model at current workflow level
-     */
-    public function approve(Model $model, User $approver, array $options = []): bool
-    {
-        if (!$model->canBeApproved()) {
-            throw new \Exception('Model cannot be approved at current status: ' . $model->workflow_status);
-        }
+    protected $workflowHandler;
+    protected $approvalRequestService;
 
-        $currentStatus = $model->workflow_status;
-        $nextStatus = $model->getNextWorkflowStep();
-        
-        if (!$nextStatus) {
-            throw new \Exception('No next workflow step defined for status: ' . $currentStatus);
-        }
-
-        // Special handling for EmployeeLeave with custom fields
-        if ($model instanceof \Modules\PersonnelReport\Models\EmployeeLeave) {
-            return $this->approveEmployeeLeave($model, $approver, $currentStatus, $nextStatus, $options);
-        }
-
-        // Special handling for VehicleRegistration with custom fields
-        if ($model instanceof \Modules\VehicleRegistration\Models\VehicleRegistration) {
-            return $this->approveVehicleRegistration($model, $approver, $currentStatus, $nextStatus, $options);
-        }
-
-        // Default handling for other models
-        $level = $this->getCurrentApprovalLevel($currentStatus);
-        
-        $updateData = [
-            'workflow_status' => $nextStatus,
-            "workflow_level{$level}_by" => $approver->id,
-            "workflow_level{$level}_at" => now(),
-        ];
-
-        if (isset($options['signature_path'])) {
-            $updateData["workflow_level{$level}_signature"] = $options['signature_path'];
-        }
-
-        $model->update($updateData);
-        $this->createHistory($model, $approver, 'approved', $level, $options);
-
-        return true;
+    public function __construct(
+        ApprovalWorkflowHandler $workflowHandler,
+        ApprovalRequestService $approvalRequestService
+    ) {
+        $this->workflowHandler = $workflowHandler;
+        $this->approvalRequestService = $approvalRequestService;
     }
 
     /**
-     * Approve EmployeeLeave with custom field mapping
+     * Approve model at current workflow level
+     * 
+     * @deprecated Use approveRequest() instead - this method is kept for backward compatibility
+     */
+    public function approve(Model $model, User $approver, array $options = []): bool
+    {
+        // Get or create ApprovalRequest
+        $approvalRequest = ApprovalRequest::where('model_type', get_class($model))
+            ->where('model_id', $model->id)
+            ->first();
+
+        if (!$approvalRequest) {
+            // Sync from model first
+            $moduleType = $this->getModuleTypeForModel($model);
+            if (!$moduleType) {
+                throw new \Exception('Không xác định được module type cho model: ' . get_class($model));
+            }
+            
+            $this->approvalRequestService->syncFromModel($model, $moduleType);
+            
+            // Reload approvalRequest
+            $approvalRequest = ApprovalRequest::where('model_type', get_class($model))
+                ->where('model_id', $model->id)
+                ->first();
+        }
+
+        if (!$approvalRequest) {
+            throw new \Exception('Không tìm thấy ApprovalRequest cho model này');
+        }
+
+        // Use ApprovalWorkflowHandler to approve
+        return $this->workflowHandler->approve($approvalRequest, $approver, $options);
+    }
+
+    /**
+     * Approve using ApprovalRequest directly (recommended)
+     */
+    public function approveRequest(ApprovalRequest $approvalRequest, User $approver, array $options = []): bool
+    {
+        return $this->workflowHandler->approve($approvalRequest, $approver, $options);
+    }
+
+    /**
+     * @deprecated Use ApprovalWorkflowHandler instead
      */
     protected function approveEmployeeLeave($model, $approver, $currentStatus, $nextStatus, $options)
     {
@@ -123,6 +134,12 @@ class ApprovalService
         $level = $this->getCurrentApprovalLevelForEmployeeLeave($currentStatus);
         $this->createHistory($model, $approver, 'approved', $level, $options);
 
+        // Sync với ApprovalRequest sau khi approve
+        if (class_exists(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class)) {
+            $service = new \Modules\ApprovalWorkflow\Services\ApprovalRequestService();
+            $service->syncFromModel($model, 'leave');
+        }
+
         return true;
     }
 
@@ -142,62 +159,139 @@ class ApprovalService
     }
 
     /**
-     * Approve VehicleRegistration with custom field mapping
+     * @deprecated Use ApprovalWorkflowHandler instead
      */
     protected function approveVehicleRegistration($model, $approver, $currentStatus, $nextStatus, $options)
     {
-        $updateData = [];
+        $approvalRequest = $model->approvalRequest;
+        if (!$approvalRequest) {
+            throw new \Exception('Không tìm thấy yêu cầu phê duyệt');
+        }
+
+        $currentStep = $approvalRequest->current_step;
+        $status = $approvalRequest->status;
         
+        // Step 2: department_head_approval - Trưởng phòng kế hoạch duyệt
+        // Note: status can be 'submitted' or 'in_review' at this step
+        if ($currentStep === 'department_head_approval' && in_array($status, ['submitted', 'in_review'])) {
+            // Check if selected_approvers (directors) are already set
+            $selectedApprovers = $approvalRequest->selected_approvers ?? [];
+            if (!is_array($selectedApprovers)) {
+                $selectedApprovers = json_decode($selectedApprovers, true) ?? [];
+            }
+            
+            $directorApprovers = $selectedApprovers['director_approval'] ?? [];
+            if (empty($directorApprovers)) {
+                throw new \Exception('Vui lòng chọn người phê duyệt (Ban Giám đốc) trước khi phê duyệt');
+            }
+            
+            // Update approval_history
+            $approvalHistory = $approvalRequest->approval_history ?? [];
+            if (!is_array($approvalHistory)) {
+                $approvalHistory = json_decode($approvalHistory, true) ?? [];
+            }
+            
+            $approvalHistory['department_head_approval'] = [
+                'approved_by' => $approver->id,
+                'approved_at' => now()->toIso8601String(),
+                'comment' => $options['comment'] ?? null,
+            ];
+            $approvalRequest->approval_history = $approvalHistory;
+            
+            // Move to next step: director_approval
+            $approvalRequest->current_step = 'director_approval';
+            $approvalRequest->status = 'in_review';
+            $approvalRequest->save();
+            
+            // Create approval history record
+            $this->createHistory($model, $approver, 'approved', 2, $options);
+            
+            // Sync với ApprovalRequestService
+            if (class_exists(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class)) {
+                $service = new \Modules\ApprovalWorkflow\Services\ApprovalRequestService();
+                $service->syncFromModel($model, 'vehicle');
+            }
+            
+            return true;
+        }
+        
+        // Step 3: director_approval - Ban Giám đốc duyệt
+        if ($currentStep === 'director_approval' && $status === 'in_review') {
+            // Update approval_history
+            $approvalHistory = $approvalRequest->approval_history ?? [];
+            if (!is_array($approvalHistory)) {
+                $approvalHistory = json_decode($approvalHistory, true) ?? [];
+            }
+            
+            $approvalHistory['director_approval'] = [
+                'approved_by' => $approver->id,
+                'approved_at' => now()->toIso8601String(),
+                'comment' => $options['comment'] ?? null,
+            ];
+            $approvalRequest->approval_history = $approvalHistory;
+            
+            // Move to approved
+            $approvalRequest->current_step = null;
+            $approvalRequest->status = 'approved';
+            $approvalRequest->save();
+            
+            // Create approval history record
+            $this->createHistory($model, $approver, 'approved', 3, $options);
+            
+            // Sync với ApprovalRequestService
+            if (class_exists(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class)) {
+                $service = new \Modules\ApprovalWorkflow\Services\ApprovalRequestService();
+                $service->syncFromModel($model, 'vehicle');
+            }
+            
+            return true;
+        }
+        
+        // Legacy support: fallback to old logic if approvalRequest doesn't have current_step
+        $updateData = [];
         switch ($currentStatus) {
             case 'dept_review':
                 $updateData['workflow_status'] = 'director_review';
-                $updateData['department_approved_by'] = $approver->id;
-                $updateData['department_approved_at'] = now();
-                if (isset($options['signature_path'])) {
-                    $updateData['digital_signature_dept'] = $options['signature_path'];
-                }
                 break;
-
             case 'director_review':
             case 'approved':
                 if (!$model->director_approved_by) {
                     $updateData['workflow_status'] = 'approved';
-                    $updateData['status'] = 'approved';
-                    $updateData['director_approved_by'] = $approver->id;
-                    $updateData['director_approved_at'] = now();
-                    if (isset($options['signature_path'])) {
-                        $updateData['digital_signature_director'] = $options['signature_path'];
-                    }
                 }
                 break;
-
             case 'submitted':
                 $updateData['workflow_status'] = 'dept_review';
                 break;
         }
 
-        if (empty($updateData)) {
-            $updateData['workflow_status'] = $nextStatus;
+        if (!empty($updateData)) {
+            $model->update($updateData);
+            $level = $this->getCurrentApprovalLevelForVehicleRegistration($currentStatus);
+            $this->createHistory($model, $approver, 'approved', $level, $options);
+            
+            // Sync với ApprovalRequestService
+            if (class_exists(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class)) {
+                $service = new \Modules\ApprovalWorkflow\Services\ApprovalRequestService();
+                $service->syncFromModel($model, 'vehicle');
+            }
         }
-
-        $model->update($updateData);
-        
-        $level = $this->getCurrentApprovalLevelForVehicleRegistration($currentStatus);
-        $this->createHistory($model, $approver, 'approved', $level, $options);
 
         return true;
     }
 
     /**
      * Get approval level for VehicleRegistration
+     * Level mapping:
+     * - submitted (vehicle_picked) = level 1
+     * - dept_review (department_head_approval) = level 2
+     * - director_review (director_approval) = level 3
      */
     protected function getCurrentApprovalLevelForVehicleRegistration(string $status): int
     {
         $map = [
-            'submitted' => 1,
-            'dept_review' => 2,
-            'director_review' => 3,
-            'approved' => 4,
+            'submitted' => 1,        // vehicle_picked
+            'dept_review' => 2,      // department_head_approval
+            'director_review' => 3,  // director_approval
         ];
 
         return $map[$status] ?? 1;
@@ -205,55 +299,45 @@ class ApprovalService
 
     /**
      * Reject model
+     * 
+     * @deprecated Use rejectRequest() instead - this method is kept for backward compatibility
      */
     public function reject(Model $model, User $approver, string $reason, array $options = []): bool
     {
-        if (!$model->canBeRejected()) {
-            throw new \Exception('Model cannot be rejected at current status: ' . $model->workflow_status);
-        }
+        // Get or create ApprovalRequest
+        $approvalRequest = ApprovalRequest::where('model_type', get_class($model))
+            ->where('model_id', $model->id)
+            ->first();
 
-        $currentStatus = $model->workflow_status;
-
-        // Special handling for EmployeeLeave
-        if ($model instanceof \Modules\PersonnelReport\Models\EmployeeLeave) {
-            $updateData = [
-                'workflow_status' => \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_REJECTED,
-                'rejection_reason' => $reason,
-            ];
-
-            // Set rejection by field based on current step
-            switch ($currentStatus) {
-                case \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_PENDING:
-                    $updateData['approved_by_department_head'] = $approver->id;
-                    $updateData['approved_at_department_head'] = now();
-                    break;
-                case \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD:
-                    $updateData['approved_by_reviewer'] = $approver->id;
-                    $updateData['approved_at_reviewer'] = now();
-                    break;
-                case \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER:
-                    $updateData['approved_by_director'] = $approver->id;
-                    $updateData['approved_at_director'] = now();
-                    break;
+        if (!$approvalRequest) {
+            // Sync from model first
+            $moduleType = $this->getModuleTypeForModel($model);
+            if (!$moduleType) {
+                throw new \Exception('Không xác định được module type cho model: ' . get_class($model));
             }
-
-            $model->update($updateData);
-            $level = $this->getCurrentApprovalLevelForEmployeeLeave($currentStatus);
-            $this->createHistory($model, $approver, 'rejected', $level, array_merge($options, ['reason' => $reason]));
-            return true;
+            
+            $this->approvalRequestService->syncFromModel($model, $moduleType);
+            
+            // Reload approvalRequest
+            $approvalRequest = ApprovalRequest::where('model_type', get_class($model))
+                ->where('model_id', $model->id)
+                ->first();
         }
 
-        // Default handling
-        $level = $this->getCurrentApprovalLevel($currentStatus);
-        $model->update([
-            'workflow_status' => 'rejected',
-            'rejection_reason' => $reason,
-            "workflow_level{$level}_by" => $approver->id,
-            "workflow_level{$level}_at" => now(),
-        ]);
+        if (!$approvalRequest) {
+            throw new \Exception('Không tìm thấy ApprovalRequest cho model này');
+        }
 
-        $this->createHistory($model, $approver, 'rejected', $level, array_merge($options, ['reason' => $reason]));
-        return true;
+        // Use ApprovalWorkflowHandler to reject
+        return $this->workflowHandler->reject($approvalRequest, $approver, $reason, $options);
+    }
+
+    /**
+     * Reject using ApprovalRequest directly (recommended)
+     */
+    public function rejectRequest(ApprovalRequest $approvalRequest, User $approver, string $reason, array $options = []): bool
+    {
+        return $this->workflowHandler->reject($approvalRequest, $approver, $reason, $options);
     }
 
     /**
@@ -291,23 +375,75 @@ class ApprovalService
             throw new \Exception($validation['error']);
         }
 
-        // Approve first
-        $this->approve($model, $approver, $options);
+        // Get or create ApprovalRequest
+        $approvalRequest = ApprovalRequest::where('model_type', get_class($model))
+            ->where('model_id', $model->id)
+            ->first();
+
+        if (!$approvalRequest) {
+            // Sync from model first
+            $moduleType = $this->getModuleTypeForModel($model);
+            if (!$moduleType) {
+                throw new \Exception('Không xác định được module type cho model: ' . get_class($model));
+            }
+            
+            $this->approvalRequestService->syncFromModel($model, $moduleType);
+            
+            // Reload approvalRequest
+            $approvalRequest = ApprovalRequest::where('model_type', get_class($model))
+                ->where('model_id', $model->id)
+                ->first();
+        }
+
+        if (!$approvalRequest) {
+            throw new \Exception('Không tìm thấy ApprovalRequest cho model này');
+        }
+
+        // Approve first (without signature)
+        $this->workflowHandler->approve($approvalRequest, $approver, $options);
 
         // Generate signed PDF
         $pdfService = app(PdfGeneratorService::class);
         $pdfPath = $pdfService->generateSignedPdf($model, $approver, $certificatePath, $certificatePassword);
 
-        // Update model with signed PDF path
-        $model->update([
-            'signed_pdf_path' => $pdfPath
-        ]);
+        // Update ApprovalRequest with signed PDF path
+        $approvalRequest->signed_pdf_path = $pdfPath;
+        $approvalRequest->save();
+
+        // Update model with signed PDF path (for backward compatibility)
+        if (in_array('signed_pdf_path', $model->getFillable())) {
+            $model->update(['signed_pdf_path' => $pdfPath]);
+        }
+
+        // Sync lại để đảm bảo đồng bộ
+        $this->approvalRequestService->syncFromModel($model, $approvalRequest->module_type);
 
         return [
             'success' => true,
             'pdf_path' => $pdfPath,
-            'workflow_status' => $model->workflow_status
+            'status' => $approvalRequest->status,
+            'current_step' => $approvalRequest->current_step,
         ];
+    }
+
+    /**
+     * Get module type for model
+     */
+    protected function getModuleTypeForModel(Model $model): ?string
+    {
+        if ($model instanceof \Modules\PersonnelReport\Models\EmployeeLeave) {
+            return 'leave';
+        }
+        
+        if ($model instanceof \Modules\VehicleRegistration\Models\VehicleRegistration) {
+            return 'vehicle';
+        }
+        
+        if ($model instanceof \Modules\ProductionManagement\Models\MaterialPlan) {
+            return 'material_plan';
+        }
+        
+        return null;
     }
 
     /**

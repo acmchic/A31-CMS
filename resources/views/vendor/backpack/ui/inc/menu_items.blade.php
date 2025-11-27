@@ -89,6 +89,15 @@
 </li>
 @endif
 
+{{-- Production Management --}}
+@if(\App\Helpers\PermissionHelper::userCan('material_plan.view') || backpack_user()->hasRole('Admin'))
+<li class="nav-item">
+    <a class="nav-link" href="{{ backpack_url('material-plan') }}">
+        <i class="la la-clipboard-list nav-icon"></i> Quản lý sản xuất
+    </a>
+</li>
+@endif
+
 {{-- Record Management --}}
 @if(\App\Helpers\PermissionHelper::userCan('record_management.view'))
 <li class="nav-item">

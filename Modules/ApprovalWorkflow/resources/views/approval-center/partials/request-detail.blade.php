@@ -26,17 +26,22 @@
                     $isReviewerStep = isset($request['is_reviewer_step']) && $request['is_reviewer_step'];
                     $isDepartmentHeadStep = (isset($request['is_department_head_step']) && $request['is_department_head_step']) ||
                                             ($request['model_type'] === 'vehicle' &&
-                                             $request['status'] === 'dept_review');
+                                             $request['status'] === 'in_review');
                     $hasSelectedApprovers = isset($request['has_selected_approvers']) && $request['has_selected_approvers'];
                     $canApproveReviewerStep = isset($request['can_approve_reviewer_step']) ? $request['can_approve_reviewer_step'] : true;
 
-                    // Show assign button if at reviewer/department head step and no selected approvers yet
+                    // For Leave: Show assign button if at reviewer step and no selected approvers yet
+                    // For Vehicle: At department_head_step, always show approve button (approve will include approver selection)
                     // OR if at reviewer step and cannot approve (missing selected approvers)
-                    $showAssignButton = (($isReviewerStep || $isDepartmentHeadStep) && !$hasSelectedApprovers) ||
+                    $showAssignButton = ($isReviewerStep && !$hasSelectedApprovers) ||
                                        ($isReviewerStep && !$canApproveReviewerStep);
+                    
+                    // For Vehicle at department_head_step: always show approve button
+                    $isVehicleDepartmentHeadStep = $request['model_type'] === 'vehicle' && $isDepartmentHeadStep;
                 @endphp
 
-                @if($showAssignButton)
+                @if($showAssignButton && !$isVehicleDepartmentHeadStep)
+                    {{-- Show assign button only for Leave reviewer step --}}
                     <button id="btn-assign-approvers"
                             class="btn btn-sm btn-primary"
                             data-id="{{ $request['id'] }}"
@@ -44,13 +49,15 @@
                         <i class="la la-user-plus"></i> Người phê duyệt
                     </button>
                 @else
-                    {{-- Show approve button only if can proceed --}}
-                    @if(!$isReviewerStep || ($isReviewerStep && $canApproveReviewerStep))
+                    {{-- Show approve button --}}
+                    @if(!$isReviewerStep || ($isReviewerStep && $canApproveReviewerStep) || $isVehicleDepartmentHeadStep)
                         <button id="btn-approve"
                                 class="btn btn-sm btn-success"
                                 data-id="{{ $request['id'] }}"
                                 data-model-type="{{ $request['model_type'] }}"
-                                data-needs-pin="{{ isset($request['needs_pin']) && $request['needs_pin'] === false ? '0' : '1' }}">
+                                data-needs-pin="{{ isset($request['needs_pin']) && $request['needs_pin'] === false ? '0' : '1' }}"
+                                data-is-department-head-step="{{ $isVehicleDepartmentHeadStep ? '1' : '0' }}"
+                                data-has-selected-approvers="{{ isset($request['has_selected_approvers']) && $request['has_selected_approvers'] ? '1' : '0' }}">
                             <i class="la la-check"></i> {{ (isset($request['is_reviewer_role']) && $request['is_reviewer_role']) ? 'Gửi lên BGD' : 'Phê duyệt' }}
                         </button>
                     @endif
@@ -99,6 +106,16 @@
 
         <hr class="my-4">
 
+        <!-- Rejection Reason (if rejected) -->
+        @if(isset($request['rejection_reason']) && !empty($request['rejection_reason']))
+        <div class="alert alert-danger mb-4">
+            <h6 class="mb-2 fw-semibold">
+                <i class="la la-times-circle"></i> Lý do từ chối
+            </h6>
+            <p class="mb-0">{{ $request['rejection_reason'] }}</p>
+        </div>
+        @endif
+
         <!-- Approval Workflow Timeline -->
         <div id="approval-history-content">
             @if(isset($request['workflow_data']) && ($request['model_type'] === 'leave' || $request['model_type'] === 'vehicle'))
@@ -107,6 +124,7 @@
                     'currentStatus' => $request['workflow_data']['currentStatus'] ?? '',
                     'currentStepIndex' => $request['workflow_data']['currentStepIndex'] ?? 0,
                     'rejected' => $request['workflow_data']['rejected'] ?? false,
+                    'rejection_level' => $request['workflow_data']['rejection_level'] ?? null,
                     'stepDates' => $request['workflow_data']['stepDates'] ?? [],
                     'stepUsers' => $request['workflow_data']['stepUsers'] ?? []
                 ])
