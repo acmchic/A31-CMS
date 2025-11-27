@@ -32,10 +32,18 @@ class LeaveRequestPdfService
                 $certificatePassword
             );
 
-            // Update leave request with PDF path
-            $leaveRequest->update([
-                'signed_pdf_path' => $pdfPath
-            ]);
+            // ✅ Sửa: Không update signed_pdf_path vào employee_leave nữa vì đã chuyển sang approval_requests
+            // Update approval_requests với PDF path
+            $approvalRequest = $leaveRequest->approvalRequest;
+            if ($approvalRequest) {
+                $approvalRequest->signed_pdf_path = $pdfPath;
+                $approvalRequest->save();
+            }
+            
+            // Không update vào employee_leave vì cột không còn tồn tại
+            // $leaveRequest->update([
+            //     'signed_pdf_path' => $pdfPath
+            // ]);
 
             return $pdfPath;
 

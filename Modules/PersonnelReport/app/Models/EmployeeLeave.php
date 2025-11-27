@@ -36,8 +36,8 @@ class EmployeeLeave extends Model
         'approved_by',
         'approved_at',
         'digital_signature',
-        'signed_pdf_path',
-        'template_pdf_path',
+        // 'signed_pdf_path', // ✅ Đã chuyển sang approval_requests
+        // 'template_pdf_path', // ✅ Đã chuyển sang approval_requests
         'signature_certificate',
         'reviewer_id',
         'reviewed_at',
@@ -178,11 +178,11 @@ class EmployeeLeave extends Model
         $step = $approvalRequest->current_step;
         $map = [
             'department_head_approval' => self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD,
-            'review' => self::WORKFLOW_APPROVED_BY_REVIEWER,
-            'director_approval' => self::WORKFLOW_APPROVED_BY_REVIEWER, // Before director approves
+            'review' => self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD, // ✅ Sửa: review step map về WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD (đã qua TP, đang ở review)
+            'director_approval' => self::WORKFLOW_APPROVED_BY_REVIEWER, // Đã qua review, đang chờ BGD
         ];
         
-        return $map[$step] ?? self::WORKFLOW_APPROVED_BY_REVIEWER;
+        return $map[$step] ?? self::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
     }
 
     /**

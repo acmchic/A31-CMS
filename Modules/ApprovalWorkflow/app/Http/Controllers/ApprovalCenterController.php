@@ -282,22 +282,45 @@ class ApprovalCenterController extends Controller
                 }
                 
                 $approverIds = array_map('intval', $approverIds);
-                $leave->selected_approvers = $approverIds;
-                $leave->workflow_status = EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER;
-                $leave->approved_by_reviewer = $user->id;
-                $leave->approved_at_reviewer = now();
-                $leave->save();
                 
-                \Modules\ApprovalWorkflow\Models\ApprovalHistory::create([
-                    'approvable_type' => get_class($leave),
-                    'approvable_id' => $leave->id,
-                    'user_id' => $user->id,
-                    'action' => 'approved',
-                    'level' => 2,
-                    'workflow_status_before' => EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD,
-                    'workflow_status_after' => EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER,
-                    'comment' => 'Đã chọn người phê duyệt: ' . implode(', ', \App\Models\User::whereIn('id', $approverIds)->pluck('name')->toArray()),
-                ]);
+                // ✅ Sửa: Lưu selected_approvers vào approval_requests, không phải employee_leave
+                $approvalRequest = $leave->approvalRequest;
+                if (!$approvalRequest) {
+                    // Tạo approvalRequest nếu chưa có
+                    $approvalRequestService = app(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class);
+                    $approvalRequest = $approvalRequestService->syncFromModel($leave, 'leave');
+                }
+                
+                // Lấy selected_approvers hiện có
+                $selectedApprovers = $approvalRequest->selected_approvers ?? [];
+                if (!is_array($selectedApprovers)) {
+                    $selectedApprovers = json_decode($selectedApprovers, true) ?? [];
+                }
+                
+                // Set selected_approvers cho bước director_approval
+                $selectedApprovers['director_approval'] = [
+                    'selected_by' => $user->id,
+                    'selected_at' => now()->toIso8601String(),
+                    'users' => \App\Models\User::whereIn('id', $approverIds)->get()->map(function($u) {
+                        return [
+                            'id' => $u->id,
+                            'name' => $u->name,
+                            'email' => $u->email,
+                        ];
+                    })->toArray()
+                ];
+                
+                $approvalRequest->selected_approvers = $selectedApprovers;
+                $approvalRequest->save(); // Lưu selected_approvers trước
+                
+                // Dùng WorkflowEngine để xử lý workflow (không truyền selectedApprovers vì đã lưu rồi)
+                $workflowEngine = app(\App\Services\WorkflowEngine::class);
+                $workflowEngine->processApprovalStep(
+                    $approvalRequest,
+                    'approved',
+                    'Đã chọn người phê duyệt: ' . implode(', ', \App\Models\User::whereIn('id', $approverIds)->pluck('name')->toArray()),
+                    null // Leave workflow không cần selectedApprovers trong processApprovalStep
+                );
                 
                 return response()->json([
                     'success' => true,
@@ -519,24 +542,44 @@ class ApprovalCenterController extends Controller
                     continue;
                 }
                 
-                // Save selected approvers and forward to BGD step
-                $leave->selected_approvers = $approverIds;
-                $leave->workflow_status = \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER;
-                $leave->approved_by_reviewer = $user->id;
-                $leave->approved_at_reviewer = now();
-                $leave->save();
+                // ✅ Sửa: Lưu selected_approvers vào approval_requests, không phải employee_leave
+                $approvalRequest = $leave->approvalRequest;
+                if (!$approvalRequest) {
+                    // Tạo approvalRequest nếu chưa có
+                    $approvalRequestService = app(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class);
+                    $approvalRequest = $approvalRequestService->syncFromModel($leave, 'leave');
+                }
                 
-                // Create approval history entry
-                \Modules\ApprovalWorkflow\Models\ApprovalHistory::create([
-                    'approvable_type' => get_class($leave),
-                    'approvable_id' => $leave->id,
-                    'user_id' => $user->id,
-                    'action' => 'approved',
-                    'level' => 2,
-                    'workflow_status_before' => \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD,
-                    'workflow_status_after' => \Modules\PersonnelReport\Models\EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER,
-                    'comment' => 'Đã chọn người phê duyệt (thẩm định hàng loạt): ' . implode(', ', \App\Models\User::whereIn('id', $approverIds)->pluck('name')->toArray()),
-                ]);
+                // Lấy selected_approvers hiện có
+                $selectedApprovers = $approvalRequest->selected_approvers ?? [];
+                if (!is_array($selectedApprovers)) {
+                    $selectedApprovers = json_decode($selectedApprovers, true) ?? [];
+                }
+                
+                // Set selected_approvers cho bước director_approval
+                $selectedApprovers['director_approval'] = [
+                    'selected_by' => $user->id,
+                    'selected_at' => now()->toIso8601String(),
+                    'users' => \App\Models\User::whereIn('id', $approverIds)->get()->map(function($u) {
+                        return [
+                            'id' => $u->id,
+                            'name' => $u->name,
+                            'email' => $u->email,
+                        ];
+                    })->toArray()
+                ];
+                
+                $approvalRequest->selected_approvers = $selectedApprovers;
+                $approvalRequest->save(); // Lưu selected_approvers trước
+                
+                // Dùng WorkflowEngine để xử lý workflow (không truyền selectedApprovers vì đã lưu rồi)
+                $workflowEngine = app(\App\Services\WorkflowEngine::class);
+                $workflowEngine->processApprovalStep(
+                    $approvalRequest,
+                    'approved',
+                    'Đã chọn người phê duyệt (thẩm định hàng loạt): ' . implode(', ', \App\Models\User::whereIn('id', $approverIds)->pluck('name')->toArray()),
+                    null // Leave workflow không cần selectedApprovers trong processApprovalStep
+                );
                 
                 $successCount++;
             } catch (\Exception $e) {

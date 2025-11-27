@@ -106,9 +106,19 @@ class ApprovalController extends Controller
             // Find model
             $model = $modelClass::findOrFail($id);
 
-            // Get ApprovalRequest
+            // Xác định module type
+            $moduleType = $this->getModuleTypeForModel($modelClass);
+            if (!$moduleType) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Không xác định được module type'
+                ], 400);
+            }
+
+            // Get ApprovalRequest - QUAN TRỌNG: filter theo module_type
             $approvalRequest = \Modules\ApprovalWorkflow\Models\ApprovalRequest::where('model_type', $modelClass)
                 ->where('model_id', $id)
+                ->where('module_type', $moduleType) // ⚠️ QUAN TRỌNG: filter theo module_type
                 ->first();
 
             if (!$approvalRequest) {
@@ -198,9 +208,19 @@ class ApprovalController extends Controller
             // Find model
             $model = $modelClass::findOrFail($id);
 
-            // Get ApprovalRequest
+            // Xác định module type
+            $moduleType = $this->getModuleTypeForModel($modelClass);
+            if (!$moduleType) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Không xác định được module type'
+                ], 400);
+            }
+
+            // Get ApprovalRequest - QUAN TRỌNG: filter theo module_type
             $approvalRequest = \Modules\ApprovalWorkflow\Models\ApprovalRequest::where('model_type', $modelClass)
                 ->where('model_id', $id)
+                ->where('module_type', $moduleType) // ⚠️ QUAN TRỌNG: filter theo module_type
                 ->first();
 
             if (!$approvalRequest) {
@@ -300,6 +320,27 @@ class ApprovalController extends Controller
 
         // Convert to snake_case
         return strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $moduleName));
+    }
+
+    /**
+     * Get module type from model class
+     */
+    protected function getModuleTypeForModel(string $modelClass): ?string
+    {
+        $modelName = class_basename($modelClass);
+
+        // Map specific models to their module types
+        $moduleTypeMap = [
+            'EmployeeLeave' => 'leave',
+            'VehicleRegistration' => 'vehicle',
+            'MaterialPlan' => 'material',
+        ];
+
+        if (isset($moduleTypeMap[$modelName])) {
+            return $moduleTypeMap[$modelName];
+        }
+
+        return null;
     }
 
     /**

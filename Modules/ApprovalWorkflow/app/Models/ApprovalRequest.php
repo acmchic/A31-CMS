@@ -3,30 +3,40 @@
 namespace Modules\ApprovalWorkflow\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\User;
 
 /**
  * ApprovalRequest Model
  * 
- * Bảng tập trung quản lý tất cả các yêu cầu phê duyệt
+ * Bảng tập trung quản lý tất cả các yêu cầu phê duyệt từ các module
  */
 class ApprovalRequest extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'approval_requests';
+    // Status constants
+    const STATUS_DRAFT = 'draft';
+    const STATUS_SUBMITTED = 'submitted';
+    const STATUS_IN_REVIEW = 'in_review';
+    const STATUS_APPROVED = 'approved';
+    const STATUS_REJECTED = 'rejected';
+    const STATUS_RETURNED = 'returned';
+    const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
         'module_type',
         'model_type',
         'model_id',
+        'flow_id',
         'created_by',
         'title',
         'description',
         'status',
         'approval_steps',
         'current_step',
+        'current_step_index',
         'selected_approvers',
         'approval_history',
         'rejected_by',
@@ -42,153 +52,172 @@ class ApprovalRequest extends Model
         'approval_steps' => 'array',
         'selected_approvers' => 'array',
         'approval_history' => 'array',
-        'rejected_at' => 'datetime',
         'metadata' => 'array',
+        'current_step_index' => 'integer',
+        'rejected_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
-    // Status constants - Trạng thái chung cho toàn hệ thống
-    const STATUS_DRAFT = 'draft';
-    const STATUS_SUBMITTED = 'submitted';
-    const STATUS_IN_REVIEW = 'in_review';
-    const STATUS_APPROVED = 'approved';
-    const STATUS_REJECTED = 'rejected';
-    const STATUS_RETURNED = 'returned';
-    const STATUS_CANCELLED = 'cancelled';
-
     /**
-     * Relationships
+     * Get the flow that owns this request
      */
-    public function creator()
+    public function flow(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
-    public function rejector()
-    {
-        return $this->belongsTo(User::class, 'rejected_by');
-    }
-    
-    /**
-     * Get approver for a specific step
-     */
-    public function getApproverForStep($stepName)
-    {
-        $history = $this->approval_history ?? [];
-        if (isset($history[$stepName]['approved_by'])) {
-            return User::find($history[$stepName]['approved_by']);
-        }
-        return null;
+        return $this->belongsTo(ApprovalFlow::class, 'flow_id');
     }
 
     /**
-     * Get the actual model instance
+     * Get the user who created this request
      */
-    public function getModel()
+    public function creator(): BelongsTo
     {
-        if (!class_exists($this->model_type)) {
-            return null;
-        }
-        
-        return $this->model_type::find($this->model_id);
+        return $this->belongsTo(\App\Models\User::class, 'created_by');
     }
 
     /**
-     * Get status display label
+     * Get the user who rejected this request
      */
-    public function getStatusLabelAttribute()
+    public function rejector(): BelongsTo
     {
-        $labels = [
-            self::STATUS_DRAFT => 'Nháp',
-            self::STATUS_SUBMITTED => 'Đã gửi',
-            self::STATUS_IN_REVIEW => 'Đang xem xét',
-            self::STATUS_APPROVED => 'Đã phê duyệt',
-            self::STATUS_REJECTED => 'Đã từ chối',
-            self::STATUS_RETURNED => 'Trả lại',
-            self::STATUS_CANCELLED => 'Đã hủy',
-        ];
-
-        return $labels[$this->status] ?? $this->status;
+        return $this->belongsTo(\App\Models\User::class, 'rejected_by');
     }
 
     /**
-     * Get current step label
+     * Get the related model (polymorphic)
      */
-    public function getCurrentStepLabelAttribute()
+    public function model(): MorphTo
     {
-        if (!$this->current_step) {
-            return null;
-        }
-        
-        $stepLabels = [
-            'department_head_approval' => 'Trưởng phòng phê duyệt',
-            'review' => 'Thẩm định',
-            'vehicle_picked' => 'Đã phân công xe',
-            'director_approval' => 'BGD phê duyệt',
-        ];
-        
-        return $stepLabels[$this->current_step] ?? $this->current_step;
+        return $this->morphTo('model', 'model_type', 'model_id');
     }
 
     /**
-     * Check if can be approved by user at current step
+     * Scope: Filter by module type
      */
-    public function canBeApprovedBy($user, $stepName = null)
+    public function scopeModuleType($query, string $moduleType)
     {
-        // Check if already approved or rejected
-        if (in_array($this->status, [self::STATUS_APPROVED, self::STATUS_REJECTED, self::STATUS_CANCELLED])) {
+        return $query->where('module_type', $moduleType);
+    }
+
+    /**
+     * Scope: Filter by status
+     */
+    public function scopeStatus($query, string $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    /**
+     * Scope: Filter by current step
+     */
+    public function scopeCurrentStep($query, string $step)
+    {
+        return $query->where('current_step', $step);
+    }
+
+    /**
+     * Kiểm tra xem user có thể phê duyệt ApprovalRequest ở bước hiện tại không
+     * 
+     * @param \App\Models\User $user
+     * @return bool
+     */
+    public function canBeApprovedBy(\App\Models\User $user): bool
+    {
+        // Chỉ có thể approve nếu status là 'submitted' hoặc 'in_review'
+        if (!in_array($this->status, ['submitted', 'in_review'])) {
             return false;
         }
 
-        // Must be in review status
-        if ($this->status !== self::STATUS_IN_REVIEW) {
+        // Xác định module permission
+        $modulePermission = $this->getModulePermission();
+        
+        // Kiểm tra quyền approve cơ bản
+        $hasApprovePermission = \App\Helpers\PermissionHelper::can($user, "{$modulePermission}.approve");
+        
+        // Với leave module: kiểm tra thêm quyền review nếu ở bước review
+        $hasReviewPermission = false;
+        if ($this->module_type === 'leave' && $this->current_step === 'review') {
+            $hasReviewPermission = \App\Helpers\PermissionHelper::can($user, "{$modulePermission}.review");
+        }
+
+        if (!$hasApprovePermission && !$hasReviewPermission) {
             return false;
         }
 
-        // Determine current step
-        $step = $stepName ?? $this->current_step;
-        if (!$step) {
-            return false;
+        // Kiểm tra selected_approvers nếu có
+        // Nếu bước hiện tại có selected_approvers, user phải nằm trong danh sách đó
+        if ($this->selected_approvers) {
+            $selectedApprovers = is_array($this->selected_approvers) 
+                ? $this->selected_approvers 
+                : json_decode($this->selected_approvers, true);
+
+            if (is_array($selectedApprovers)) {
+                // Kiểm tra xem current_step có selected_approvers không
+                $stepApprovers = $selectedApprovers[$this->current_step] ?? null;
+                
+                if ($stepApprovers) {
+                    // Nếu là object/array với key 'users'
+                    if (is_array($stepApprovers) && isset($stepApprovers['users'])) {
+                        $users = $stepApprovers['users'];
+                    } else {
+                        $users = $stepApprovers;
+                    }
+
+                    // Kiểm tra user có trong danh sách không
+                    if (is_array($users)) {
+                        // ✅ Sửa: users có thể là array objects {id, name, email} hoặc array IDs
+                        $userIds = [];
+                        foreach ($users as $userItem) {
+                            if (is_array($userItem) && isset($userItem['id'])) {
+                                // Là object với key 'id'
+                                $userIds[] = (int)$userItem['id'];
+                            } elseif (is_numeric($userItem)) {
+                                // Là ID trực tiếp
+                                $userIds[] = (int)$userItem;
+                            }
+                        }
+                        
+                        if (!in_array((int)$user->id, $userIds)) {
+                            return false;
+                        }
+                    }
+                }
+            }
         }
 
-        // Check if user is in selected approvers for this step
-        $selectedApprovers = $this->selected_approvers ?? [];
-        if (isset($selectedApprovers[$step]) && !empty($selectedApprovers[$step])) {
-            $userId = (int)$user->id;
-            $stepApprovers = $selectedApprovers[$step];
-            return in_array($userId, $stepApprovers) || in_array((string)$userId, $stepApprovers);
-        }
-
-        // If no selected approvers for this step, check permission
         return true;
     }
 
     /**
-     * Get next step after approval at current step
+     * Get module permission prefix
      */
-    public function getNextStepAfterApproval()
+    protected function getModulePermission(): string
     {
-        if (!$this->current_step || !$this->approval_steps) {
-            return null;
-        }
+        $modulePermissionMap = [
+            'leave' => 'leave',
+            'vehicle' => 'vehicle_registration',
+            'material' => 'material_plan',
+        ];
 
-        $steps = $this->approval_steps;
-        $currentIndex = array_search($this->current_step, $steps);
-        
-        if ($currentIndex === false || $currentIndex === count($steps) - 1) {
-            // Last step, move to approved
-            return null;
-        }
-
-        return $steps[$currentIndex + 1] ?? null;
+        return $modulePermissionMap[$this->module_type] ?? $this->module_type;
     }
 
     /**
-     * Check if step is completed
+     * Get status label (Vietnamese)
      */
-    public function isStepCompleted($stepName)
+    public function getStatusLabelAttribute(): string
     {
-        $history = $this->approval_history ?? [];
-        return isset($history[$stepName]) && !empty($history[$stepName]['approved_by']);
+        $labels = [
+            'draft' => 'Nháp',
+            'submitted' => 'Đã gửi',
+            'in_review' => 'Đang xem xét',
+            'approved' => 'Đã phê duyệt',
+            'rejected' => 'Đã từ chối',
+            'returned' => 'Trả lại',
+            'cancelled' => 'Đã hủy',
+        ];
+
+        return $labels[$this->status] ?? $this->status;
     }
 }
-

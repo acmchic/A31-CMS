@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\PersonnelReport\Models\EmployeeLeave;
+use Modules\VehicleRegistration\Models\VehicleRegistration;
+use Modules\ApprovalWorkflow\Observers\ApprovalRequestObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Đăng ký Observer để tự động tạo ApprovalRequest khi model được tạo
+        EmployeeLeave::observe(ApprovalRequestObserver::class);
+        VehicleRegistration::observe(ApprovalRequestObserver::class);
     }
 }

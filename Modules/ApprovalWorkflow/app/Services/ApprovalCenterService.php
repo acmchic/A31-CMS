@@ -185,16 +185,38 @@ class ApprovalCenterService
             $userId = (int)$user->id;
             // Director: count requests at director_approval step where user is in selected_approvers
             // Build a fresh query without user permission filters to get accurate count
+            // ✅ Sửa: Load và filter trong PHP vì JSON structure phức tạp (array objects)
             $directorQuery = EmployeeLeave::query()
-                ->whereHas('approvalRequest', function($q) use ($userId) {
+                ->whereHas('approvalRequest', function($q) {
                     $q->where('status', 'in_review')
                       ->where('current_step', 'director_approval')
-                      ->where(function($jsonQ) use ($userId) {
-                          $jsonQ->whereJsonContains('selected_approvers->director_approval', $userId)
-                                ->orWhereJsonContains('selected_approvers->director_approval', (string)$userId);
-                      });
-                });
-            $counts['leave']['director'] = $directorQuery->count();
+                      ->whereNotNull('selected_approvers');
+                })
+                ->with('approvalRequest');
+            
+            $counts['leave']['director'] = $directorQuery->get()->filter(function($leave) use ($userId) {
+                $approvalRequest = $leave->approvalRequest;
+                if (!$approvalRequest || !$approvalRequest->selected_approvers) {
+                    return false;
+                }
+                
+                $selectedApprovers = is_array($approvalRequest->selected_approvers) 
+                    ? $approvalRequest->selected_approvers 
+                    : json_decode($approvalRequest->selected_approvers, true);
+                
+                if (!is_array($selectedApprovers) || !isset($selectedApprovers['director_approval']['users'])) {
+                    return false;
+                }
+                
+                $users = $selectedApprovers['director_approval']['users'];
+                foreach ($users as $userItem) {
+                    if (is_array($userItem) && isset($userItem['id']) && (int)$userItem['id'] === $userId) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            })->count();
         } else {
             $counts['leave']['director'] = 0;
         }
@@ -374,10 +396,95 @@ class ApprovalCenterService
         $hasReviewPermission = PermissionHelper::can($user, 'leave.review');
         $hasOfficerReviewPermission = PermissionHelper::can($user, 'leave.review.officer');
 
-        return $query->with(['employee.department'])
+        $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
+        $userId = (int)$user->id;
+        
+        return $query->with(['employee.department', 'approvalRequest'])
             ->orderBy('created_at', 'desc')
             ->get()
-            ->filter(function($leave) use ($hasReviewPermission, $hasOfficerReviewPermission) {
+            ->filter(function($leave) use ($hasReviewPermission, $hasOfficerReviewPermission, $isDirector, $userId) {
+                // ✅ Filter theo selected_approvers cho director
+                if ($isDirector) {
+                    $approvalRequest = $leave->approvalRequest;
+                    if ($approvalRequest) {
+                        // Nếu ở bước director_approval và status là in_review
+                        if ($approvalRequest->current_step === 'director_approval' && $approvalRequest->status === 'in_review') {
+                            // Chỉ hiển thị nếu user có trong selected_approvers
+                            if ($approvalRequest->selected_approvers) {
+                                $selectedApprovers = is_array($approvalRequest->selected_approvers) 
+                                    ? $approvalRequest->selected_approvers 
+                                    : json_decode($approvalRequest->selected_approvers, true);
+                                
+                                if (is_array($selectedApprovers) && isset($selectedApprovers['director_approval']['users'])) {
+                                    $users = $selectedApprovers['director_approval']['users'];
+                                    $found = false;
+                                    foreach ($users as $userItem) {
+                                        if (is_array($userItem) && isset($userItem['id']) && (int)$userItem['id'] === $userId) {
+                                            $found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!$found) {
+                                        return false; // User không có trong selected_approvers
+                                    }
+                                    // User có trong selected_approvers, tiếp tục với logic filter khác
+                                } else {
+                                    return false; // Không có selected_approvers structure đúng
+                                }
+                            } else {
+                                return false; // Không có selected_approvers
+                            }
+                        } elseif ($approvalRequest->status === 'approved') {
+                            // Nếu đã approved, chỉ hiển thị nếu user đã approve
+                            $approvalHistory = $approvalRequest->approval_history ?? [];
+                            if (is_string($approvalHistory)) {
+                                $approvalHistory = json_decode($approvalHistory, true);
+                            }
+                            
+                            // ✅ Sửa: Kiểm tra approval_history structure
+                            // approval_history có thể là: { "director_approval": [{...}] } hoặc { "director_approval": {...} }
+                            if (isset($approvalHistory['director_approval'])) {
+                                $directorHistory = $approvalHistory['director_approval'];
+                                
+                                // Nếu là array, lấy phần tử đầu tiên
+                                if (is_array($directorHistory) && isset($directorHistory[0])) {
+                                    $directorHistory = $directorHistory[0];
+                                }
+                                
+                                // Kiểm tra approved_by
+                                if (is_array($directorHistory)) {
+                                    $approvedBy = $directorHistory['approved_by'] ?? null;
+                                    if ($approvedBy && (int)$approvedBy === $userId) {
+                                        return true; // User đã approve, hiển thị
+                                    }
+                                }
+                            }
+                            
+                            // Nếu không tìm thấy trong approval_history, có thể là request cũ
+                            // Cho phép hiển thị nếu user có trong selected_approvers (fallback)
+                            if ($approvalRequest->selected_approvers) {
+                                $selectedApprovers = is_array($approvalRequest->selected_approvers) 
+                                    ? $approvalRequest->selected_approvers 
+                                    : json_decode($approvalRequest->selected_approvers, true);
+                                
+                                if (is_array($selectedApprovers) && isset($selectedApprovers['director_approval']['users'])) {
+                                    $users = $selectedApprovers['director_approval']['users'];
+                                    foreach ($users as $userItem) {
+                                        if (is_array($userItem) && isset($userItem['id']) && (int)$userItem['id'] === $userId) {
+                                            return true; // User có trong selected_approvers, hiển thị
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            return false; // User không approve request này
+                        }
+                        // Nếu không phải director_approval hoặc approved, tiếp tục với logic filter khác
+                    }
+                    // Nếu không có approvalRequest, tiếp tục với logic filter khác (có thể là request cũ)
+                }
+                
+                // Existing filter logic
                 // If user has both permissions, see all
                 if ($hasReviewPermission && $hasOfficerReviewPermission) {
                     return true;
@@ -419,17 +526,27 @@ class ApprovalCenterService
                 }
                 
                 $needsPin = !($isReviewerStep && $hasReviewPermission);
-                $hasSelectedApprovers = !empty($leave->selected_approvers);
                 
-                // At reviewer step: can_approve = true if user has permission (regardless of selected_approvers)
-                // The UI will show appropriate button based on has_selected_approvers
-                // For other steps: normal can_approve logic
-                if ($isReviewerStep && $hasReviewPermission) {
-                    // At reviewer step with permission: always allow approve (UI will handle button type)
-                    $canApprove = $leave->canBeApproved();
+                // ✅ Sửa: Lấy selected_approvers từ approvalRequest, không phải từ leave
+                $approvalRequest = $leave->approvalRequest;
+                $hasSelectedApprovers = false;
+                if ($approvalRequest && $approvalRequest->selected_approvers) {
+                    $selectedApprovers = is_array($approvalRequest->selected_approvers) 
+                        ? $approvalRequest->selected_approvers 
+                        : json_decode($approvalRequest->selected_approvers, true);
+                    $hasSelectedApprovers = !empty($selectedApprovers);
+                }
+                
+                // ✅ Sửa: Dùng approvalRequest->canBeApprovedBy() để kiểm tra quyền
+                if ($approvalRequest) {
+                    $canApprove = $approvalRequest->canBeApprovedBy($user);
                 } else {
-                    // Normal approval logic for other steps
-                    $canApprove = $leave->canBeApproved() && $this->canUserApprove($leave, $user);
+                    // Fallback nếu chưa có approvalRequest
+                    if ($isReviewerStep && $hasReviewPermission) {
+                        $canApprove = $leave->canBeApproved();
+                    } else {
+                        $canApprove = $leave->canBeApproved() && $this->canUserApprove($leave, $user);
+                    }
                 }
 
                 return [
@@ -730,7 +847,8 @@ class ApprovalCenterService
             $statusFilter = $filters['status'] ?? 'all';
             $userId = (int)$user->id;
 
-            // For director, show all requests at director_approval step (waiting for BGD)
+            // ✅ Sửa: For director, show requests ở bước director_approval (filter selected_approvers sẽ làm trong PHP)
+            // Query level: chỉ filter theo step và status, không filter selected_approvers ở đây
             if ($statusFilter === 'all') {
                 // Show all requests at director_approval step OR already approved by this user
                 $query->where(function($q) use ($userId) {
@@ -739,21 +857,23 @@ class ApprovalCenterService
                             ->where('current_step', 'director_approval');
                     })
                     ->orWhereHas('approvalRequest', function($arQ) use ($userId) {
-                        $arQ->where('status', 'approved')
-                            ->whereJsonContains('approval_history->director_approval->approved_by', $userId);
+                        // ✅ Sửa: Lấy tất cả requests đã approved, filter selected_approvers sẽ làm trong PHP
+                        $arQ->where('status', 'approved');
                     });
                 });
-            } elseif ($statusFilter === 'approved_by_reviewer') {
+            } elseif ($statusFilter === 'approved_by_reviewer' || $statusFilter === 'director_review') {
+                // Chờ BGD phê duyệt
                 $query->whereHas('approvalRequest', function($arQ) {
                     $arQ->where('status', 'in_review')
                         ->where('current_step', 'director_approval');
                 });
             } elseif ($statusFilter === 'completed' || $statusFilter === 'approved_by_director') {
-                $query->whereHas('approvalRequest', function($arQ) use ($userId) {
-                    $arQ->where('status', 'approved')
-                        ->whereJsonContains('approval_history->director_approval->approved_by', $userId);
+                // ✅ Sửa: Lấy tất cả requests đã approved, filter selected_approvers sẽ làm trong PHP
+                $query->whereHas('approvalRequest', function($arQ) {
+                    $arQ->where('status', 'approved');
                 });
             }
+            // Note: Filter selected_approvers sẽ được làm trong PHP filter sau khi get()
             return;
         }
 
@@ -859,17 +979,27 @@ class ApprovalCenterService
                 }
                 
                 $needsPin = !($isReviewerStep && $hasReviewPermission);
-                $hasSelectedApprovers = !empty($model->selected_approvers);
                 
-                // At reviewer step: can_approve = true if user has permission (regardless of selected_approvers)
-                // The UI will show "Người phê duyệt" button if no selected_approvers, or "Gửi lên BGD" if has selected_approvers
-                // For other steps: normal can_approve logic
-                if ($isReviewerStep && $hasReviewPermission) {
-                    // At reviewer step with permission: always allow approve (UI will handle button type)
-                    $canApprove = $model->canBeApproved();
+                // ✅ Sửa: Lấy selected_approvers từ approvalRequest, không phải từ model
+                $approvalRequest = $model->approvalRequest;
+                $hasSelectedApprovers = false;
+                if ($approvalRequest && $approvalRequest->selected_approvers) {
+                    $selectedApprovers = is_array($approvalRequest->selected_approvers) 
+                        ? $approvalRequest->selected_approvers 
+                        : json_decode($approvalRequest->selected_approvers, true);
+                    $hasSelectedApprovers = !empty($selectedApprovers);
+                }
+                
+                // ✅ Sửa: Dùng approvalRequest->canBeApprovedBy() để kiểm tra quyền
+                if ($approvalRequest) {
+                    $canApprove = $approvalRequest->canBeApprovedBy($user);
                 } else {
-                    // Normal approval logic for other steps
-                    $canApprove = $model->canBeApproved() && $this->canUserApprove($model, $user);
+                    // Fallback nếu chưa có approvalRequest
+                    if ($isReviewerStep && $hasReviewPermission) {
+                        $canApprove = $model->canBeApproved();
+                    } else {
+                        $canApprove = $model->canBeApproved() && $this->canUserApprove($model, $user);
+                    }
                 }
 
                 return [
@@ -1479,6 +1609,136 @@ class ApprovalCenterService
             return null;
         }
 
+        // ✅ QUAN TRỌNG: Dùng approvalRequest->current_step thay vì workflow_status
+        $approvalRequest = $model->approvalRequest;
+        if (!$approvalRequest) {
+            // Fallback nếu chưa có approvalRequest
+            return $this->getWorkflowProgressDataLegacy($model);
+        }
+
+        $steps = [
+            [
+                'key' => 'created',
+                'label' => 'Tạo đơn'
+            ],
+            [
+                'key' => 'department_head_approval',
+                'label' => 'Chỉ huy xác nhận'
+            ],
+            [
+                'key' => 'review',
+                'label' => 'Thẩm định'
+            ],
+            [
+                'key' => 'director_approval',
+                'label' => 'BGD phê duyệt'
+            ]
+        ];
+
+        $stepDates = [];
+        $stepUsers = [];
+        $approvalHistory = $approvalRequest->approval_history ?? [];
+
+        // Step 1: Created
+        if ($model->created_at) {
+            $stepDates['created'] = $this->formatDateWithTimezone($model->created_at, 'd/m/Y H:i');
+        }
+        if ($model->employee) {
+            $stepUsers['created'] = $model->employee->name ?? 'N/A';
+        }
+
+        // Step 2: Department Head Approval
+        if (isset($approvalHistory['department_head_approval'])) {
+            $deptHeadHistory = is_array($approvalHistory['department_head_approval']) 
+                ? (isset($approvalHistory['department_head_approval'][0]) ? $approvalHistory['department_head_approval'][0] : $approvalHistory['department_head_approval'])
+                : [];
+            
+            if (isset($deptHeadHistory['approved_at'])) {
+                $stepDates['department_head_approval'] = $this->formatDateWithTimezone($deptHeadHistory['approved_at'], 'd/m/Y H:i');
+            }
+            if (isset($deptHeadHistory['approved_by'])) {
+                $deptHead = \App\Models\User::find($deptHeadHistory['approved_by']);
+                if ($deptHead) {
+                    $stepUsers['department_head_approval'] = $deptHead->name ?? 'N/A';
+                }
+            }
+        }
+
+        // Step 3: Review
+        if (isset($approvalHistory['review'])) {
+            $reviewHistory = is_array($approvalHistory['review']) 
+                ? (isset($approvalHistory['review'][0]) ? $approvalHistory['review'][0] : $approvalHistory['review'])
+                : [];
+            
+            if (isset($reviewHistory['approved_at'])) {
+                $stepDates['review'] = $this->formatDateWithTimezone($reviewHistory['approved_at'], 'd/m/Y H:i');
+            }
+            if (isset($reviewHistory['approved_by'])) {
+                $reviewer = \App\Models\User::find($reviewHistory['approved_by']);
+                if ($reviewer) {
+                    $stepUsers['review'] = $reviewer->name ?? 'N/A';
+                }
+            }
+        }
+
+        // Step 4: Director Approval
+        if (isset($approvalHistory['director_approval'])) {
+            $directorHistory = is_array($approvalHistory['director_approval']) 
+                ? (isset($approvalHistory['director_approval'][0]) ? $approvalHistory['director_approval'][0] : $approvalHistory['director_approval'])
+                : [];
+            
+            if (isset($directorHistory['approved_at'])) {
+                $stepDates['director_approval'] = $this->formatDateWithTimezone($directorHistory['approved_at'], 'd/m/Y H:i');
+            }
+            if (isset($directorHistory['approved_by'])) {
+                $director = \App\Models\User::find($directorHistory['approved_by']);
+                if ($director) {
+                    $stepUsers['director_approval'] = $director->name ?? 'N/A';
+                }
+            }
+        }
+
+        // Xác định currentStepIndex dựa trên current_step từ approvalRequest
+        $currentStep = $approvalRequest->current_step;
+        $currentStepIndex = 0;
+        
+        // Map current_step sang step index
+        $stepIndexMap = [
+            'department_head_approval' => 1,
+            'review' => 2,
+            'director_approval' => 3,
+        ];
+        
+        if ($approvalRequest->status === 'approved') {
+            $currentStepIndex = 4; // Completed
+        } elseif ($approvalRequest->status === 'rejected') {
+            // Rejected: xác định step dựa trên rejection_step hoặc current_step
+            $rejectionStep = $approvalRequest->rejection_step ?? $currentStep;
+            $currentStepIndex = $stepIndexMap[$rejectionStep] ?? 1;
+        } elseif ($currentStep) {
+            $currentStepIndex = $stepIndexMap[$currentStep] ?? 0;
+        } else {
+            // No current step - should be at created step
+            $currentStepIndex = 0;
+        }
+
+        return [
+            'steps' => $steps,
+            'currentStatus' => $approvalRequest->status,
+            'currentStep' => $currentStep,
+            'currentStepIndex' => $currentStepIndex,
+            'rejected' => $approvalRequest->status === 'rejected',
+            'stepDates' => $stepDates,
+            'stepUsers' => $stepUsers
+        ];
+    }
+
+    /**
+     * Legacy method for backward compatibility
+     */
+    protected function getWorkflowProgressDataLegacy($model)
+    {
+        // Old logic using workflow_status - kept for backward compatibility
         $steps = [
             [
                 'key' => 'created',
@@ -1496,7 +1756,6 @@ class ApprovalCenterService
                 'key' => EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR,
                 'label' => 'BGD phê duyệt'
             ]
-
         ];
 
         $stepDates = [];
@@ -1509,57 +1768,12 @@ class ApprovalCenterService
             $stepUsers['created'] = $model->employee->name ?? 'N/A';
         }
 
-        if ($model->approved_at_department_head && $model->workflow_status !== EmployeeLeave::WORKFLOW_PENDING) {
-            $stepDates[EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD] = $this->formatDateWithTimezone($model->approved_at_department_head, 'd/m/Y H:i');
-        }
-        if ($model->approved_by_department_head && $model->workflow_status !== EmployeeLeave::WORKFLOW_PENDING) {
-            $deptHead = \App\Models\User::find($model->approved_by_department_head);
-            if ($deptHead) {
-                $stepUsers[EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD] = $deptHead->name ?? 'N/A';
-            }
-        }
-
-        if ($model->approved_at_reviewer && in_array($model->workflow_status, [
-            EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER,
-            EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR
-        ])) {
-            $stepDates[EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER] = $this->formatDateWithTimezone($model->approved_at_reviewer, 'd/m/Y H:i');
-        }
-        if ($model->approved_by_reviewer && in_array($model->workflow_status, [
-            EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER,
-            EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR
-        ])) {
-            $reviewer = \App\Models\User::find($model->approved_by_reviewer);
-            if ($reviewer) {
-                $stepUsers[EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER] = $reviewer->name ?? 'N/A';
-            }
-        }
-
-        if ($model->approved_at_director && $model->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR) {
-            $stepDates[EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR] = $this->formatDateWithTimezone($model->approved_at_director, 'd/m/Y H:i');
-        }
-        if ($model->approved_by_director && $model->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR) {
-            $director = \App\Models\User::find($model->approved_by_director);
-            if ($director) {
-                $stepUsers[EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR] = $director->name ?? 'N/A';
-            }
-        }
-
         $currentStatusKey = $model->workflow_status;
         $currentStepIndex = 0;
 
         switch ($currentStatusKey) {
             case EmployeeLeave::WORKFLOW_APPROVED_BY_DIRECTOR:
                 $currentStepIndex = 4;
-                if ($model->approved_at_director) {
-                    $stepDates['completed'] = $this->formatDateWithTimezone($model->approved_at_director, 'd/m/Y H:i');
-                    if ($model->approved_by_director) {
-                        $director = \App\Models\User::find($model->approved_by_director);
-                        if ($director) {
-                            $stepUsers['completed'] = $director->name ?? 'N/A';
-                        }
-                    }
-                }
                 break;
             case EmployeeLeave::WORKFLOW_APPROVED_BY_REVIEWER:
                 $currentStepIndex = 3;
@@ -1570,25 +1784,8 @@ class ApprovalCenterService
             case EmployeeLeave::WORKFLOW_PENDING:
                 $currentStepIndex = 1;
                 break;
-            case EmployeeLeave::WORKFLOW_REJECTED:
-                if ($model->approved_at_reviewer) {
-                    $currentStepIndex = 3;
-                } elseif ($model->approved_at_department_head) {
-                    $currentStepIndex = 2;
-                } else {
-                    $currentStepIndex = 1;
-                }
-                break;
             default:
-                if ($model->approved_at_director) {
-                    $currentStepIndex = 4;
-                } elseif ($model->approved_at_reviewer) {
-                    $currentStepIndex = 3;
-                } elseif ($model->approved_at_department_head) {
-                    $currentStepIndex = 2;
-                } else {
-                    $currentStepIndex = 1;
-                }
+                $currentStepIndex = 1;
                 break;
         }
 

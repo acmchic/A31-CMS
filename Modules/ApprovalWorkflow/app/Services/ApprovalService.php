@@ -33,23 +33,26 @@ class ApprovalService
      */
     public function approve(Model $model, User $approver, array $options = []): bool
     {
-        // Get or create ApprovalRequest
+        // Xác định module type TRƯỚC KHI query
+        $moduleType = $this->getModuleTypeForModel($model);
+        if (!$moduleType) {
+            throw new \Exception('Không xác định được module type cho model: ' . get_class($model));
+        }
+
+        // Get or create ApprovalRequest - filter theo module_type
         $approvalRequest = ApprovalRequest::where('model_type', get_class($model))
             ->where('model_id', $model->id)
+            ->where('module_type', $moduleType)
             ->first();
 
         if (!$approvalRequest) {
             // Sync from model first
-            $moduleType = $this->getModuleTypeForModel($model);
-            if (!$moduleType) {
-                throw new \Exception('Không xác định được module type cho model: ' . get_class($model));
-            }
-            
             $this->approvalRequestService->syncFromModel($model, $moduleType);
             
-            // Reload approvalRequest
+            // Reload approvalRequest - filter theo module_type
             $approvalRequest = ApprovalRequest::where('model_type', get_class($model))
                 ->where('model_id', $model->id)
+                ->where('module_type', $moduleType)
                 ->first();
         }
 
@@ -304,23 +307,26 @@ class ApprovalService
      */
     public function reject(Model $model, User $approver, string $reason, array $options = []): bool
     {
-        // Get or create ApprovalRequest
+        // Xác định module type TRƯỚC KHI query
+        $moduleType = $this->getModuleTypeForModel($model);
+        if (!$moduleType) {
+            throw new \Exception('Không xác định được module type cho model: ' . get_class($model));
+        }
+
+        // Get or create ApprovalRequest - filter theo module_type
         $approvalRequest = ApprovalRequest::where('model_type', get_class($model))
             ->where('model_id', $model->id)
+            ->where('module_type', $moduleType)
             ->first();
 
         if (!$approvalRequest) {
             // Sync from model first
-            $moduleType = $this->getModuleTypeForModel($model);
-            if (!$moduleType) {
-                throw new \Exception('Không xác định được module type cho model: ' . get_class($model));
-            }
-            
             $this->approvalRequestService->syncFromModel($model, $moduleType);
             
-            // Reload approvalRequest
+            // Reload approvalRequest - filter theo module_type
             $approvalRequest = ApprovalRequest::where('model_type', get_class($model))
                 ->where('model_id', $model->id)
+                ->where('module_type', $moduleType)
                 ->first();
         }
 
@@ -337,7 +343,10 @@ class ApprovalService
      */
     public function rejectRequest(ApprovalRequest $approvalRequest, User $approver, string $reason, array $options = []): bool
     {
-        return $this->workflowHandler->reject($approvalRequest, $approver, $reason, $options);
+        // ✅ Sửa: workflowHandler->reject() return ApprovalRequest, nhưng method này phải return bool
+        // Signature của workflowHandler->reject() là: reject(ApprovalRequest $request, ?string $comment = null)
+        $this->workflowHandler->reject($approvalRequest, $reason);
+        return true;
     }
 
     /**
@@ -375,28 +384,47 @@ class ApprovalService
             throw new \Exception($validation['error']);
         }
 
-        // Get or create ApprovalRequest
+        // Xác định module type TRƯỚC KHI query
+        $moduleType = $this->getModuleTypeForModel($model);
+        if (!$moduleType) {
+            throw new \Exception('Không xác định được module type cho model: ' . get_class($model));
+        }
+
+        // Get or create ApprovalRequest - QUAN TRỌNG: filter theo cả model_type, model_id VÀ module_type
         $approvalRequest = ApprovalRequest::where('model_type', get_class($model))
             ->where('model_id', $model->id)
+            ->where('module_type', $moduleType) // ⚠️ QUAN TRỌNG: filter theo module_type để tránh nhầm
             ->first();
 
         if (!$approvalRequest) {
             // Sync from model first
-            $moduleType = $this->getModuleTypeForModel($model);
-            if (!$moduleType) {
-                throw new \Exception('Không xác định được module type cho model: ' . get_class($model));
+            try {
+                $this->approvalRequestService->syncFromModel($model, $moduleType);
+            } catch (\Exception $e) {
+                \Log::error('Error syncing ApprovalRequest in approveWithSignature:', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'model_type' => get_class($model),
+                    'model_id' => $model->id,
+                    'module_type' => $moduleType
+                ]);
+                throw new \Exception('Không thể tạo yêu cầu phê duyệt: ' . $e->getMessage());
             }
             
-            $this->approvalRequestService->syncFromModel($model, $moduleType);
-            
-            // Reload approvalRequest
+            // Reload approvalRequest - QUAN TRỌNG: filter theo module_type
             $approvalRequest = ApprovalRequest::where('model_type', get_class($model))
                 ->where('model_id', $model->id)
+                ->where('module_type', $moduleType) // ⚠️ QUAN TRỌNG: filter theo module_type
                 ->first();
         }
 
         if (!$approvalRequest) {
-            throw new \Exception('Không tìm thấy ApprovalRequest cho model này');
+            \Log::error('ApprovalRequest not found after sync in approveWithSignature:', [
+                'model_type' => get_class($model),
+                'model_id' => $model->id,
+                'module_type' => $moduleType
+            ]);
+            throw new \Exception('Không tìm thấy yêu cầu phê duyệt. Vui lòng thử lại hoặc liên hệ quản trị viên.');
         }
 
         // Approve first (without signature)
@@ -410,10 +438,11 @@ class ApprovalService
         $approvalRequest->signed_pdf_path = $pdfPath;
         $approvalRequest->save();
 
-        // Update model with signed PDF path (for backward compatibility)
-        if (in_array('signed_pdf_path', $model->getFillable())) {
-            $model->update(['signed_pdf_path' => $pdfPath]);
-        }
+        // ✅ Sửa: Không update signed_pdf_path vào model nữa vì đã chuyển sang approval_requests
+        // Chỉ update nếu model có cột này (backward compatibility cho các model cũ)
+        // if (in_array('signed_pdf_path', $model->getFillable())) {
+        //     $model->update(['signed_pdf_path' => $pdfPath]);
+        // }
 
         // Sync lại để đảm bảo đồng bộ
         $this->approvalRequestService->syncFromModel($model, $approvalRequest->module_type);
