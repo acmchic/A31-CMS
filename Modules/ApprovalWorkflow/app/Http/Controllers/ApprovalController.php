@@ -257,16 +257,26 @@ class ApprovalController extends Controller
                 ], 403);
             }
 
-            // Validate reason
             $request->validate([
                 'reason' => 'required|string'
             ]);
 
-            // Reject using ApprovalRequest
+            $rejectionReason = $request->reason;
+            if (is_string($rejectionReason)) {
+                $decoded = json_decode($rejectionReason, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $rejectionReason = 'Dữ liệu không hợp lệ';
+                } else {
+                    $rejectionReason = trim($rejectionReason);
+                }
+            } else {
+                $rejectionReason = is_string($request->reason) ? trim($request->reason) : '';
+            }
+
             $this->approvalService->rejectRequest(
                 $approvalRequest,
                 $user,
-                $request->reason,
+                $rejectionReason,
                 $request->only(['comment', 'metadata'])
             );
 

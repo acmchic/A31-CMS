@@ -106,13 +106,26 @@
 
         <hr class="my-4">
 
-        <!-- Rejection Reason (if rejected) -->
         @if(isset($request['rejection_reason']) && !empty($request['rejection_reason']))
-        <div class="alert alert-danger mb-4">
+        @php
+            $isReturned = isset($request['status']) && $request['status'] === 'returned';
+            $alertClass = $isReturned ? 'alert-warning' : 'alert-danger';
+            $iconClass = $isReturned ? 'la-undo' : 'la-times-circle';
+            $title = $isReturned ? 'Lý do trả lại' : 'Lý do từ chối';
+            
+            $rejectionReason = $request['rejection_reason'];
+            if (is_string($rejectionReason)) {
+                $decoded = json_decode($rejectionReason, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $rejectionReason = 'Dữ liệu không hợp lệ';
+                }
+            }
+        @endphp
+        <div class="alert {{ $alertClass }} mb-4">
             <h6 class="mb-2 fw-semibold">
-                <i class="la la-times-circle"></i> Lý do từ chối
+                <i class="la {{ $iconClass }}"></i> {{ $title }}
             </h6>
-            <p class="mb-0">{{ $request['rejection_reason'] }}</p>
+            <p class="mb-0" style="white-space: pre-wrap;">{{ $rejectionReason }}</p>
         </div>
         @endif
 

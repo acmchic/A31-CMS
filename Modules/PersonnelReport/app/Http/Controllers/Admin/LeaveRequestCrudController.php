@@ -598,8 +598,16 @@ class LeaveRequestCrudController extends CrudController
             'other'      => 'Khác'
         ];
 
-        // Convert to array if it's a Collection, then add empty option for placeholder "Chọn" - always show it, let user choose
+        // Convert to array if it's a Collection, then add empty option for placeholder "Chọn"
         $employeeOptionsArray = is_array($employeeOptions) ? $employeeOptions : $employeeOptions->toArray();
+
+        // ✅ Sửa: Nếu chỉ có 1 option, tự động selected. Nếu > 1 option, phải chọn
+        $defaultValue = null;
+        if (count($employeeOptionsArray) === 1) {
+            // Chỉ có 1 option → tự động selected
+            $defaultValue = array_key_first($employeeOptionsArray);
+        }
+
         $employeeOptionsWithPlaceholder = ['' => 'Chọn'] + $employeeOptionsArray;
 
         $employeeField = CRUD::field('employee_id')
@@ -607,12 +615,8 @@ class LeaveRequestCrudController extends CrudController
             ->type('select_from_array')
             ->options($employeeOptionsWithPlaceholder)
             ->allows_null(true)
-            ->default(null) // Always start with empty selection - let user choose
+            ->default($defaultValue) // ✅ Tự động selected nếu chỉ có 1 option
             ->tab('Thông tin cơ bản');
-
-        // If there's only 1 option and user is not admin/manager,
-        // field is still required in validation, but don't pre-select it
-        // User still needs to manually choose
 
         CRUD::field('leave_type')
             ->label('Loại nghỉ')
@@ -914,7 +918,7 @@ class LeaveRequestCrudController extends CrudController
                     ->orWhereDoesntHave('approvalRequest');
                 })
                 ->count(),
-            
+
             // approved_by_department_head = in_review with current_step = department_head_approval
             'approved_by_department_head' => (clone $baseQuery)
                 ->whereHas('approvalRequest', function($q) {
@@ -922,7 +926,7 @@ class LeaveRequestCrudController extends CrudController
                       ->where('current_step', 'department_head_approval');
                 })
                 ->count(),
-            
+
             // approved_by_reviewer = in_review with current_step = review
             'approved_by_reviewer' => (clone $baseQuery)
                 ->whereHas('approvalRequest', function($q) {
@@ -930,21 +934,21 @@ class LeaveRequestCrudController extends CrudController
                       ->where('current_step', 'review');
                 })
                 ->count(),
-            
+
             // approved_by_director = approved status
             'approved_by_director' => (clone $baseQuery)
                 ->whereHas('approvalRequest', function($q) {
                     $q->where('status', 'approved');
                 })
                 ->count(),
-            
+
             // rejected = rejected status
             'rejected' => (clone $baseQuery)
                 ->whereHas('approvalRequest', function($q) {
                     $q->where('status', 'rejected');
                 })
                 ->count(),
-            
+
             'all' => (clone $baseQuery)->count(),
         ];
 
@@ -1279,15 +1283,29 @@ class LeaveRequestCrudController extends CrudController
             ->label('Ghi chú')
             ->limit(500);
 
-        // Only show rejection_reason if it exists
         CRUD::column('rejection_reason')
             ->label('Lý do từ chối')
             ->type('closure')
             ->function(function($entry) {
-                return $entry->rejection_reason ?: null;
+                $approvalRequest = $entry->approvalRequest;
+                if ($approvalRequest && ($approvalRequest->status === 'rejected' || $approvalRequest->status === 'returned')) {
+                    $reason = $approvalRequest->rejection_reason;
+                    if (is_string($reason)) {
+                        $decoded = json_decode($reason, true);
+                        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                            return 'Dữ liệu không hợp lệ';
+                        }
+                    }
+                    return $reason ?: null;
+                }
+                return null;
             })
             ->visible(function($entry) {
-                return !empty($entry->rejection_reason);
+                $approvalRequest = $entry->approvalRequest;
+                if ($approvalRequest && ($approvalRequest->status === 'rejected' || $approvalRequest->status === 'returned')) {
+                    return !empty($approvalRequest->rejection_reason);
+                }
+                return false;
             });
     }
 

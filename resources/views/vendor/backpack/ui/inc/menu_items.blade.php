@@ -14,10 +14,11 @@
     $pendingCount = $approvalService->getTotalPendingCountForUser(backpack_user());
 @endphp
 <li class="nav-item">
-    <a class="nav-link" href="{{ url('approval-center') }}">
-        <i class="la la-check-circle nav-icon"></i> Trung tâm phê duyệt
+    <a class="nav-link" href="{{ url('approval-center') }}" style="position: relative; padding-right: 45px !important;">
+        <i class="la la-check-circle nav-icon"></i> 
+        <span>Trung tâm phê duyệt</span>
         @if($pendingCount > 0)
-            <span class="badge bg-danger rounded-pill ms-1">{{ $pendingCount }}</span>
+            <span class="badge bg-danger rounded-pill" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); min-width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; padding: 0 6px; line-height: 1;">{{ $pendingCount }}</span>
         @endif
     </a>
 </li>

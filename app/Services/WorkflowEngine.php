@@ -203,10 +203,22 @@ class WorkflowEngine
         $currentStep = $request->current_step;
         $statusBefore = $request->status;
 
-        $request->status = $action; // 'rejected', 'returned', 'cancelled'
+        $rejectionReason = $comment;
+        if (is_string($rejectionReason)) {
+            $decoded = json_decode($rejectionReason, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $rejectionReason = 'Dữ liệu không hợp lệ';
+            } else {
+                $rejectionReason = trim($rejectionReason);
+            }
+        } else {
+            $rejectionReason = is_string($comment) ? trim($comment) : '';
+        }
+
+        $request->status = $action;
         $request->rejected_by = auth()->id();
         $request->rejected_at = now();
-        $request->rejection_reason = $comment;
+        $request->rejection_reason = $rejectionReason;
         $request->rejection_step = $currentStep;
 
         $this->saveHistory($request, $currentStep, $action, $comment, $statusBefore, $request->status);

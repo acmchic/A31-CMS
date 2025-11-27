@@ -1026,6 +1026,7 @@ class ApprovalCenterService
                     'workflow_data' => $this->getWorkflowProgressData($model),
                     'has_signed_pdf' => $model->hasSignedPdf(),
                     'pdf_url' => $model->hasSignedPdf() ? route('approval.preview-pdf', ['modelClass' => base64_encode(get_class($model)), 'id' => $model->id]) : null,
+                    'rejection_reason' => ($approvalRequest && ($approvalRequest->status === 'rejected' || $approvalRequest->status === 'returned')) ? ($approvalRequest->rejection_reason ?? null) : null,
                 ];
 
             case 'vehicle':
@@ -1060,7 +1061,7 @@ class ApprovalCenterService
                     'workflow_data' => $this->getVehicleWorkflowProgressData($model),
                     'has_signed_pdf' => $model->hasSignedPdf(),
                     'pdf_url' => $model->hasSignedPdf() ? route('approval.preview-pdf', ['modelClass' => base64_encode(get_class($model)), 'id' => $model->id]) : null,
-                    'rejection_reason' => $model->rejection_reason ?? null,
+                    'rejection_reason' => ($approvalRequest && ($approvalRequest->status === 'rejected' || $approvalRequest->status === 'returned')) ? ($approvalRequest->rejection_reason ?? null) : null,
                 ];
 
             case 'material_plan':
@@ -1927,13 +1928,20 @@ class ApprovalCenterService
                 break;
         }
 
+        $approvalRequest = $model->approvalRequest;
+        $rejectionReason = null;
+        if ($approvalRequest && ($approvalRequest->status === 'rejected' || $approvalRequest->status === 'returned')) {
+            $rejectionReason = $approvalRequest->rejection_reason ?? null;
+        }
+        
         return [
             'steps' => $steps,
             'currentStatus' => $currentStatusKey,
             'currentStepIndex' => $currentStepIndex,
-            'rejected' => $model->workflow_status === 'rejected',
-            'rejection_level' => $model->rejection_level ?? null,
-            'rejection_reason' => $model->rejection_reason ?? null,
+            'rejected' => $approvalRequest && $approvalRequest->status === 'rejected',
+            'returned' => $approvalRequest && $approvalRequest->status === 'returned',
+            'rejection_level' => null,
+            'rejection_reason' => $rejectionReason,
             'stepDates' => $stepDates,
             'stepUsers' => $stepUsers
         ];
