@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Log;
  */
 class WorkflowEngine
 {
+    protected $currentApprover = null;
+
     /**
      * Xử lý bước phê duyệt
      * 
@@ -29,14 +31,33 @@ class WorkflowEngine
         ApprovalRequest $request,
         string $action,
         ?string $comment = null,
-        ?array $selectedApprovers = null
+        ?array $selectedApprovers = null,
+        $approver = null
     ): ApprovalRequest {
         // Validate action
         if (!in_array($action, ['approved', 'rejected', 'returned', 'cancelled'])) {
             throw new \Exception("Invalid action: {$action}");
         }
 
-        // Xử lý theo từng module - TÁCH BIỆT HOÀN TOÀN
+        if ($approver && is_object($approver) && (isset($approver->id) || method_exists($approver, 'id'))) {
+            $this->currentApprover = $approver;
+        } else {
+            $this->currentApprover = auth()->user();
+        }
+        
+        if (!$this->currentApprover) {
+            $this->currentApprover = backpack_user();
+        }
+        
+        \Log::info('WorkflowEngine::processApprovalStep - Setting currentApprover', [
+            'approver_type' => $approver ? get_class($approver) : 'null',
+            'approver_id' => $approver && is_object($approver) ? ($approver->id ?? 'no_id') : 'N/A',
+            'currentApprover_type' => $this->currentApprover ? get_class($this->currentApprover) : 'null',
+            'currentApprover_id' => $this->currentApprover ? $this->currentApprover->id : 'null',
+            'auth_id' => auth()->id(),
+            'backpack_user_id' => backpack_user() ? backpack_user()->id : 'null',
+        ]);
+
         switch ($request->module_type) {
             case 'leave':
                 return $this->handleLeaveWorkflow($request, $action, $comment, $selectedApprovers);
@@ -227,9 +248,6 @@ class WorkflowEngine
         return $request;
     }
 
-    /**
-     * Lưu lịch sử phê duyệt vào approval_history
-     */
     protected function saveHistory(
         ApprovalRequest $request,
         string $step,
@@ -239,16 +257,60 @@ class WorkflowEngine
         string $statusAfter
     ): void {
         $history = $request->approval_history ?? [];
+        
+        if (is_string($history)) {
+            $history = json_decode($history, true) ?? [];
+        }
+
+        $user = $this->currentApprover;
+        if (!$user) {
+            $user = auth()->user();
+        }
+        
+        \Log::info('WorkflowEngine::saveHistory - User info', [
+            'step' => $step,
+            'action' => $action,
+            'currentApprover_set' => $this->currentApprover ? 'yes' : 'no',
+            'currentApprover_id' => $this->currentApprover ? $this->currentApprover->id : 'null',
+            'currentApprover_name' => $this->currentApprover ? $this->currentApprover->name : 'null',
+            'user_found' => $user ? 'yes' : 'no',
+            'user_id' => $user ? $user->id : 'null',
+            'user_name' => $user ? $user->name : 'null',
+            'auth_id' => auth()->id(),
+        ]);
+        
+        if (!$user) {
+            \Log::warning('WorkflowEngine::saveHistory - No user found', [
+                'step' => $step,
+                'action' => $action,
+                'currentApprover' => $this->currentApprover ? get_class($this->currentApprover) : null,
+                'auth_id' => auth()->id(),
+            ]);
+        }
+        $userId = $user ? $user->id : null;
+        $userName = $user ? $user->name : 'N/A';
 
         $history[$step] = [
-            'action' => $action,
-            'comment' => $comment,
+            'approved_by' => $userId,
+            'approved_by_name' => $userName,
             'approved_at' => now()->toIso8601String(),
-            'approved_by' => auth()->id(),
-            'workflow_status_before' => $statusBefore,
-            'workflow_status_after' => $statusAfter,
-            'step_index' => $request->current_step_index,
+            'action' => $action,
         ];
+
+        if ($comment && $action !== 'approved') {
+            $cleanComment = $comment;
+            if (is_string($comment)) {
+                $decoded = json_decode($comment, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $cleanComment = null;
+                } else {
+                    $cleanComment = trim($comment);
+                }
+            }
+            if ($cleanComment) {
+                $history[$step]['comment'] = $cleanComment;
+            }
+        }
 
         $request->approval_history = $history;
     }

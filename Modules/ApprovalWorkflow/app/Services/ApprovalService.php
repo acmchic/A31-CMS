@@ -343,9 +343,7 @@ class ApprovalService
      */
     public function rejectRequest(ApprovalRequest $approvalRequest, User $approver, string $reason, array $options = []): bool
     {
-        // ✅ Sửa: workflowHandler->reject() return ApprovalRequest, nhưng method này phải return bool
-        // Signature của workflowHandler->reject() là: reject(ApprovalRequest $request, ?string $comment = null)
-        $this->workflowHandler->reject($approvalRequest, $reason);
+        $this->workflowHandler->reject($approvalRequest, $approver, $reason);
         return true;
     }
 

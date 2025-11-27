@@ -1146,6 +1146,21 @@ class ApprovalCenterService
 
         // If no PIN needed, approve without PIN
         if (!$needsPin) {
+            if (!$user) {
+                $user = backpack_user();
+            }
+            if (!$user) {
+                $user = auth()->user();
+            }
+            
+            \Log::info('ApprovalCenterService::approveRequest - Before approve', [
+                'user_type' => $user ? get_class($user) : 'null',
+                'user_id' => $user ? $user->id : 'null',
+                'user_name' => $user ? $user->name : 'null',
+                'backpack_user_id' => backpack_user() ? backpack_user()->id : 'null',
+                'auth_id' => auth()->id(),
+            ]);
+            
             $workflowHandler = app(\Modules\ApprovalWorkflow\Services\ApprovalWorkflowHandler::class);
             $workflowHandler->approve($approvalRequest, $user, ['comment' => $comment]);
             
@@ -1639,8 +1654,11 @@ class ApprovalCenterService
         $stepDates = [];
         $stepUsers = [];
         $approvalHistory = $approvalRequest->approval_history ?? [];
+        
+        if (is_string($approvalHistory)) {
+            $approvalHistory = json_decode($approvalHistory, true) ?? [];
+        }
 
-        // Step 1: Created
         if ($model->created_at) {
             $stepDates['created'] = $this->formatDateWithTimezone($model->created_at, 'd/m/Y H:i');
         }
@@ -1648,53 +1666,95 @@ class ApprovalCenterService
             $stepUsers['created'] = $model->employee->name ?? 'N/A';
         }
 
-        // Step 2: Department Head Approval
         if (isset($approvalHistory['department_head_approval'])) {
-            $deptHeadHistory = is_array($approvalHistory['department_head_approval']) 
-                ? (isset($approvalHistory['department_head_approval'][0]) ? $approvalHistory['department_head_approval'][0] : $approvalHistory['department_head_approval'])
-                : [];
-            
-            if (isset($deptHeadHistory['approved_at'])) {
-                $stepDates['department_head_approval'] = $this->formatDateWithTimezone($deptHeadHistory['approved_at'], 'd/m/Y H:i');
+            $deptHeadHistory = $approvalHistory['department_head_approval'];
+            if (is_array($deptHeadHistory) && isset($deptHeadHistory[0])) {
+                $deptHeadHistory = $deptHeadHistory[0];
             }
-            if (isset($deptHeadHistory['approved_by'])) {
-                $deptHead = \App\Models\User::find($deptHeadHistory['approved_by']);
-                if ($deptHead) {
-                    $stepUsers['department_head_approval'] = $deptHead->name ?? 'N/A';
+            
+            if (is_array($deptHeadHistory)) {
+                if (isset($deptHeadHistory['approved_at'])) {
+                    $approvedAt = $deptHeadHistory['approved_at'];
+                    if (is_string($approvedAt)) {
+                        try {
+                            $stepDates['department_head_approval'] = $this->formatDateWithTimezone($approvedAt, 'd/m/Y H:i');
+                        } catch (\Exception $e) {
+                            $stepDates['department_head_approval'] = $approvedAt;
+                        }
+                    }
+                }
+                if (isset($deptHeadHistory['approved_by_name'])) {
+                    $stepUsers['department_head_approval'] = $deptHeadHistory['approved_by_name'];
+                } elseif (isset($deptHeadHistory['approved_by'])) {
+                    $approvedBy = $deptHeadHistory['approved_by'];
+                    if ($approvedBy) {
+                        $deptHead = \App\Models\User::find($approvedBy);
+                        if ($deptHead) {
+                            $stepUsers['department_head_approval'] = $deptHead->name ?? 'N/A';
+                        }
+                    }
                 }
             }
         }
 
-        // Step 3: Review
         if (isset($approvalHistory['review'])) {
-            $reviewHistory = is_array($approvalHistory['review']) 
-                ? (isset($approvalHistory['review'][0]) ? $approvalHistory['review'][0] : $approvalHistory['review'])
-                : [];
-            
-            if (isset($reviewHistory['approved_at'])) {
-                $stepDates['review'] = $this->formatDateWithTimezone($reviewHistory['approved_at'], 'd/m/Y H:i');
+            $reviewHistory = $approvalHistory['review'];
+            if (is_array($reviewHistory) && isset($reviewHistory[0])) {
+                $reviewHistory = $reviewHistory[0];
             }
-            if (isset($reviewHistory['approved_by'])) {
-                $reviewer = \App\Models\User::find($reviewHistory['approved_by']);
-                if ($reviewer) {
-                    $stepUsers['review'] = $reviewer->name ?? 'N/A';
+            
+            if (is_array($reviewHistory)) {
+                if (isset($reviewHistory['approved_at'])) {
+                    $approvedAt = $reviewHistory['approved_at'];
+                    if (is_string($approvedAt)) {
+                        try {
+                            $stepDates['review'] = $this->formatDateWithTimezone($approvedAt, 'd/m/Y H:i');
+                        } catch (\Exception $e) {
+                            $stepDates['review'] = $approvedAt;
+                        }
+                    }
+                }
+                if (isset($reviewHistory['approved_by_name'])) {
+                    $stepUsers['review'] = $reviewHistory['approved_by_name'];
+                } elseif (isset($reviewHistory['approved_by'])) {
+                    $approvedBy = $reviewHistory['approved_by'];
+                    if ($approvedBy) {
+                        $reviewer = \App\Models\User::find($approvedBy);
+                        if ($reviewer) {
+                            $stepUsers['review'] = $reviewer->name ?? 'N/A';
+                        }
+                    }
                 }
             }
         }
 
-        // Step 4: Director Approval
         if (isset($approvalHistory['director_approval'])) {
-            $directorHistory = is_array($approvalHistory['director_approval']) 
-                ? (isset($approvalHistory['director_approval'][0]) ? $approvalHistory['director_approval'][0] : $approvalHistory['director_approval'])
-                : [];
-            
-            if (isset($directorHistory['approved_at'])) {
-                $stepDates['director_approval'] = $this->formatDateWithTimezone($directorHistory['approved_at'], 'd/m/Y H:i');
+            $directorHistory = $approvalHistory['director_approval'];
+            if (is_array($directorHistory) && isset($directorHistory[0])) {
+                $directorHistory = $directorHistory[0];
             }
-            if (isset($directorHistory['approved_by'])) {
-                $director = \App\Models\User::find($directorHistory['approved_by']);
-                if ($director) {
-                    $stepUsers['director_approval'] = $director->name ?? 'N/A';
+            
+            if (is_array($directorHistory)) {
+                if (isset($directorHistory['approved_at'])) {
+                    $approvedAt = $directorHistory['approved_at'];
+                    if (is_string($approvedAt)) {
+                        try {
+                            $stepDates['director_approval'] = $this->formatDateWithTimezone($approvedAt, 'd/m/Y H:i');
+                        } catch (\Exception $e) {
+                            $stepDates['director_approval'] = $approvedAt;
+                        }
+                    }
+                }
+                if (isset($directorHistory['approved_by_name'])) {
+                    $stepUsers['director_approval'] = $directorHistory['approved_by_name'];
+                } elseif (isset($directorHistory['approved_by'])) {
+                    $approvedBy = $directorHistory['approved_by'];
+                    if ($approvedBy) {
+                        $director = \App\Models\User::find($approvedBy);
+                        if ($director) {
+                            $stepUsers['director_approval'] = $director->name ?? 'N/A';
+                        }
+                    }
                 }
             }
         }
