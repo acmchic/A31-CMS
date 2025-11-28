@@ -2589,6 +2589,18 @@ $(document).ready(function() {
             }
         });
     }
+    
+    // Suppress tabler errors - Backpack theme will handle dropdown initialization
+    window.addEventListener('error', function(e) {
+        if (e.message && (
+            e.message.includes('tabler is not defined') ||
+            e.message.includes('Cannot read properties of undefined') ||
+            e.message.includes('tabler.Dropdown')
+        )) {
+            e.preventDefault();
+            return false;
+        }
+    }, true);
 });
 </script>
 @endpush

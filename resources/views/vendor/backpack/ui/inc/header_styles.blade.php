@@ -41,3 +41,8 @@ table.table .text-muted * {
     color: #000000 !important;
 }
 </style>
+
+{{-- Load CSS files directly from public to avoid basset storage permission issues --}}
+<link rel="stylesheet" type="text/css" href="{{ asset('css/custom-admin.css') }}">
+<link rel="stylesheet" type="text/css" href="{{ asset('css/dynamic-font.css') }}">
+<link rel="stylesheet" type="text/css" href="{{ asset('css/login-logo.css') }}">

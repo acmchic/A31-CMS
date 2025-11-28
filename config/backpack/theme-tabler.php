@@ -41,9 +41,7 @@ return [
     'styles' => [
         base_path('vendor/backpack/theme-tabler/resources/assets/css/color-adjustments.css'),
         base_path('vendor/backpack/theme-tabler/resources/assets/css/colors.css'),
-        'css/custom-admin.css', // Custom navbar color - Xanh da trời
-        'css/dynamic-font.css', // Dynamic font based on settings
-        'css/login-logo.css', // Custom login logo size
+        // Custom CSS files are loaded in header_styles.blade.php to avoid basset storage permission issues
     ],
 
     /**
