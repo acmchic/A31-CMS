@@ -1577,7 +1577,8 @@ $(document).ready(function() {
                             class="btn btn-sm btn-success"
                             data-id="${request.id}"
                             data-model-type="${request.model_type}"
-                            data-needs-pin="${needsPin ? '1' : '0'}">
+                            data-needs-pin="${needsPin ? '1' : '0'}"
+                            data-current-step="${request.current_step || ''}">
                         <i class="la la-check"></i> ${approveButtonText}
                     </button>
                 `;
@@ -1811,6 +1812,13 @@ $(document).ready(function() {
         const isDepartmentHeadStep = $(this).data('is-department-head-step') == '1' || $(this).data('is-department-head-step') === '1';
         const isReviewerStep = $(this).data('is-reviewer-step') == '1' || $(this).data('is-reviewer-step') === '1';
         const hasSelectedApprovers = $(this).data('has-selected-approvers') == '1' || $(this).data('has-selected-approvers') === '1';
+        const currentStep = $(this).data('current-step') || '';
+
+        // ✅ Sửa: Nếu ở bước director_approval (BGD phê duyệt), luôn hiện PIN modal để ký số
+        if (currentStep === 'director_approval') {
+            showPinModal(id, modelType);
+            return;
+        }
 
         // For Vehicle at review step (Thẩm định): need to select approvers first
         if (modelType === 'vehicle' && isReviewerStep && !hasSelectedApprovers) {

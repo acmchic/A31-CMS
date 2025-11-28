@@ -997,6 +997,29 @@ class ApprovalCenterService
                 if (!$model) return null;
 
                 $user = backpack_user();
+                
+                // ✅ Sửa: Lấy selected_approvers từ approvalRequest, không phải từ model
+                $approvalRequest = $model->approvalRequest;
+                
+                // ✅ Sửa: Dùng needsPinForStep để xác định needsPin dựa trên current_step
+                // Thay vì chỉ dựa vào workflow_status
+                if ($approvalRequest) {
+                    $needsPin = $this->needsPinForStep($approvalRequest, $user);
+                } else {
+                    // Fallback: tính toán như cũ nếu chưa có approvalRequest
+                    $isReviewerStep = $model->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
+                    $rankCode = $model->employee ? $model->employee->rank_code : null;
+                    $isOfficer = $this->isOfficerRank($rankCode);
+                    $hasReviewPermission = false;
+                    if ($isReviewerStep) {
+                        $hasReviewPermission = $isOfficer 
+                            ? PermissionHelper::can($user, 'leave.review.officer')
+                            : PermissionHelper::can($user, 'leave.review');
+                    }
+                    $needsPin = !($isReviewerStep && $hasReviewPermission);
+                }
+                
+                // Check reviewer step for other flags
                 $isReviewerStep = $model->workflow_status === EmployeeLeave::WORKFLOW_APPROVED_BY_DEPARTMENT_HEAD;
                 
                 // Check review permission based on employee rank
@@ -1009,11 +1032,6 @@ class ApprovalCenterService
                         ? PermissionHelper::can($user, 'leave.review.officer')
                         : PermissionHelper::can($user, 'leave.review');
                 }
-                
-                $needsPin = !($isReviewerStep && $hasReviewPermission);
-                
-                // ✅ Sửa: Lấy selected_approvers từ approvalRequest, không phải từ model
-                $approvalRequest = $model->approvalRequest;
                 $hasSelectedApprovers = false;
                 if ($approvalRequest && $approvalRequest->selected_approvers) {
                     $selectedApprovers = is_array($approvalRequest->selected_approvers) 
@@ -1067,6 +1085,7 @@ class ApprovalCenterService
                     'has_signed_pdf' => $model->hasSignedPdf(),
                     'pdf_url' => $model->hasSignedPdf() ? route('approval.preview-pdf', ['modelClass' => base64_encode(get_class($model)), 'id' => $model->id]) : null,
                     'rejection_reason' => ($approvalRequest && ($approvalRequest->status === 'rejected' || $approvalRequest->status === 'returned')) ? ($approvalRequest->rejection_reason ?? null) : null,
+                    'current_step' => $approvalRequest ? $approvalRequest->current_step : null, // ✅ Thêm current_step để check trong view
                 ];
 
             case 'vehicle':
@@ -1097,6 +1116,15 @@ class ApprovalCenterService
                 
                 $hasDepartmentHeadPermission = $this->canUserApproveVehicle($model, $user);
                 $hasReviewPermission = PermissionHelper::can($user, 'vehicle_registration.review');
+                
+                // ✅ Sửa: Dùng needsPinForStep để xác định needsPin dựa trên current_step
+                $needsPin = false;
+                if ($approvalRequest) {
+                    $needsPin = $this->needsPinForStep($approvalRequest, $user);
+                } else {
+                    // Fallback: department head step needs PIN
+                    $needsPin = $isDepartmentHeadStep;
+                }
                 
                 return [
                     'id' => $model->id,
@@ -1129,7 +1157,8 @@ class ApprovalCenterService
                     'has_signed_pdf' => $model->hasSignedPdf(),
                     'pdf_url' => $model->hasSignedPdf() ? route('approval.preview-pdf', ['modelClass' => base64_encode(get_class($model)), 'id' => $model->id]) : null,
                     'rejection_reason' => ($approvalRequest && ($approvalRequest->status === 'rejected' || $approvalRequest->status === 'returned')) ? ($approvalRequest->rejection_reason ?? null) : null,
-                    'needs_pin' => $isDepartmentHeadStep, // Department head step needs PIN for digital signature
+                    'needs_pin' => $needsPin, // ✅ Sử dụng needsPinForStep để xác định
+                    'current_step' => $approvalRequest ? $approvalRequest->current_step : null, // ✅ Thêm current_step để check trong view
                 ];
 
             case 'material_plan':
