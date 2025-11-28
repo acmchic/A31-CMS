@@ -42,7 +42,7 @@
 
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="text-muted small">Số lượng bản ghi</span>
-                            <span class="badge bg-{{ $type['color'] }}">{{ number_format($type['count']) }}</span>
+                            <span class="badge bg-{{ $type['color'] }} text-white" style="color: #ffffff !important;">{{ number_format($type['count']) }}</span>
                         </div>
 
                         <div class="progress progress-sm mb-2">

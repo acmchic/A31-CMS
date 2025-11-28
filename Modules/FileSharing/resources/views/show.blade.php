@@ -52,16 +52,16 @@
                                             'other' => 'Khác'
                                         ];
                                     @endphp
-                                    <span class="badge badge-secondary">{{ $categories[$file->category] ?? $file->category }}</span>
+                                    <span class="badge badge-secondary bg-secondary text-white" style="color: #ffffff !important;">{{ $categories[$file->category] ?? $file->category }}</span>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>Quyền truy cập:</strong></td>
                                 <td>
                                     @if($file->is_public)
-                                        <span class="badge badge-success">Công khai</span>
+                                        <span class="badge badge-success bg-success text-white" style="color: #ffffff !important;">Công khai</span>
                                     @else
-                                        <span class="badge badge-warning">Riêng tư</span>
+                                        <span class="badge badge-warning bg-warning text-white" style="color: #ffffff !important;">Riêng tư</span>
                                     @endif
                                 </td>
                             </tr>
@@ -86,12 +86,12 @@
                                 <td>
                                     @if($file->expires_at)
                                         @if($file->isExpired())
-                                            <span class="badge badge-danger">Đã hết hạn</span>
+                                            <span class="badge badge-danger bg-danger text-white" style="color: #ffffff !important;">Đã hết hạn</span>
                                         @else
                                             {{ $file->expires_at->format('d/m/Y H:i:s') }}
                                         @endif
                                     @else
-                                        <span class="badge badge-info">Không hết hạn</span>
+                                        <span class="badge badge-info bg-info text-white" style="color: #ffffff !important;">Không hết hạn</span>
                                     @endif
                                 </td>
                             </tr>

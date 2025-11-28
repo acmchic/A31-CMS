@@ -24,7 +24,7 @@
                                 $approver = \App\Models\User::find($approverId);
                             @endphp
                             @if($approver)
-                                <span class="badge bg-primary d-inline-flex align-items-center">
+                                <span class="badge bg-primary text-white d-inline-flex align-items-center" style="color: #ffffff !important;">
                                     <i class="la la-user me-1"></i>
                                     {{ $approver->display_name ?? $approver->name }}
                                 </span>

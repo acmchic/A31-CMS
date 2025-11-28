@@ -122,13 +122,13 @@
             </div>
             <div class="card-body">
                 <p><strong>Trạng thái:</strong>
-                    <span class="badge bg-warning">{{ $registration->status_display }}</span>
+                    {!! renderStatusBadge($registration->status ?? 'pending', $registration->status_display ?? 'Nháp', 'vehicle') !!}
                 </p>
                 @php
                     $approvalRequest = $registration->approvalRequest;
                 @endphp
                 <p><strong>Quy trình:</strong>
-                    <span class="badge bg-info">{{ $approvalRequest ? $approvalRequest->status_label : 'Nháp' }}</span>
+                    {!! renderStatusBadge($approvalRequest ? $approvalRequest->status : 'pending', $approvalRequest ? $approvalRequest->status_label : 'Nháp', 'vehicle') !!}
                 </p>
 
                 @if($registration->vehicle_id)

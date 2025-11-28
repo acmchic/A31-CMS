@@ -536,7 +536,7 @@ class LeaveRequestCrudController extends CrudController
                 ];
 
                 return '<span data-workflow-status="' . htmlspecialchars($status) . '">' .
-                       '<span class="badge badge-' . $config['badge'] . ' bg-' . $config['badge'] . '" style="font-size: 0.875rem; padding: 0.35em 0.65em;">' .
+                       '<span class="badge badge-' . $config['badge'] . ' bg-' . $config['badge'] . ' text-white" style="font-size: 0.875rem; padding: 0.35em 0.65em; color: #ffffff !important;">' .
                        '<i class="la ' . $config['icon'] . '" style="margin-right: 4px;"></i>' .
                        $text .
                        '</span>' .

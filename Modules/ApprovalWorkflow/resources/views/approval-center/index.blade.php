@@ -88,7 +88,7 @@
                         <span class="type-label">Nghỉ phép</span>
                     </div>
                     @if($leaveCount > 0)
-                        <span class="badge bg-danger rounded-pill type-badge">
+                        <span class="badge bg-danger rounded-pill type-badge text-white" style="color: #ffffff !important;">
                             {{ $leaveCount }}
                         </span>
                     @endif
@@ -105,7 +105,7 @@
                         <span class="type-label">Đăng ký xe</span>
                     </div>
                     @if($vehicleCount > 0)
-                        <span class="badge bg-danger rounded-pill type-badge">
+                        <span class="badge bg-danger rounded-pill type-badge text-white" style="color: #ffffff !important;">
                             {{ $vehicleCount }}
                         </span>
                     @endif
@@ -122,7 +122,7 @@
                         <span class="type-label">Phương án vật tư</span>
                     </div>
                     @if($materialPlanCount > 0)
-                        <span class="badge bg-danger rounded-pill type-badge">
+                        <span class="badge bg-danger rounded-pill type-badge text-white" style="color: #ffffff !important;">
                             {{ $materialPlanCount }}
                         </span>
                     @endif
@@ -657,7 +657,7 @@ $(document).ready(function() {
     const urlParams = new URLSearchParams(window.location.search);
     const modelType = urlParams.get('model_type');
     let currentType = $('#filter-type').val() || 'all';
-    
+
     // Override with model_type from URL if present
     if (modelType) {
         if (modelType === 'leave') {
@@ -670,7 +670,7 @@ $(document).ready(function() {
         // Update hidden input
         $('#filter-type').val(currentType);
     }
-    
+
     // Set active menu based on currentType
     $('.type-item').removeClass('active');
     if (currentType === 'leave') {
@@ -729,45 +729,46 @@ $(document).ready(function() {
     // Bulk selection handlers
     let selectedRequests = new Set();
 
-    // Use event delegation for select-all checkbox (since it's reloaded via AJAX)
+    function getRowCheckboxes() {
+        return Array.from(document.querySelectorAll('#request-list .request-checkbox:not(:disabled)'));
+    }
+
     $(document).on('change', '#select-all-requests', function() {
-        const isChecked = $(this).is(':checked');
-        
-        // Find all checkboxes within request-list that are not disabled
-        $('#request-list .request-checkbox').each(function() {
-            const $checkbox = $(this);
-            if (!$checkbox.prop('disabled')) {
-                // Set checked state
-                $checkbox.prop('checked', isChecked);
-                // Trigger change event to ensure all handlers run
-                $checkbox.trigger('change');
-            }
-        });
+        const isChecked = this.checked;
+        const rowCheckboxes = getRowCheckboxes();
+
+        rowCheckboxes
+            .filter(checkbox => checkbox.checked !== isChecked)
+            .forEach(checkbox => {
+                checkbox.checked = isChecked;
+                const $checkbox = $(checkbox);
+                updateSelection($checkbox, isChecked);
+            });
+
+        updateBulkActionsBar();
     });
 
-    // Individual checkbox
     $(document).on('change', '.request-checkbox', function() {
-        updateSelection($(this), $(this).is(':checked'));
+        updateSelection($(this), this.checked);
         updateBulkActionsBar();
         updateSelectAllCheckbox();
     });
 
-    // Prevent checkbox click from triggering card click
     $(document).on('click', '.request-checkbox', function(e) {
         e.stopPropagation();
     });
 
-    // Clear selection
     $(document).on('click', '#btn-clear-selection', function() {
-        $('.request-checkbox').prop('checked', false);
+        getRowCheckboxes().forEach(checkbox => {
+            checkbox.checked = false;
+            const $checkbox = $(checkbox);
+            updateSelection($checkbox, false);
+        });
         $('#select-all-requests').prop('checked', false);
-        selectedRequests.clear();
-        $('.request-item').removeClass('selected');
         updateBulkActionsBar();
     });
 
-    // Bulk approve button
-    $('#btn-bulk-approve').on('click', function() {
+    $(document).on('click', '#btn-bulk-approve', function() {
         if (selectedRequests.size === 0) {
             alert('Vui lòng chọn ít nhất một đơn để phê duyệt');
             return;
@@ -801,8 +802,9 @@ $(document).ready(function() {
     }
 
     function updateSelectAllCheckbox() {
-        const totalCheckboxes = $('.request-checkbox:not(:disabled)').length;
-        const checkedCheckboxes = $('.request-checkbox:checked').length;
+        const rowCheckboxes = getRowCheckboxes();
+        const totalCheckboxes = rowCheckboxes.length;
+        const checkedCheckboxes = rowCheckboxes.filter(cb => cb.checked).length;
         const isAllChecked = totalCheckboxes > 0 && checkedCheckboxes === totalCheckboxes;
         $('#select-all-requests').prop('checked', isAllChecked);
     }
@@ -901,7 +903,7 @@ $(document).ready(function() {
             modalHtml += `
                                         <tr>
                                             <td>${index + 1}</td>
-                                            <td><span class="badge bg-primary">${req.type}</span></td>
+                                            <td><span class="badge bg-primary text-white" style="color: #ffffff !important;">${req.type}</span></td>
                                             <td>${req.title}</td>
                                             <td><i class="la la-user"></i> ${req.initiated_by}</td>
                                             <td><span class="badge bg-${req.status_badge || 'secondary'} text-white badge-pill" style="color: #ffffff !important;">${req.status_label || req.status}</span></td>
@@ -2589,7 +2591,7 @@ $(document).ready(function() {
             }
         });
     }
-    
+
     // Suppress tabler errors - Backpack theme will handle dropdown initialization
     window.addEventListener('error', function(e) {
         if (e.message && (

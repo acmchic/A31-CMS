@@ -52,10 +52,10 @@
              data-can-approve="{{ $request['can_approve'] ? '1' : '0' }}"
              data-is-reviewer-step="{{ $isReviewerStep ? '1' : '0' }}"
              style="cursor: pointer; border-radius: 12px; overflow: hidden;">
-            <div class="card-body p-4">
+            <div class="card-body p-3">
                 <div class="d-flex align-items-start">
                     {{-- Checkbox - Luôn hiển thị --}}
-                    <div class="me-1 mt-1 request-checkbox-wrapper">
+                    <div class=" mt-1 request-checkbox-wrapper">
                         @if($canBulkApprove)
                             <input type="checkbox"
                                    class="form-check-input request-checkbox"
@@ -280,7 +280,7 @@
 }
 
 .request-period-text {
-    font-size: 0.85rem;
+    font-size: 0.7rem;
     color: #64748b;
 }
 
