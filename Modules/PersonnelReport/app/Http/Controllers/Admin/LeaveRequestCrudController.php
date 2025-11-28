@@ -390,14 +390,6 @@ class LeaveRequestCrudController extends CrudController
         if (PermissionHelper::can($user, 'leave.view')) {
             CRUD::addButtonFromModelFunction('line', 'download_pdf', 'downloadPdfButton', 'beginning');
         }
-
-        $hasApprove = PermissionHelper::can($user, 'leave.approve');
-        $hasReview = PermissionHelper::can($user, 'leave.review');
-
-        if ($hasApprove || $hasReview) {
-            CRUD::addButtonFromModelFunction('line', 'reject', 'rejectButton', 'beginning');
-            CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
-        }
     }
 
     protected function setupListOperation()

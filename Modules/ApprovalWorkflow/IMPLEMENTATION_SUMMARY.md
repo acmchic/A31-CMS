@@ -139,3 +139,4 @@ $materialPlans = ApprovalRequest::where('module_type', 'material_plan')
 4. ✅ **Không phá kiến trúc**: Module cũ vẫn hoạt động bình thường
 
 
+

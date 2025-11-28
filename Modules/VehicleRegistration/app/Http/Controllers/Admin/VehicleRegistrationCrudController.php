@@ -73,13 +73,11 @@ class VehicleRegistrationCrudController extends CrudController
     {
         $user = backpack_user();
 
-        // Remove all workflow buttons first to ensure clean state
         CRUD::removeButton('assign_vehicle');
         CRUD::removeButton('approve');
         CRUD::removeButton('reject');
         CRUD::removeButton('download_pdf');
 
-        // CRUD buttons - Deny access to operations if no permission
         if (!PermissionHelper::can($user, 'vehicle_registration.create')) {
             CRUD::denyAccess('create');
         }
@@ -92,28 +90,8 @@ class VehicleRegistrationCrudController extends CrudController
             CRUD::denyAccess('delete');
         }
 
-        // ✅ Workflow Buttons using ApprovalWorkflow module
-        // Only add buttons if user has the specific permission
-
-        // Step 1: Đội trưởng xe phân công (specific to VehicleRegistration)
         if (PermissionHelper::can($user, 'vehicle_registration.assign')) {
             CRUD::addButtonFromModelFunction('line', 'assign_vehicle', 'assignVehicleButton', 'beginning');
-        }
-
-        // Step 2: Ban Giám Đốc phê duyệt (using ApprovalWorkflow buttons)
-        // Approve button - check approve permission
-        if (PermissionHelper::can($user, 'vehicle_registration.approve')) {
-            CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
-        }
-        
-        // Reject button - check reject permission (separate from approve)
-        if (PermissionHelper::can($user, 'vehicle_registration.reject')) {
-            CRUD::addButtonFromModelFunction('line', 'reject', 'rejectButton', 'beginning');
-        }
-
-        // Download PDF (using ApprovalWorkflow button)
-        if (PermissionHelper::can($user, 'vehicle_registration.view')) {
-            CRUD::addButtonFromModelFunction('line', 'download_pdf', 'downloadPdfButton', 'beginning');
         }
     }
 
@@ -449,49 +427,6 @@ class VehicleRegistrationCrudController extends CrudController
      * Use /approval/approve/{modelClass}/{id} or /approval/reject/{modelClass}/{id}
      */
 
-    /**
-     * Approve with digital signature
-     */
-    public function approve($id)
-    {
-        $registration = VehicleRegistration::findOrFail($id);
-
-        if (!PermissionHelper::userCan('vehicle_registration.approve')) {
-            abort(403, getUserTitle() . ' không có quyền phê duyệt.');
-        }
-
-        // Update approval info
-        $registration->update([
-            'status' => 'approved',
-            'workflow_status' => 'approved',
-            'director_approved_by' => backpack_user()->id,
-            'director_approved_at' => now(),
-        ]);
-
-        // Generate PDF with digital signature
-        try {
-            $pdfPath = VehicleRegistrationPdfService::generateApprovalPdf($registration);
-
-            \Log::info('PDF Generated for vehicle registration:', [
-                'registration_id' => $registration->id,
-                'pdf_path' => $pdfPath,
-                'approver' => backpack_user()->name
-            ]);
-
-            return redirect(backpack_url('vehicle-registration'))->with('success', 'Đã phê duyệt và tạo PDF thành công! Chữ ký số đã được áp dụng.');
-
-        } catch (\Exception $e) {
-            \Log::error('PDF Generation Error:', [
-                'registration_id' => $registration->id,
-                'error' => $e->getMessage()
-            ]);
-
-            return redirect(backpack_url('vehicle-registration'))->with('warning', 'Đã phê duyệt thành công nhưng có lỗi khi tạo PDF: ' . $e->getMessage());
-        }
-    }
-
-    // ❌ REMOVED: reject() method
-    // ✅ This is now handled by ApprovalWorkflow module's ApprovalController!
 
     /**
      * Download PDF with signature

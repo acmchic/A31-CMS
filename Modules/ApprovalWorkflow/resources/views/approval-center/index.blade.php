@@ -729,24 +729,20 @@ $(document).ready(function() {
     // Bulk selection handlers
     let selectedRequests = new Set();
 
-    // Select All checkbox
-    $('#select-all-requests').on('change', function() {
+    // Use event delegation for select-all checkbox (since it's reloaded via AJAX)
+    $(document).on('change', '#select-all-requests', function() {
         const isChecked = $(this).is(':checked');
-
-        // Show/hide checkboxes based on select all state
-        if (isChecked) {
-            $('.request-checkbox-wrapper').show();
-        } else {
-            $('.request-checkbox-wrapper').hide();
-        }
-
-        $('.request-checkbox').each(function() {
-            if (!$(this).prop('disabled')) {
-                $(this).prop('checked', isChecked);
-                updateSelection($(this), isChecked);
+        
+        // Find all checkboxes within request-list that are not disabled
+        $('#request-list .request-checkbox').each(function() {
+            const $checkbox = $(this);
+            if (!$checkbox.prop('disabled')) {
+                // Set checked state
+                $checkbox.prop('checked', isChecked);
+                // Trigger change event to ensure all handlers run
+                $checkbox.trigger('change');
             }
         });
-        updateBulkActionsBar();
     });
 
     // Individual checkbox
@@ -754,12 +750,6 @@ $(document).ready(function() {
         updateSelection($(this), $(this).is(':checked'));
         updateBulkActionsBar();
         updateSelectAllCheckbox();
-
-        // Hide checkboxes if all are unchecked
-        const checkedCount = $('.request-checkbox:checked').length;
-        if (checkedCount === 0 && !$('#select-all-requests').is(':checked')) {
-            $('.request-checkbox-wrapper').hide();
-        }
     });
 
     // Prevent checkbox click from triggering card click
@@ -768,7 +758,7 @@ $(document).ready(function() {
     });
 
     // Clear selection
-    $('#btn-clear-selection').on('click', function() {
+    $(document).on('click', '#btn-clear-selection', function() {
         $('.request-checkbox').prop('checked', false);
         $('#select-all-requests').prop('checked', false);
         selectedRequests.clear();
@@ -815,11 +805,6 @@ $(document).ready(function() {
         const checkedCheckboxes = $('.request-checkbox:checked').length;
         const isAllChecked = totalCheckboxes > 0 && checkedCheckboxes === totalCheckboxes;
         $('#select-all-requests').prop('checked', isAllChecked);
-
-        // Hide checkboxes if all are unchecked
-        if (!isAllChecked && checkedCheckboxes === 0) {
-            $('.request-checkbox-wrapper').hide();
-        }
     }
 
     function showBulkApproveModal() {
@@ -1322,6 +1307,11 @@ $(document).ready(function() {
 
                 // Update list
                 $('#request-list').html(listHtml || '<div class="card"><div class="card-body text-center text-muted py-5"><i class="la la-inbox la-3x mb-3"></i><p>Không có yêu cầu nào</p></div></div>');
+
+                // Reset select all checkbox state after reload
+                $('#select-all-requests').prop('checked', false);
+                selectedRequests.clear();
+                updateBulkActionsBar();
 
                 // Update detail if there's a selected request
                 if (detailHtml) {

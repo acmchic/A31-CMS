@@ -1248,16 +1248,8 @@ class ApprovalCenterService
                 $user = auth()->user();
             }
             
-            \Log::info('ApprovalCenterService::approveRequest - Before approve', [
-                'user_type' => $user ? get_class($user) : 'null',
-                'user_id' => $user ? $user->id : 'null',
-                'user_name' => $user ? $user->name : 'null',
-                'backpack_user_id' => backpack_user() ? backpack_user()->id : 'null',
-                'auth_id' => auth()->id(),
-            ]);
-            
-            $workflowHandler = app(\Modules\ApprovalWorkflow\Services\ApprovalWorkflowHandler::class);
-            $workflowHandler->approve($approvalRequest, $user, ['comment' => $comment]);
+            $workflowEngine = app(\App\Services\WorkflowEngine::class);
+            $workflowEngine->processApprovalStep($approvalRequest, 'approved', $comment, null, $user);
             
             $approvalRequest->refresh();
             
@@ -1332,32 +1324,33 @@ class ApprovalCenterService
      */
     public function rejectRequest($id, $modelType, $user, $reason = '')
     {
-        $model = $this->getModel($id, $modelType);
-        if (!$model) {
-            throw new \Exception('Request not found');
+        $approvalRequest = \Modules\ApprovalWorkflow\Models\ApprovalRequest::where('model_type', $this->getModelClassFromType($modelType))
+            ->where('model_id', $id)
+            ->first();
+
+        if (!$approvalRequest) {
+            throw new \Exception('Không tìm thấy yêu cầu phê duyệt');
         }
 
-        $controller = app(\Modules\ApprovalWorkflow\Http\Controllers\ApprovalController::class);
-        $request = new \Illuminate\Http\Request();
-        $request->merge(['reason' => $reason]);
-
-        $modelClass = base64_encode(get_class($model));
-        $response = $controller->reject($request, $modelClass, $id);
-
-        // Convert response to array format
-        if ($response instanceof \Illuminate\Http\JsonResponse) {
-            $data = $response->getData(true);
-            return [
-                'success' => $data['success'] ?? true,
-                'message' => $data['message'] ?? 'Từ chối thành công',
-                'data' => $data['data'] ?? null,
-            ];
+        if (!$user) {
+            $user = backpack_user();
         }
+        if (!$user) {
+            $user = auth()->user();
+        }
+
+        $workflowEngine = app(\App\Services\WorkflowEngine::class);
+        $workflowEngine->processApprovalStep($approvalRequest, 'rejected', $reason, null, $user);
+        
+        $approvalRequest->refresh();
 
         return [
             'success' => true,
-            'message' => 'Từ chối thành công',
-            'data' => null,
+            'message' => 'Đã từ chối thành công',
+            'data' => [
+                'status' => $approvalRequest->status,
+                'current_step' => $approvalRequest->current_step,
+            ],
         ];
     }
 

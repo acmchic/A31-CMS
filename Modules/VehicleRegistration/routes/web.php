@@ -23,17 +23,9 @@ Route::group([
         Route::crud('vehicle-registration', VehicleRegistrationCrudController::class);
     });
     
-    // Step 2: Vehicle Assignment (Đội trưởng xe)
     Route::group(['middleware' => 'permission:vehicle_registration.assign'], function () {
         Route::get('vehicle-registration/{id}/assign-vehicle', [VehicleRegistrationCrudController::class, 'showAssignForm'])->name('vehicle-registration.assign-vehicle');
         Route::post('vehicle-registration/{id}/assign-vehicle', [VehicleRegistrationCrudController::class, 'processAssignment'])->name('vehicle-registration.process-assignment');
-    });
-    
-    // Step 3: Approval (Ban Giám Đốc)
-    Route::group(['middleware' => 'permission:vehicle_registration.approve'], function () {
-        Route::get('vehicle-registration/{id}/approve', [VehicleRegistrationCrudController::class, 'approve'])->name('vehicle-registration.approve');
-        Route::get('vehicle-registration/{id}/reject', [VehicleRegistrationCrudController::class, 'reject'])->name('vehicle-registration.reject');
-        Route::get('vehicle-registration/{id}/download-pdf', [VehicleRegistrationCrudController::class, 'downloadPdf'])->name('vehicle-registration.download-pdf');
     });
     
 });

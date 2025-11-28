@@ -54,8 +54,8 @@
              style="cursor: pointer; border-radius: 12px; overflow: hidden;">
             <div class="card-body p-4">
                 <div class="d-flex align-items-start">
-                    {{-- Checkbox - Ẩn mặc định, chỉ hiện khi chọn "Chọn tất cả" --}}
-                    <div class="me-1 mt-1 request-checkbox-wrapper" style="display: none;">
+                    {{-- Checkbox - Luôn hiển thị --}}
+                    <div class="me-1 mt-1 request-checkbox-wrapper">
                         @if($canBulkApprove)
                             <input type="checkbox"
                                    class="form-check-input request-checkbox"
