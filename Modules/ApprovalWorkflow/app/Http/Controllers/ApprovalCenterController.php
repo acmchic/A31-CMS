@@ -341,15 +341,14 @@ class ApprovalCenterController extends Controller
                     ], 404);
                 }
                 
-                // Check if at department_head_approval step
-                $isDepartmentHeadStep = $approvalRequest->status === 'in_review' && 
-                                       $approvalRequest->current_step === 'department_head_approval' &&
-                                       $vehicle->vehicle_id;
+                // Check if at review step (Thẩm định)
+                $isReviewStep = $approvalRequest->status === 'in_review' && 
+                               $approvalRequest->current_step === 'review';
                 
-                $hasDepartmentHeadPermission = PermissionHelper::can($user, 'vehicle_registration.approve');
-                $isDepartmentHead = $user->is_department_head || $user->hasRole(['Trưởng phòng', 'Truong Phong', 'Trưởng Phòng', 'Trưởng phòng ban', 'Trưởng phòng kế hoạch']);
+                // Check permission for review step
+                $hasReviewPermission = PermissionHelper::can($user, 'vehicle_registration.review');
                 
-                if (!$isDepartmentHeadStep || !$hasDepartmentHeadPermission || !$isDepartmentHead) {
+                if (!$isReviewStep || !$hasReviewPermission) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Bạn không có quyền thực hiện thao tác này',
@@ -389,23 +388,17 @@ class ApprovalCenterController extends Controller
                 $selectedApprovers['director_approval'] = $approverIds;
                 $approvalRequest->selected_approvers = $selectedApprovers;
                 
-                // Update approval history
-                $approvalHistory = $approvalRequest->approval_history ?? [];
-                if (!is_array($approvalHistory)) {
-                    $approvalHistory = json_decode($approvalHistory, true) ?? [];
-                }
+                // Use WorkflowEngine to process review step (similar to leave)
+                $workflowEngine = app(\App\Services\WorkflowEngine::class);
+                $workflowEngine->processApprovalStep(
+                    $approvalRequest,
+                    'approved',
+                    'Đã chọn người phê duyệt: ' . implode(', ', \App\Models\User::whereIn('id', $approverIds)->pluck('name')->toArray()),
+                    $approverIds, // Pass selected approvers
+                    $user
+                );
                 
-                $approvalHistory['department_head_approval'] = [
-                    'approved_by' => $user->id,
-                    'approved_at' => now()->toIso8601String(),
-                    'comment' => 'Đã chọn người phê duyệt: ' . implode(', ', \App\Models\User::whereIn('id', $approverIds)->pluck('name')->toArray()),
-                ];
-                $approvalRequest->approval_history = $approvalHistory;
-                
-                // Move to next step: director_approval
-                $approvalRequest->current_step = 'director_approval';
-                $approvalRequest->status = 'in_review';
-                $approvalRequest->save();
+                $approvalRequest->refresh();
                 
                 // History is now stored in approval_requests.approval_history JSON field
                 // No need to create separate ApprovalHistory record

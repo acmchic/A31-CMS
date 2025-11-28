@@ -31,16 +31,20 @@
                     $canApproveReviewerStep = isset($request['can_approve_reviewer_step']) ? $request['can_approve_reviewer_step'] : true;
 
                     // For Leave: Show assign button if at reviewer step and no selected approvers yet
-                    // For Vehicle: At department_head_step, always show approve button (approve will include approver selection)
-                    // OR if at reviewer step and cannot approve (missing selected approvers)
+                    // For Vehicle: 
+                    //   - At department_head_step: show approve button (cần PIN để ký số)
+                    //   - At review step: show "Thẩm định" button (mở modal chọn người phê duyệt)
                     $showAssignButton = ($isReviewerStep && !$hasSelectedApprovers) ||
                                        ($isReviewerStep && !$canApproveReviewerStep);
                     
-                    // For Vehicle at department_head_step: always show approve button
+                    // For Vehicle at department_head_step: always show approve button (cần PIN)
                     $isVehicleDepartmentHeadStep = $request['model_type'] === 'vehicle' && $isDepartmentHeadStep;
+                    
+                    // For Vehicle at review step: show "Thẩm định" button
+                    $isVehicleReviewStep = $request['model_type'] === 'vehicle' && $isReviewerStep;
                 @endphp
 
-                @if($showAssignButton && !$isVehicleDepartmentHeadStep)
+                @if($showAssignButton && !$isVehicleDepartmentHeadStep && !$isVehicleReviewStep)
                     {{-- Show assign button only for Leave reviewer step --}}
                     <button id="btn-assign-approvers"
                             class="btn btn-sm btn-primary"
@@ -50,15 +54,23 @@
                     </button>
                 @else
                     {{-- Show approve button --}}
-                    @if(!$isReviewerStep || ($isReviewerStep && $canApproveReviewerStep) || $isVehicleDepartmentHeadStep)
+                    @if(!$isReviewerStep || ($isReviewerStep && $canApproveReviewerStep) || $isVehicleDepartmentHeadStep || $isVehicleReviewStep)
                         <button id="btn-approve"
                                 class="btn btn-sm btn-success"
                                 data-id="{{ $request['id'] }}"
                                 data-model-type="{{ $request['model_type'] }}"
-                                data-needs-pin="{{ isset($request['needs_pin']) && $request['needs_pin'] === false ? '0' : '1' }}"
+                                data-needs-pin="{{ ($isVehicleDepartmentHeadStep && isset($request['needs_pin']) && $request['needs_pin']) ? '1' : (isset($request['needs_pin']) && $request['needs_pin'] === false ? '0' : '0') }}"
                                 data-is-department-head-step="{{ $isVehicleDepartmentHeadStep ? '1' : '0' }}"
+                                data-is-reviewer-step="{{ $isVehicleReviewStep ? '1' : '0' }}"
                                 data-has-selected-approvers="{{ isset($request['has_selected_approvers']) && $request['has_selected_approvers'] ? '1' : '0' }}">
-                            <i class="la la-check"></i> {{ (isset($request['is_reviewer_role']) && $request['is_reviewer_role']) ? 'Gửi lên BGD' : 'Phê duyệt' }}
+                            <i class="la la-check"></i> 
+                            @if($isVehicleReviewStep)
+                                Thẩm định
+                            @elseif(isset($request['is_reviewer_role']) && $request['is_reviewer_role'])
+                                Thẩm định
+                            @else
+                                Phê duyệt
+                            @endif
                         </button>
                     @endif
                 @endif

@@ -164,7 +164,18 @@ class WorkflowEngine
         }
 
         if ($currentStep === 'department_head_approval') {
-            // TP duyệt → PHẢI mở modal chọn người BGĐ
+            // TP duyệt → chuyển sang bước review (Gửi lên BGD)
+            // Bước này cần ký số (PIN) - đã được xử lý ở frontend
+            $request->current_step = 'review';
+            $request->current_step_index = 2; // Step 2: review (after vehicle_picked=0, dept_head=1)
+            $request->status = 'in_review';
+            $this->saveHistory($request, $currentStep, $action, $comment, $statusBefore, $request->status);
+            $request->save();
+            return $request;
+        }
+
+        if ($currentStep === 'review') {
+            // Review step → PHẢI mở modal chọn người BGĐ
             if (empty($selectedApprovers)) {
                 throw new \Exception('director selection required');
             }
@@ -176,7 +187,7 @@ class WorkflowEngine
 
             // Chuyển sang bước giám đốc
             $request->current_step = 'director_approval';
-            $request->current_step_index = 2; // Step 2: director_approval (after vehicle_assigned=1, dept_head=2)
+            $request->current_step_index = 3; // Step 3: director_approval (after vehicle_picked=0, dept_head=1, review=2)
             $request->status = 'in_review';
             $this->saveHistory($request, $currentStep, $action, $comment, $statusBefore, $request->status);
             $request->save();

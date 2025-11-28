@@ -167,7 +167,7 @@ class ApprovalController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Đã gửi lên BGD thành công!',
+                'message' => 'Đã thẩm định và gửi lên BGD thành công!',
                 'data' => [
                     'status' => $approvalRequest->status,
                     'current_step' => $approvalRequest->current_step,

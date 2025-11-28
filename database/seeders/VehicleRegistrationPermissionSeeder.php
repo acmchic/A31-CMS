@@ -24,6 +24,7 @@ class VehicleRegistrationPermissionSeeder extends Seeder
             // Workflow permissions
             'vehicle_registration.assign' => 'Phân công xe và lái xe (Đội trưởng xe)',
             'vehicle_registration.approve' => 'Phê duyệt đăng ký xe (Ban Giám Đốc)',
+            'vehicle_registration.review' => 'Thẩm định đăng ký xe',
             'vehicle_registration.reject' => 'Từ chối đăng ký xe',
 
             // Additional permissions
@@ -42,6 +43,7 @@ class VehicleRegistrationPermissionSeeder extends Seeder
         $banGiamDoc = Role::firstOrCreate(['name' => 'ban_giam_doc']);
         $doiTruongXe = Role::firstOrCreate(['name' => 'doi_truong_xe']);
         $nhanVien = Role::firstOrCreate(['name' => 'nhan_vien']);
+        $truongPhong = Role::firstOrCreate(['name' => 'truong_phong']);
 
         // Gán quyền cho Admin (tất cả quyền)
         $admin->givePermissionTo(Permission::where('name', 'like', 'vehicle_registration.%')->get());
@@ -52,6 +54,14 @@ class VehicleRegistrationPermissionSeeder extends Seeder
             'vehicle_registration.approve',
             'vehicle_registration.reject',
             'vehicle_registration.download_pdf',
+        ]);
+
+        // Gán quyền cho Trưởng phòng (có thể phê duyệt và gửi lên BGD)
+        $truongPhong->givePermissionTo([
+            'vehicle_registration.view',
+            'vehicle_registration.approve',
+            'vehicle_registration.review',
+            'vehicle_registration.reject',
         ]);
 
         // Gán quyền cho Đội trưởng xe

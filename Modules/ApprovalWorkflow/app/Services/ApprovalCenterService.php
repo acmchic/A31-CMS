@@ -1081,7 +1081,23 @@ class ApprovalCenterService
                                        $approvalRequest->status === 'in_review' && 
                                        $approvalRequest->current_step === 'department_head_approval' &&
                                        $model->vehicle_id;
+                
+                // Check if at review step (Thẩm định)
+                $isReviewStep = $approvalRequest && 
+                               $approvalRequest->status === 'in_review' && 
+                               $approvalRequest->current_step === 'review';
+                
+                // Check if department_head_approval was already approved (required for review step)
+                $approvalHistory = $approvalRequest ? ($approvalRequest->approval_history ?? []) : [];
+                if (is_string($approvalHistory)) {
+                    $approvalHistory = json_decode($approvalHistory, true) ?? [];
+                }
+                $hasDepartmentHeadApproved = isset($approvalHistory['department_head_approval']) && 
+                                            isset($approvalHistory['department_head_approval']['approved_by']);
+                
                 $hasDepartmentHeadPermission = $this->canUserApproveVehicle($model, $user);
+                $hasReviewPermission = PermissionHelper::can($user, 'vehicle_registration.review');
+                
                 return [
                     'id' => $model->id,
                     'model_type' => 'vehicle',
@@ -1104,11 +1120,16 @@ class ApprovalCenterService
                                     ]) &&
                                     !$this->isCurrentStepApproved($approvalRequest),
                     'is_department_head_step' => $isDepartmentHeadStep,
-                    'has_selected_approvers' => !empty($model->selected_approvers),
+                    'is_reviewer_step' => $isReviewStep && $hasDepartmentHeadApproved && $hasReviewPermission,
+                    'is_reviewer_role' => $isReviewStep && $hasReviewPermission,
+                    'can_approve_reviewer_step' => $isReviewStep ? true : true, // Review step doesn't need selected approvers check
+                    'has_selected_approvers' => !empty($model->selected_approvers) || 
+                                               ($approvalRequest && !empty($approvalRequest->selected_approvers)),
                     'workflow_data' => $this->getVehicleWorkflowProgressData($model),
                     'has_signed_pdf' => $model->hasSignedPdf(),
                     'pdf_url' => $model->hasSignedPdf() ? route('approval.preview-pdf', ['modelClass' => base64_encode(get_class($model)), 'id' => $model->id]) : null,
                     'rejection_reason' => ($approvalRequest && ($approvalRequest->status === 'rejected' || $approvalRequest->status === 'returned')) ? ($approvalRequest->rejection_reason ?? null) : null,
+                    'needs_pin' => $isDepartmentHeadStep, // Department head step needs PIN for digital signature
                 ];
 
             case 'material_plan':
@@ -1611,7 +1632,25 @@ class ApprovalCenterService
             return $isDepartmentHead;
         }
         
-        // Step 3: director_approval - Ban Giám đốc duyệt
+        // Step 3: review - Thẩm định (chọn người phê duyệt)
+        if ($currentStep === 'review' && $status === 'in_review') {
+            // Check if department_head_approval was already approved
+            $approvalHistory = $approvalRequest->approval_history ?? [];
+            if (is_string($approvalHistory)) {
+                $approvalHistory = json_decode($approvalHistory, true) ?? [];
+            }
+            
+            // Only show if department_head_approval was approved
+            if (!isset($approvalHistory['department_head_approval']) || 
+                !isset($approvalHistory['department_head_approval']['approved_by'])) {
+                return false;
+            }
+            
+            // Check permission for review step
+            return PermissionHelper::can($user, 'vehicle_registration.review');
+        }
+        
+        // Step 4: director_approval - Ban Giám đốc duyệt
         if ($currentStep === 'director_approval' && $status === 'in_review') {
             $isDirector = $user->hasRole(['Ban Giám đốc', 'Ban Giam Doc', 'Ban Giám Đốc', 'Giám đốc']);
             if (!$isDirector) {
@@ -1968,6 +2007,10 @@ class ApprovalCenterService
                 'label' => 'Trưởng phòng KH duyệt'
             ],
             [
+                'key' => 'review',
+                'label' => 'Thẩm định'
+            ],
+            [
                 'key' => 'approved',
                 'label' => 'BGD duyệt'
             ]
@@ -2022,6 +2065,29 @@ class ApprovalCenterService
                     $deptApprover = \App\Models\User::find($deptStep['approved_by']);
                     if ($deptApprover) {
                         $stepUsers['dept_review'] = $deptApprover->name ?? 'N/A';
+                    }
+                }
+            }
+            
+            // Check review step (Thẩm định)
+            if (isset($history['review'])) {
+                $reviewStep = $history['review'];
+                if (isset($reviewStep['approved_at'])) {
+                    try {
+                        $stepDates['review'] = $this->formatDateWithTimezone(
+                            \Carbon\Carbon::parse($reviewStep['approved_at']), 
+                            'd/m/Y H:i'
+                        );
+                    } catch (\Exception $e) {
+                        $stepDates['review'] = $reviewStep['approved_at'];
+                    }
+                }
+                if (isset($reviewStep['approved_by_name']) && !empty($reviewStep['approved_by_name'])) {
+                    $stepUsers['review'] = $reviewStep['approved_by_name'];
+                } elseif (isset($reviewStep['approved_by'])) {
+                    $reviewApprover = \App\Models\User::find($reviewStep['approved_by']);
+                    if ($reviewApprover) {
+                        $stepUsers['review'] = $reviewApprover->name ?? 'N/A';
                     }
                 }
             }
@@ -2099,9 +2165,14 @@ class ApprovalCenterService
                     $currentStepIndex = 2;
                 }
                 
-                // Step 3: director_approval (approved)
-                if ($isStepApproved('director_approval')) {
+                // Step 3: review (Thẩm định)
+                if ($isStepApproved('review')) {
                     $currentStepIndex = 3;
+                }
+                
+                // Step 4: director_approval (approved)
+                if ($isStepApproved('director_approval')) {
+                    $currentStepIndex = 4;
                 }
             }
         }

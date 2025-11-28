@@ -135,10 +135,12 @@ class ApprovalRequest extends Model
         // Kiểm tra quyền approve cơ bản
         $hasApprovePermission = \App\Helpers\PermissionHelper::can($user, "{$modulePermission}.approve");
         
-        // Với leave module: kiểm tra thêm quyền review nếu ở bước review
+        // Với leave và vehicle module: kiểm tra thêm quyền review nếu ở bước review
         $hasReviewPermission = false;
-        if ($this->module_type === 'leave' && $this->current_step === 'review') {
-            $hasReviewPermission = \App\Helpers\PermissionHelper::can($user, "{$modulePermission}.review");
+        if ($this->current_step === 'review') {
+            if ($this->module_type === 'leave' || $this->module_type === 'vehicle') {
+                $hasReviewPermission = \App\Helpers\PermissionHelper::can($user, "{$modulePermission}.review");
+            }
         }
 
         if (!$hasApprovePermission && !$hasReviewPermission) {

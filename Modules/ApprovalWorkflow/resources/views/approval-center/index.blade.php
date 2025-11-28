@@ -1571,7 +1571,7 @@ $(document).ready(function() {
                     needsPin = false;
                 }
 
-                const approveButtonText = (request.is_reviewer_role === true) ? 'Gửi lên BGD' : (needsPin ? 'Phê duyệt' : 'Gửi lên BGD');
+                const approveButtonText = (request.is_reviewer_role === true || request.is_reviewer_step === true) ? 'Thẩm định' : (needsPin ? 'Phê duyệt' : 'Thẩm định');
                 detailHtml += `
                     <button id="btn-approve"
                             class="btn btn-sm btn-success"
@@ -1809,12 +1809,19 @@ $(document).ready(function() {
         const modelType = $(this).data('model-type');
         const needsPin = $(this).data('needs-pin') == '1' || $(this).data('needs-pin') === '1';
         const isDepartmentHeadStep = $(this).data('is-department-head-step') == '1' || $(this).data('is-department-head-step') === '1';
+        const isReviewerStep = $(this).data('is-reviewer-step') == '1' || $(this).data('is-reviewer-step') === '1';
         const hasSelectedApprovers = $(this).data('has-selected-approvers') == '1' || $(this).data('has-selected-approvers') === '1';
 
-        // For Vehicle at department_head_approval step: check if need to select approvers first
-        if (modelType === 'vehicle' && isDepartmentHeadStep && !hasSelectedApprovers) {
+        // For Vehicle at review step (Thẩm định): need to select approvers first
+        if (modelType === 'vehicle' && isReviewerStep && !hasSelectedApprovers) {
             // Show assign approvers modal first
             showAssignApproversModal(id, modelType);
+            return;
+        }
+
+        // For Vehicle at department_head_approval step: always show PIN modal (cần ký số)
+        if (modelType === 'vehicle' && isDepartmentHeadStep) {
+            showPinModal(id, modelType);
             return;
         }
 
@@ -2180,7 +2187,7 @@ $(document).ready(function() {
                     }, 500);
                 } else {
                     alert(response.message || 'Không thể gán người phê duyệt');
-                    $btn.prop('disabled', false).html('Xác nhận và gửi lên BGD');
+                    $btn.prop('disabled', false).html('Xác nhận và thẩm định');
                 }
             },
             error: function(xhr) {

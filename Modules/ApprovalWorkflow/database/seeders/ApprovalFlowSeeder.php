@@ -100,21 +100,35 @@ class ApprovalFlowSeeder extends Seeder
             'step_type' => 'approval',
             'order' => 1,
             'is_final' => false,
-            'needs_modal' => true, // ⚠️ Cần mở modal chọn BGĐ sau khi duyệt
+            'needs_modal' => false, // Không cần modal, chỉ cần ký số
             'metadata' => [
                 'label' => 'Trưởng phòng KH duyệt',
                 'role' => 'department_head',
-                'next_step_requires_modal' => true,
             ],
         ]);
 
-        // Step 2: director_approval (final)
+        // Step 2: review (Thẩm định) - cần mở modal chọn người phê duyệt
+        ApprovalStep::create([
+            'flow_id' => $vehicleFlow->id,
+            'module_type' => 'vehicle',
+            'step' => 'review',
+            'step_type' => 'review',
+            'order' => 2,
+            'is_final' => false,
+            'needs_modal' => true, // Cần mở modal chọn BGĐ
+            'metadata' => [
+                'label' => 'Thẩm định',
+                'permission' => 'vehicle_registration.review',
+            ],
+        ]);
+
+        // Step 3: director_approval (final)
         ApprovalStep::create([
             'flow_id' => $vehicleFlow->id,
             'module_type' => 'vehicle',
             'step' => 'director_approval',
             'step_type' => 'approval',
-            'order' => 2,
+            'order' => 3,
             'is_final' => true,
             'needs_modal' => false,
             'metadata' => [

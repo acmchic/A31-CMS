@@ -83,7 +83,7 @@ $(document).ready(function() {
         },
         'vehicle_registration': {
             title: '🚗 Đăng ký xe',
-            permissions: ['vehicle_registration.view', 'vehicle_registration.create', 'vehicle_registration.edit', 'vehicle_registration.delete', 'vehicle_registration.assign', 'vehicle_registration.approve', 'vehicle_registration.download_pdf', 'vehicle_registration.view.all']
+            permissions: ['vehicle_registration.view', 'vehicle_registration.create', 'vehicle_registration.edit', 'vehicle_registration.delete', 'vehicle_registration.assign', 'vehicle_registration.approve', 'vehicle_registration.review', 'vehicle_registration.download_pdf', 'vehicle_registration.view.all']
         },
         'personnel_report': {
             title: '📊 Báo cáo quân số',
@@ -138,6 +138,7 @@ $(document).ready(function() {
         'vehicle_registration.delete': 'Xóa đăng ký xe',
         'vehicle_registration.assign': 'Phân công xe và lái xe',
         'vehicle_registration.approve': 'Phê duyệt đăng ký xe',
+        'vehicle_registration.review': 'Thẩm định đăng ký xe',
         'vehicle_registration.reject': 'Từ chối đăng ký xe',
         'vehicle_registration.download_pdf': 'Tải về đã ký',
         'vehicle_registration.view.all': 'Xem dữ liệu đăng ký xe toàn bộ',
