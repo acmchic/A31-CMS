@@ -407,17 +407,8 @@ class ApprovalCenterController extends Controller
                 $approvalRequest->status = 'in_review';
                 $approvalRequest->save();
                 
-                // Create approval history record
-                \Modules\ApprovalWorkflow\Models\ApprovalHistory::create([
-                    'approvable_type' => get_class($vehicle),
-                    'approvable_id' => $vehicle->id,
-                    'user_id' => $user->id,
-                    'action' => 'approved',
-                    'level' => 2,
-                    'workflow_status_before' => 'department_head_approval',
-                    'workflow_status_after' => 'director_approval',
-                    'comment' => 'Đã chọn người phê duyệt: ' . implode(', ', \App\Models\User::whereIn('id', $approverIds)->pluck('name')->toArray()),
-                ]);
+                // History is now stored in approval_requests.approval_history JSON field
+                // No need to create separate ApprovalHistory record
                 
                 // Sync với ApprovalRequestService
                 if (class_exists(\Modules\ApprovalWorkflow\Services\ApprovalRequestService::class)) {

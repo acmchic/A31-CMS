@@ -171,16 +171,12 @@ class WorkflowEngine
 
             // Cập nhật BGĐ được chọn
             $selectedApproversData = $request->selected_approvers ?? [];
-            $selectedApproversData['director_approval'] = [
-                'selected_by' => auth()->id(),
-                'selected_at' => now()->toIso8601String(),
-                'users' => $selectedApprovers
-            ];
+            $selectedApproversData['director_approval'] = $selectedApprovers; // Store as simple array
             $request->selected_approvers = $selectedApproversData;
 
             // Chuyển sang bước giám đốc
             $request->current_step = 'director_approval';
-            $request->current_step_index = 2;
+            $request->current_step_index = 2; // Step 2: director_approval (after vehicle_assigned=1, dept_head=2)
             $request->status = 'in_review';
             $this->saveHistory($request, $currentStep, $action, $comment, $statusBefore, $request->status);
             $request->save();
@@ -294,14 +290,16 @@ class WorkflowEngine
             'approved_by' => $userId,
             'approved_by_name' => $userName,
             'approved_at' => now()->toIso8601String(),
-            'action' => $action,
+            'action' => $action, // Always include action
         ];
 
-        if ($comment && $action !== 'approved') {
+        // Add comment if provided (for approved actions, only add if it's not JSON)
+        if ($comment) {
             $cleanComment = $comment;
             if (is_string($comment)) {
                 $decoded = json_decode($comment, true);
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    // If comment is JSON, extract meaningful text or skip
                     $cleanComment = null;
                 } else {
                     $cleanComment = trim($comment);

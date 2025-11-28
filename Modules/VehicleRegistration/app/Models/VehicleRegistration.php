@@ -333,7 +333,8 @@ class VehicleRegistration extends Model
     public function assignVehicleButton()
     {
         // Check permission first
-        if (!\App\Helpers\PermissionHelper::userCan('vehicle_registration.assign')) {
+        $user = backpack_user();
+        if (!\App\Helpers\PermissionHelper::can($user, 'vehicle_registration.assign')) {
             return '';
         }
 

@@ -29,9 +29,6 @@ class VehicleRegistrationCrudController extends CrudController
 
         // Apply data filtering based on user scope
         $this->applyDataFilter();
-
-        // Setup buttons based on permissions
-        $this->setupButtonsBasedOnPermissions();
     }
 
     /**
@@ -76,6 +73,12 @@ class VehicleRegistrationCrudController extends CrudController
     {
         $user = backpack_user();
 
+        // Remove all workflow buttons first to ensure clean state
+        CRUD::removeButton('assign_vehicle');
+        CRUD::removeButton('approve');
+        CRUD::removeButton('reject');
+        CRUD::removeButton('download_pdf');
+
         // CRUD buttons - Deny access to operations if no permission
         if (!PermissionHelper::can($user, 'vehicle_registration.create')) {
             CRUD::denyAccess('create');
@@ -90,6 +93,7 @@ class VehicleRegistrationCrudController extends CrudController
         }
 
         // ✅ Workflow Buttons using ApprovalWorkflow module
+        // Only add buttons if user has the specific permission
 
         // Step 1: Đội trưởng xe phân công (specific to VehicleRegistration)
         if (PermissionHelper::can($user, 'vehicle_registration.assign')) {
@@ -97,8 +101,13 @@ class VehicleRegistrationCrudController extends CrudController
         }
 
         // Step 2: Ban Giám Đốc phê duyệt (using ApprovalWorkflow buttons)
+        // Approve button - check approve permission
         if (PermissionHelper::can($user, 'vehicle_registration.approve')) {
             CRUD::addButtonFromModelFunction('line', 'approve', 'approveButton', 'beginning');
+        }
+        
+        // Reject button - check reject permission (separate from approve)
+        if (PermissionHelper::can($user, 'vehicle_registration.reject')) {
             CRUD::addButtonFromModelFunction('line', 'reject', 'rejectButton', 'beginning');
         }
 
@@ -110,6 +119,9 @@ class VehicleRegistrationCrudController extends CrudController
 
     protected function setupListOperation()
     {
+        // Setup buttons based on permissions - must be called in setupListOperation
+        $this->setupButtonsBasedOnPermissions();
+        
         CRUD::column('id')->label('ID');
         CRUD::column('user_id')->label('Người đăng ký')->type('select')->entity('user')->attribute('name');
 

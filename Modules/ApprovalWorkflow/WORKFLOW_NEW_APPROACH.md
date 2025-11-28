@@ -96,3 +96,4 @@ $requests = ApprovalRequest::where('status', 'in_review')
 3. **Giai đoạn 3**: Cập nhật ApprovalCenterService để query từ `approval_requests`
 4. **Giai đoạn 4**: (Tùy chọn) Bỏ `workflow_status` ở module cũ, chỉ dùng `approval_requests`
 
+

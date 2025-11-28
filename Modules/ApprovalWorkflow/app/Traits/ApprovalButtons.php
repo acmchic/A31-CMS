@@ -209,7 +209,8 @@ trait ApprovalButtons
         $user = backpack_user();
         $modulePermission = $this->getModulePermission();
 
-        if (!\App\Helpers\PermissionHelper::can($user, "{$modulePermission}.approve")) {
+        // Check reject permission (separate from approve permission)
+        if (!\App\Helpers\PermissionHelper::can($user, "{$modulePermission}.reject")) {
             return '';
         }
 
@@ -368,6 +369,14 @@ trait ApprovalButtons
     public function downloadPdfButton()
     {
         if (!$this->hasSignedPdf()) {
+            return '';
+        }
+
+        $user = backpack_user();
+        $modulePermission = $this->getModulePermission();
+
+        // Check view permission to download PDF
+        if (!\App\Helpers\PermissionHelper::can($user, "{$modulePermission}.view")) {
             return '';
         }
 

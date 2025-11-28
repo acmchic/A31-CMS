@@ -138,3 +138,4 @@ $materialPlans = ApprovalRequest::where('module_type', 'material_plan')
 3. ✅ **Dễ mở rộng**: Thêm module mới chỉ cần định nghĩa steps
 4. ✅ **Không phá kiến trúc**: Module cũ vẫn hoạt động bình thường
 
+

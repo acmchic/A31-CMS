@@ -5,7 +5,6 @@ namespace Modules\ApprovalWorkflow\Services;
 use Modules\PersonnelReport\Models\EmployeeLeave;
 use Modules\VehicleRegistration\Models\VehicleRegistration;
 use Modules\ProductionManagement\Models\MaterialPlan;
-use Modules\ApprovalWorkflow\Models\ApprovalHistory;
 use App\Helpers\PermissionHelper;
 use Carbon\Carbon;
 
@@ -1102,7 +1101,8 @@ class ApprovalCenterService
                                         \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_APPROVED,
                                         \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_REJECTED,
                                         \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_CANCELLED
-                                    ]),
+                                    ]) &&
+                                    !$this->isCurrentStepApproved($approvalRequest),
                     'is_department_head_step' => $isDepartmentHeadStep,
                     'has_selected_approvers' => !empty($model->selected_approvers),
                     'workflow_data' => $this->getVehicleWorkflowProgressData($model),
@@ -1157,22 +1157,69 @@ class ApprovalCenterService
         $model = $modelClass::find($id);
         if (!$model) return [];
 
-        return ApprovalHistory::where('approvable_type', get_class($model))
-            ->where('approvable_id', $id)
-            ->with('user')
-            ->orderBy('created_at', 'asc')
-            ->get()
-            ->map(function($history) {
-                return [
-                    'step_name' => $this->getStepName($history->level, $history->action),
-                    'approver' => $history->user ? $history->user->name : 'N/A',
-                    'result' => $history->action_display,
-                    'result_badge' => $this->getActionBadge($history->action),
-                    'comment' => $history->comment,
-                    'time' => $this->formatDateWithTimezone($history->created_at, 'd M, H:i'),
-                    'time_relative' => $history->created_at->diffForHumans(),
-                ];
-            });
+        // Read from approval_requests.approval_history JSON field
+        $approvalRequest = $model->approvalRequest;
+        if (!$approvalRequest || !$approvalRequest->approval_history) {
+            return [];
+        }
+
+        $history = is_string($approvalRequest->approval_history) 
+            ? json_decode($approvalRequest->approval_history, true) 
+            : $approvalRequest->approval_history;
+
+        if (!is_array($history)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($history as $step => $stepData) {
+            $stepName = $this->getStepNameFromKey($step, $modelType);
+            $result[] = [
+                'step_name' => $stepName,
+                'approver' => $stepData['approved_by_name'] ?? 'N/A',
+                'result' => $this->getActionDisplay($stepData['action'] ?? 'unknown'),
+                'result_badge' => $this->getActionBadge($stepData['action'] ?? 'unknown'),
+                'comment' => $stepData['comment'] ?? null,
+                'time' => isset($stepData['approved_at']) 
+                    ? $this->formatDateWithTimezone(\Carbon\Carbon::parse($stepData['approved_at']), 'd M, H:i')
+                    : null,
+                'time_relative' => isset($stepData['approved_at']) 
+                    ? \Carbon\Carbon::parse($stepData['approved_at'])->diffForHumans()
+                    : null,
+            ];
+        }
+
+        return $result;
+    }
+
+    protected function getStepNameFromKey($stepKey, $modelType)
+    {
+        $stepNames = [
+            'leave' => [
+                'department_head_approval' => 'Trưởng phòng duyệt',
+                'review' => 'Thẩm định',
+                'director_approval' => 'BGD duyệt',
+            ],
+            'vehicle' => [
+                'vehicle_picked' => 'Phân xe',
+                'department_head_approval' => 'Trưởng phòng KH duyệt',
+                'director_approval' => 'BGD duyệt',
+            ],
+        ];
+
+        return $stepNames[$modelType][$stepKey] ?? $stepKey;
+    }
+
+    protected function getActionDisplay($action)
+    {
+        $actions = [
+            'approved' => 'Đã phê duyệt',
+            'rejected' => 'Đã từ chối',
+            'cancelled' => 'Đã hủy',
+            'returned' => 'Đã trả lại',
+        ];
+
+        return $actions[$action] ?? $action;
     }
 
     /**
@@ -1954,89 +2001,171 @@ class ApprovalCenterService
             }
         }
 
-        if ($model->department_approved_at) {
-            $stepDates['dept_review'] = $this->formatDateWithTimezone($model->department_approved_at, 'd/m/Y H:i');
-        }
-        if ($model->department_approved_by) {
-            $deptApprover = \App\Models\User::find($model->department_approved_by);
-            if ($deptApprover) {
-                $stepUsers['dept_review'] = $deptApprover->name ?? 'N/A';
-            }
-        }
-
-        if ($model->director_approved_at) {
-            $stepDates['approved'] = $this->formatDateWithTimezone($model->director_approved_at, 'd/m/Y H:i');
-        } elseif ($model->director_approved_by && $model->workflow_status === 'approved') {
-            $stepDates['approved'] = $this->formatDateWithTimezone(now(), 'd/m/Y H:i');
-        }
-        if ($model->director_approved_by) {
-            $director = \App\Models\User::find($model->director_approved_by);
-            if ($director) {
-                $stepUsers['approved'] = $director->name ?? 'N/A';
-            }
-        }
-
-        $currentStatusKey = $model->workflow_status;
-        $currentStepIndex = 0;
-
-        switch ($currentStatusKey) {
-            case 'approved':
-                $currentStepIndex = 3;
-                break;
-            case 'dept_review':
-                if ($model->vehicle_id && $model->department_approved_at) {
-                    $currentStepIndex = 3;
-                } elseif ($model->vehicle_id) {
-                    $currentStepIndex = 2;
-                } else {
-                    $currentStepIndex = 1;
+        // Read from approval_history instead of old columns
+        $approvalRequest = $model->approvalRequest;
+        if ($approvalRequest && $approvalRequest->approval_history) {
+            $history = is_string($approvalRequest->approval_history) 
+                ? json_decode($approvalRequest->approval_history, true) 
+                : $approvalRequest->approval_history;
+            
+            // Check department_head_approval step (maps to dept_review in display)
+            if (isset($history['department_head_approval'])) {
+                $deptStep = $history['department_head_approval'];
+                if (isset($deptStep['approved_at'])) {
+                    try {
+                        $stepDates['dept_review'] = $this->formatDateWithTimezone(
+                            \Carbon\Carbon::parse($deptStep['approved_at']), 
+                            'd/m/Y H:i'
+                        );
+                    } catch (\Exception $e) {
+                        // Fallback if date parsing fails
+                        $stepDates['dept_review'] = $deptStep['approved_at'];
+                    }
                 }
-                break;
-            case 'submitted':
+                if (isset($deptStep['approved_by_name']) && !empty($deptStep['approved_by_name'])) {
+                    $stepUsers['dept_review'] = $deptStep['approved_by_name'];
+                } elseif (isset($deptStep['approved_by'])) {
+                    // Fallback: get name from user ID
+                    $deptApprover = \App\Models\User::find($deptStep['approved_by']);
+                    if ($deptApprover) {
+                        $stepUsers['dept_review'] = $deptApprover->name ?? 'N/A';
+                    }
+                }
+            }
+            
+            // Check director_approval step
+            if (isset($history['director_approval'])) {
+                $directorStep = $history['director_approval'];
+                if (isset($directorStep['approved_at'])) {
+                    $stepDates['approved'] = $this->formatDateWithTimezone(
+                        \Carbon\Carbon::parse($directorStep['approved_at']), 
+                        'd/m/Y H:i'
+                    );
+                }
+                if (isset($directorStep['approved_by_name'])) {
+                    $stepUsers['approved'] = $directorStep['approved_by_name'] ?? 'N/A';
+                }
+            }
+        } else {
+            // Fallback to old columns if approval_history not available
+            if ($model->department_approved_at) {
+                $stepDates['dept_review'] = $this->formatDateWithTimezone($model->department_approved_at, 'd/m/Y H:i');
+            }
+            if ($model->department_approved_by) {
+                $deptApprover = \App\Models\User::find($model->department_approved_by);
+                if ($deptApprover) {
+                    $stepUsers['dept_review'] = $deptApprover->name ?? 'N/A';
+                }
+            }
+
+            if ($model->director_approved_at) {
+                $stepDates['approved'] = $this->formatDateWithTimezone($model->director_approved_at, 'd/m/Y H:i');
+            } elseif ($model->director_approved_by && $model->workflow_status === 'approved') {
+                $stepDates['approved'] = $this->formatDateWithTimezone(now(), 'd/m/Y H:i');
+            }
+            if ($model->director_approved_by) {
+                $director = \App\Models\User::find($model->director_approved_by);
+                if ($director) {
+                    $stepUsers['approved'] = $director->name ?? 'N/A';
+                }
+            }
+        }
+
+        // Determine current step index based on approval_history
+        $currentStepIndex = 0;
+        $approvalRequest = $model->approvalRequest;
+        $currentStatusKey = $approvalRequest ? $approvalRequest->status : ($model->workflow_status ?? 'submitted');
+        
+        if ($approvalRequest && $approvalRequest->approval_history) {
+            $history = is_string($approvalRequest->approval_history) 
+                ? json_decode($approvalRequest->approval_history, true) 
+                : $approvalRequest->approval_history;
+            
+            if (is_array($history)) {
+                // Helper function to check if a step is approved
+                $isStepApproved = function($stepKey) use ($history) {
+                    if (!isset($history[$stepKey])) {
+                        return false;
+                    }
+                    $stepData = $history[$stepKey];
+                    // Check if action is 'approved' OR if approved_at and approved_by exist (legacy data)
+                    return (isset($stepData['action']) && $stepData['action'] === 'approved') ||
+                           (isset($stepData['approved_at']) && isset($stepData['approved_by']));
+                };
+                
+                // Step 0: created (always true if model exists)
+                $currentStepIndex = 0;
+                
+                // Step 1: vehicle_assigned
                 if ($model->vehicle_id) {
                     $currentStepIndex = 1;
-                } else {
-                    $currentStepIndex = 0;
                 }
-                break;
-            case 'rejected':
-                // Use rejection_level to determine which step was rejected
-                // rejection_level: 'department' = rejected at dept_review step, 'director' = rejected at director_review step
-                if ($model->rejection_level === 'director') {
-                    // Rejected at director_review step (BGD duyệt)
-                    $currentStepIndex = 3;
-                } elseif ($model->rejection_level === 'department') {
-                    // Rejected at dept_review step (Trưởng phòng KH duyệt)
+                
+                // Step 2: department_head_approval (dept_review)
+                if ($isStepApproved('department_head_approval')) {
                     $currentStepIndex = 2;
-                } elseif ($model->director_approved_at) {
-                    // If director_approved_at exists, it means it was rejected at director_review step
-                    $currentStepIndex = 3;
-                } elseif ($model->department_approved_at) {
-                    // If department_approved_at exists but no director_approved_at, rejected at director_review step
-                    $currentStepIndex = 3;
-                } elseif ($model->vehicle_id) {
-                    // If vehicle_id exists but no department_approved_at, rejected at dept_review step (Trưởng phòng KH duyệt)
-                    // This is the most common case: vehicle assigned but rejected by department head
-                    $currentStepIndex = 2;
-                } else {
-                    // Rejected at submitted step (before vehicle assignment)
-                    $currentStepIndex = 0;
                 }
-                break;
-            default:
-                if ($model->director_approved_at) {
+                
+                // Step 3: director_approval (approved)
+                if ($isStepApproved('director_approval')) {
                     $currentStepIndex = 3;
-                } elseif ($model->department_approved_at) {
-                    $currentStepIndex = 2;
-                } elseif ($model->vehicle_id) {
-                    $currentStepIndex = 1;
-                } else {
-                    $currentStepIndex = 0;
                 }
-                break;
+            }
+        }
+        
+        // Fallback to old logic if approval_history not available
+        if (!$approvalRequest || !$approvalRequest->approval_history) {
+            $currentStatusKey = $model->workflow_status ?? 'submitted';
+            
+            switch ($currentStatusKey) {
+                case 'approved':
+                    $currentStepIndex = 3;
+                    break;
+                case 'dept_review':
+                    if ($model->vehicle_id && $model->department_approved_at) {
+                        $currentStepIndex = 3;
+                    } elseif ($model->vehicle_id) {
+                        $currentStepIndex = 2;
+                    } else {
+                        $currentStepIndex = 1;
+                    }
+                    break;
+                case 'submitted':
+                    if ($model->vehicle_id) {
+                        $currentStepIndex = 1;
+                    } else {
+                        $currentStepIndex = 0;
+                    }
+                    break;
+                case 'rejected':
+                    if ($model->rejection_level === 'director') {
+                        $currentStepIndex = 3;
+                    } elseif ($model->rejection_level === 'department') {
+                        $currentStepIndex = 2;
+                    } elseif ($model->director_approved_at) {
+                        $currentStepIndex = 3;
+                    } elseif ($model->department_approved_at) {
+                        $currentStepIndex = 3;
+                    } elseif ($model->vehicle_id) {
+                        $currentStepIndex = 2;
+                    } else {
+                        $currentStepIndex = 0;
+                    }
+                    break;
+                default:
+                    if ($model->director_approved_at) {
+                        $currentStepIndex = 3;
+                    } elseif ($model->department_approved_at) {
+                        $currentStepIndex = 2;
+                    } elseif ($model->vehicle_id) {
+                        $currentStepIndex = 1;
+                    } else {
+                        $currentStepIndex = 0;
+                    }
+                    break;
+            }
         }
 
-        $approvalRequest = $model->approvalRequest;
         $rejectionReason = null;
         if ($approvalRequest && ($approvalRequest->status === 'rejected' || $approvalRequest->status === 'returned')) {
             $rejectionReason = $approvalRequest->rejection_reason ?? null;
@@ -2053,6 +2182,59 @@ class ApprovalCenterService
             'stepDates' => $stepDates,
             'stepUsers' => $stepUsers
         ];
+    }
+
+    protected function isCurrentStepApproved($approvalRequest)
+    {
+        if (!$approvalRequest || !$approvalRequest->approval_history) {
+            return false;
+        }
+
+        $history = is_string($approvalRequest->approval_history) 
+            ? json_decode($approvalRequest->approval_history, true) 
+            : $approvalRequest->approval_history;
+
+        if (!is_array($history)) {
+            return false;
+        }
+
+        $currentStep = $approvalRequest->current_step;
+        
+        // Helper function to check if a step is approved
+        $isStepApproved = function($stepKey) use ($history) {
+            if (!isset($history[$stepKey])) {
+                return false;
+            }
+            $stepData = $history[$stepKey];
+            // Check if action is 'approved' OR if approved_at and approved_by exist (legacy data)
+            return (isset($stepData['action']) && $stepData['action'] === 'approved') ||
+                   (isset($stepData['approved_at']) && isset($stepData['approved_by']));
+        };
+        
+        // For vehicle: after department_head_approval approves, current_step becomes director_approval
+        // So if current_step is director_approval, check if department_head_approval was already approved
+        if ($approvalRequest->module_type === 'vehicle' && $currentStep === 'director_approval') {
+            if ($isStepApproved('department_head_approval')) {
+                return true; // Department head already approved, can't reject at director step
+            }
+        }
+        
+        // For leave: similar logic
+        if ($approvalRequest->module_type === 'leave') {
+            if ($currentStep === 'review' && $isStepApproved('department_head_approval')) {
+                return true;
+            }
+            if ($currentStep === 'director_approval' && $isStepApproved('review')) {
+                return true;
+            }
+        }
+        
+        // Check if current step was already approved (shouldn't happen, but just in case)
+        if ($isStepApproved($currentStep)) {
+            return true;
+        }
+
+        return false;
     }
 }
 

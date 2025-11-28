@@ -2,7 +2,6 @@
 
 namespace Modules\ApprovalWorkflow\Traits;
 
-use Modules\ApprovalWorkflow\Models\ApprovalHistory;
 
 /**
  * Trait HasApprovalWorkflow

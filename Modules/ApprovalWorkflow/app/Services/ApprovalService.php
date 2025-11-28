@@ -3,7 +3,6 @@
 namespace Modules\ApprovalWorkflow\Services;
 
 use Illuminate\Database\Eloquent\Model;
-use Modules\ApprovalWorkflow\Models\ApprovalHistory;
 use Modules\ApprovalWorkflow\Models\ApprovalRequest;
 use App\Models\User;
 
@@ -489,40 +488,5 @@ class ApprovalService
         return 1;
     }
 
-    /**
-     * Create approval history record
-     */
-    protected function createHistory(
-        Model $model, 
-        User $approver, 
-        string $action,
-        int $level,
-        array $options = []
-    ): ApprovalHistory {
-        return ApprovalHistory::create([
-            'approvable_type' => get_class($model),
-            'approvable_id' => $model->id,
-            'user_id' => $approver->id,
-            'action' => $action,
-            'level' => $level,
-            'workflow_status_before' => $options['status_before'] ?? null,
-            'workflow_status_after' => $model->workflow_status,
-            'comment' => $options['comment'] ?? null,
-            'reason' => $options['reason'] ?? null,
-            'metadata' => json_encode($options['metadata'] ?? []),
-        ]);
-    }
-
-    /**
-     * Get approval history for model
-     */
-    public function getHistory(Model $model)
-    {
-        return ApprovalHistory::where('approvable_type', get_class($model))
-            ->where('approvable_id', $model->id)
-            ->with('user')
-            ->orderBy('created_at', 'desc')
-            ->get();
-    }
 }
 
