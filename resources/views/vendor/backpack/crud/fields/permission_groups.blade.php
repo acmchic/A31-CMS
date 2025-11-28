@@ -83,7 +83,7 @@ $(document).ready(function() {
         },
         'vehicle_registration': {
             title: '🚗 Đăng ký xe',
-            permissions: ['vehicle_registration.view', 'vehicle_registration.create', 'vehicle_registration.edit', 'vehicle_registration.delete', 'vehicle_registration.assign', 'vehicle_registration.approve', 'vehicle_registration.reject', 'vehicle_registration.download_pdf', 'vehicle_registration.view.all']
+            permissions: ['vehicle_registration.view', 'vehicle_registration.create', 'vehicle_registration.edit', 'vehicle_registration.delete', 'vehicle_registration.assign', 'vehicle_registration.approve', 'vehicle_registration.download_pdf', 'vehicle_registration.view.all']
         },
         'personnel_report': {
             title: '📊 Báo cáo quân số',
@@ -95,7 +95,7 @@ $(document).ready(function() {
         },
         'approval_center': {
             title: '✅ Trung tâm phê duyệt',
-            permissions: ['approval_center.view']
+            permissions: ['approval_center.view', 'leave.reject', 'vehicle_registration.reject', 'material_plan.reject']
         },
         'record_management': {
             title: '📚 Quản lý sổ sách',
@@ -156,6 +156,9 @@ $(document).ready(function() {
         'leave.review.officer': 'Thẩm định nghỉ phép sĩ quan',
         'leave.view.all': 'Xem dữ liệu nghỉ phép toàn bộ',
         'approval_center.view': 'Trung tâm phê duyệt',
+        'leave.reject': 'Từ chối đơn nghỉ phép',
+        'vehicle_registration.reject': 'Từ chối đăng ký xe',
+        'material_plan.reject': 'Từ chối phương án vật tư',
         'record_management.view': 'Xem quản lý sổ sách',
         'record_management.view.own': 'Xem sổ sách cá nhân',
         'record_management.view.department': 'Xem sổ sách phòng ban',

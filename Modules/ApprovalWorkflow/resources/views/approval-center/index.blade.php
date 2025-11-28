@@ -19,9 +19,27 @@
     <!-- First Column: Type Sidebar -->
     <div class="col-md-2 border-end" style="overflow-y: auto; max-height: 100%; padding: 0;">
         @php
-            $activeType = $filters['type'];
-            if (request()->has('model_type') && !request()->has('type')) {
-                $activeType = request()->get('model_type');
+            $activeType = 'all';
+            if (request()->has('model_type')) {
+                $modelType = request()->get('model_type');
+                if ($modelType === 'leave') {
+                    $activeType = 'leave';
+                } elseif ($modelType === 'vehicle' || $modelType === 'vehicle_registration') {
+                    $activeType = 'vehicle';
+                } elseif ($modelType === 'material_plan') {
+                    $activeType = 'material_plan';
+                }
+            } elseif (isset($filters['type']) && $filters['type'] !== 'all') {
+                $activeType = $filters['type'];
+            } elseif (isset($selectedRequest) && $selectedRequest) {
+                $selectedModelType = $selectedRequest['model_type'] ?? null;
+                if ($selectedModelType === 'leave') {
+                    $activeType = 'leave';
+                } elseif ($selectedModelType === 'vehicle' || $selectedModelType === 'vehicle_registration') {
+                    $activeType = 'vehicle';
+                } elseif ($selectedModelType === 'material_plan') {
+                    $activeType = 'material_plan';
+                }
             }
         @endphp
         <input type="hidden" id="filter-type" value="{{ $activeType }}">
@@ -635,7 +653,25 @@ $(document).ready(function() {
             window.open(pdfUrl, '_blank');
         }
     });
-    const currentType = $('#filter-type').val() || 'all';
+    // Get active type from URL parameter or hidden input
+    const urlParams = new URLSearchParams(window.location.search);
+    const modelType = urlParams.get('model_type');
+    let currentType = $('#filter-type').val() || 'all';
+    
+    // Override with model_type from URL if present
+    if (modelType) {
+        if (modelType === 'leave') {
+            currentType = 'leave';
+        } else if (modelType === 'vehicle' || modelType === 'vehicle_registration') {
+            currentType = 'vehicle';
+        } else if (modelType === 'material_plan') {
+            currentType = 'material_plan';
+        }
+        // Update hidden input
+        $('#filter-type').val(currentType);
+    }
+    
+    // Set active menu based on currentType
     $('.type-item').removeClass('active');
     if (currentType === 'leave') {
         $('.type-item[data-type="leave"]').addClass('active');
@@ -643,6 +679,19 @@ $(document).ready(function() {
         $('.type-item[data-type="vehicle"]').addClass('active');
     } else if (currentType === 'material_plan') {
         $('.type-item[data-type="material_plan"]').addClass('active');
+    } else if (currentType === 'all') {
+        // If 'all', check if there's a selected request to determine active type
+        const selectedRequest = $('.request-item.selected');
+        if (selectedRequest.length > 0) {
+            const selectedModelType = selectedRequest.data('model-type');
+            if (selectedModelType === 'leave') {
+                $('.type-item[data-type="leave"]').addClass('active');
+            } else if (selectedModelType === 'vehicle' || selectedModelType === 'vehicle_registration') {
+                $('.type-item[data-type="vehicle"]').addClass('active');
+            } else if (selectedModelType === 'material_plan') {
+                $('.type-item[data-type="material_plan"]').addClass('active');
+            }
+        }
     }
 
     // Type item click handlers

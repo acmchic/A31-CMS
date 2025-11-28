@@ -575,7 +575,12 @@ class ApprovalCenterService
                     'created_at_formatted' => $this->formatDateWithTimezone($leave->created_at, 'd/m/Y H:i'),
                     'period' => $this->getLeavePeriod($leave),
                     'can_approve' => $canApprove,
-                    'can_reject' => $leave->canBeRejected() && $this->canUserApprove($leave, $user),
+                    'can_reject' => PermissionHelper::can($user, 'leave.reject') && 
+                                    !in_array($leave->approvalRequest->status ?? '', [
+                                        \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_APPROVED,
+                                        \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_REJECTED,
+                                        \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_CANCELLED
+                                    ]),
                     'needs_pin' => $needsPin,
                     'is_reviewer_step' => $isReviewerStep && $hasReviewPermission,
                     'has_selected_approvers' => $hasSelectedApprovers,
@@ -642,7 +647,13 @@ class ApprovalCenterService
                     'created_at_formatted' => $this->formatDateWithTimezone($vehicle->created_at, 'd/m/Y H:i'),
                     'period' => $this->getVehiclePeriod($vehicle),
                     'can_approve' => $vehicle->canBeApproved() && $this->canUserApproveVehicle($vehicle, backpack_user()),
-                    'can_reject' => $vehicle->canBeRejected() && $this->canUserApproveVehicle($vehicle, backpack_user()),
+                    'can_reject' => PermissionHelper::can(backpack_user(), 'vehicle_registration.reject') && 
+                                    $vehicle->approvalRequest && 
+                                    !in_array($vehicle->approvalRequest->status ?? '', [
+                                        \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_APPROVED,
+                                        \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_REJECTED,
+                                        \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_CANCELLED
+                                    ]),
                 ];
             });
     }
@@ -704,7 +715,8 @@ class ApprovalCenterService
                     'created_at_formatted' => $this->formatDateWithTimezone($plan->created_at, 'd/m/Y H:i'),
                     'period' => $plan->ngay_vao_sua_chua ?? '-',
                     'can_approve' => $plan->canBeApproved() && $this->canUserApproveMaterialPlan($plan, backpack_user()),
-                    'can_reject' => $plan->canBeRejected() && $this->canUserApproveMaterialPlan($plan, backpack_user()),
+                    'can_reject' => PermissionHelper::can(backpack_user(), 'material_plan.reject') && 
+                                    !in_array($plan->workflow_status ?? '', ['approved', 'rejected', 'cancelled']),
                     'is_reviewer_step' => $plan->workflow_status === 'approved_by_department_head',
                     'has_selected_approvers' => !empty($plan->selected_approvers),
                 ];
@@ -1014,12 +1026,20 @@ class ApprovalCenterService
                 // ✅ Sửa: Dùng approvalRequest->canBeApprovedBy() để kiểm tra quyền
                 if ($approvalRequest) {
                     $canApprove = $approvalRequest->canBeApprovedBy($user);
+                    $canReject = PermissionHelper::can($user, 'leave.reject') && 
+                                 !in_array($approvalRequest->status, [
+                                     \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_APPROVED,
+                                     \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_REJECTED,
+                                     \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_CANCELLED
+                                 ]);
                 } else {
                     // Fallback nếu chưa có approvalRequest
                     if ($isReviewerStep && $hasReviewPermission) {
                         $canApprove = $model->canBeApproved();
+                        $canReject = PermissionHelper::can($user, 'leave.reject');
                     } else {
                         $canApprove = $model->canBeApproved() && $this->canUserApprove($model, $user);
+                        $canReject = PermissionHelper::can($user, 'leave.reject');
                     }
                 }
 
@@ -1038,7 +1058,7 @@ class ApprovalCenterService
                     'can_approve' => $canApprove,
                     // Flag to check if at reviewer step and can proceed (has selected approvers)
                     'can_approve_reviewer_step' => ($isReviewerStep && $hasReviewPermission) ? $hasSelectedApprovers : true,
-                    'can_reject' => $model->canBeRejected() && $this->canUserApprove($model, $user),
+                    'can_reject' => $canReject,
                     'needs_pin' => $needsPin,
                     'is_reviewer_step' => $isReviewerStep && $hasReviewPermission,
                     'is_reviewer_role' => $hasReviewPermission || $user->hasRole('Thẩm định'),
@@ -1076,7 +1096,13 @@ class ApprovalCenterService
                     'submitted_at' => $this->formatDateWithTimezone($model->created_at, 'd/m/Y, H:i'),
                     'details' => $this->getVehicleDetails($model),
                     'can_approve' => $model->canBeApproved() && $this->canUserApproveVehicle($model, $user),
-                    'can_reject' => $model->canBeRejected() && $this->canUserApproveVehicle($model, $user),
+                    'can_reject' => PermissionHelper::can($user, 'vehicle_registration.reject') && 
+                                    $approvalRequest && 
+                                    !in_array($approvalRequest->status, [
+                                        \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_APPROVED,
+                                        \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_REJECTED,
+                                        \Modules\ApprovalWorkflow\Models\ApprovalRequest::STATUS_CANCELLED
+                                    ]),
                     'is_department_head_step' => $isDepartmentHeadStep,
                     'has_selected_approvers' => !empty($model->selected_approvers),
                     'workflow_data' => $this->getVehicleWorkflowProgressData($model),
@@ -1105,7 +1131,8 @@ class ApprovalCenterService
                     'submitted_at' => $this->formatDateWithTimezone($model->created_at, 'd/m/Y H:i'),
                     'details' => $this->getMaterialPlanDetails($model),
                     'can_approve' => $model->canBeApproved() && $this->canUserApproveMaterialPlan($model, $user),
-                    'can_reject' => $model->canBeRejected() && $this->canUserApproveMaterialPlan($model, $user),
+                    'can_reject' => PermissionHelper::can($user, 'material_plan.reject') && 
+                                    !in_array($model->workflow_status ?? '', ['approved', 'rejected', 'cancelled']),
                     'is_reviewer_step' => $model->workflow_status === 'approved_by_department_head',
                     'has_selected_approvers' => $hasSelectedApprovers,
                     'selected_approvers' => $model->selected_approvers ? (is_array($model->selected_approvers) ? $model->selected_approvers : json_decode($model->selected_approvers, true)) : [],
